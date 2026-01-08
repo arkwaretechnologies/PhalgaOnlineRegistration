@@ -26,9 +26,9 @@ npm install
 2. Create a `.env.local` file in the root directory with your database credentials:
 ```
 DB_HOST=localhost
-DB_NAME=PHALGA
-DB_USER=fulzjdjlrc8c
-DB_PASSWORD=Masterkey2024@ph
+DB_NAME="your database'
+DB_USER="your username"
+DB_PASSWORD= "your-password"
 ```
 
 3. Run the development server:

@@ -581,7 +581,7 @@ export default function RegistrationForm() {
             <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6">
                 <h2 className="text-2xl font-bold text-gray-900 mb-4">Confirm Registration Details</h2>
-                <p className="text-gray-700 mb-6">Please review all details below. Click "Confirm and Submit" if everything is correct.</p>
+                <p className="text-gray-700 mb-6">Please review all details below. Click &quot;Confirm and Submit&quot; if everything is correct.</p>
                 
                 {/* Header Details */}
                 <div className="mb-6">
@@ -722,7 +722,7 @@ export default function RegistrationForm() {
               </tbody>
             </table>
             
-            <p><strong>C.</strong> The duly-accomplished Registration Form "IN EXCEL FORMAT" AND THE scanned/photographed Validated Bank Deposit Slip shall be emailed directly at <a href="mailto:visgeo@phalga.org" className="text-blue-600 hover:underline">visgeo@phalga.org</a>.</p>
+            <p><strong>C.</strong> The duly-accomplished Registration Form &quot;IN EXCEL FORMAT&quot; AND THE scanned/photographed Validated Bank Deposit Slip shall be emailed directly at <a href="mailto:visgeo@phalga.org" className="text-blue-600 hover:underline">visgeo@phalga.org</a>.</p>
             
             <p>
               An e-mail reply-confirmation would be received for successful registration. Print a copy of the confirmation and attach the validated deposit slip for reference during the conference.

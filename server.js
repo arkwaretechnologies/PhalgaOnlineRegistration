@@ -2,9 +2,11 @@ const { createServer } = require('http');
 const { parse } = require('url');
 const next = require('next');
 
+// Determine if we're in development mode
 const dev = process.env.NODE_ENV !== 'production';
 // Bind to 0.0.0.0 for Railway (accepts connections from any network interface)
-// Use localhost only for local development when PORT is not set by Railway
+// Railway provides PORT environment variable, so bind to 0.0.0.0 when PORT is set
+// Use localhost only for local development when PORT is not set
 const hostname = process.env.HOSTNAME || (process.env.PORT ? '0.0.0.0' : 'localhost');
 const port = parseInt(process.env.PORT || '3000', 10);
 
@@ -13,7 +15,8 @@ if (!port) {
   process.exit(1);
 }
 
-const app = next({ dev, hostname, port });
+// Initialize Next.js app (only dev option needed for custom server)
+const app = next({ dev });
 const handle = app.getRequestHandler();
 
 app.prepare().then(() => {

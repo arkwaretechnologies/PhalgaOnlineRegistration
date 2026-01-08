@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface Participant {
   id: number;
@@ -40,6 +41,7 @@ const PROVINCES = [
 const TSHIRT_SIZES = ['S', 'M', 'L', 'XL', 'XXL'];
 
 export default function RegistrationForm() {
+  const router = useRouter();
   const [province, setProvince] = useState('');
   const [lgu, setLgu] = useState('');
   const [contactPerson, setContactPerson] = useState('');
@@ -228,29 +230,9 @@ export default function RegistrationForm() {
 
       const data = await response.json();
 
-      if (response.ok) {
-        setSubmitMessage({ type: 'success', text: data.message });
-        // Reset form
-        setProvince('');
-        setLgu('');
-        setContactPerson('');
-        setContactNo('');
-        setEmailAddress('');
-        setParticipants([{
-          id: 1,
-          lastName: '',
-          firstName: '',
-          middleInit: '',
-          position: '',
-          lgu: '',
-          barangay: '',
-          tshirt: '',
-          contactNo: '',
-          prcNo: '',
-          expiryDate: '',
-          email: ''
-        }]);
-        setPendingFormData(null);
+      if (response.ok && data.transId) {
+        // Redirect to landing page with transaction ID
+        router.push(`/?success=true&transId=${encodeURIComponent(data.transId)}`);
       } else {
         setSubmitMessage({ type: 'error', text: data.error || 'Registration failed' });
       }

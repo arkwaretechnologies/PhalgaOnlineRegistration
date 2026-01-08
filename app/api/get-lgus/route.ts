@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getDbConnection } from '@/lib/db';
+import { supabase } from '@/lib/db';
 
 export async function GET(request: Request) {
   try {
@@ -13,30 +13,45 @@ export async function GET(request: Request) {
       );
     }
 
-    const db = getDbConnection();
-    
     // Get PSGC for the province
-    const [psgcRows] = await db.execute(
-      "SELECT PSGC FROM LGUS WHERE LGUNAME = ?",
-      [province]
-    );
+    const { data: psgcData, error: psgcError } = await supabase
+      .from('lgus')
+      .select('psgc')
+      .eq('lguname', province)
+      .limit(1);
 
-    if (!Array.isArray(psgcRows) || psgcRows.length === 0) {
+    if (psgcError) {
+      console.error('Database error:', psgcError);
+      return NextResponse.json(
+        { error: 'Failed to fetch LGUs' },
+        { status: 500 }
+      );
+    }
+
+    if (!psgcData || psgcData.length === 0) {
       return NextResponse.json([]);
     }
 
-    const psgc = (psgcRows[0] as { PSGC: string }).PSGC;
+    const psgc = psgcData[0].psgc;
     const subgeo = psgc.substring(0, 5) + '%';
 
     // Get LGUs in the province
-    const [lguRows] = await db.execute(
-      "SELECT LGUNAME FROM LGUS WHERE PSGC LIKE ? AND (GEOLEVEL = 'MUN' OR GEOLEVEL = 'CITY') ORDER BY LGUNAME",
-      [subgeo]
-    );
+    const { data: lguData, error: lguError } = await supabase
+      .from('lgus')
+      .select('lguname')
+      .like('psgc', subgeo)
+      .in('geolevel', ['MUN', 'CITY'])
+      .order('lguname', { ascending: true });
 
-    const data = Array.isArray(lguRows)
-      ? lguRows.map((row: any) => row.LGUNAME)
-      : [];
+    if (lguError) {
+      console.error('Database error:', lguError);
+      return NextResponse.json(
+        { error: 'Failed to fetch LGUs' },
+        { status: 500 }
+      );
+    }
+
+    const data = lguData?.map((row) => row.lguname) || [];
 
     return NextResponse.json(data);
   } catch (error) {

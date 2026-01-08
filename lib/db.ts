@@ -1,31 +1,18 @@
-import mysql from 'mysql2/promise';
+import { createClient } from '@supabase/supabase-js';
 
-let pool: mysql.Pool | null = null;
+const supabaseUrl = process.env.SUPABASE_URL || 'https://voitsxjrfqylbeebdaqq.supabase.co';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'sb_publishable_DLnf9Uad5xi5fDwzqUwpRA_xRe6Xwhb';
 
-export function getDbConnection(): mysql.Pool {
-  if (!pool) {
-    const dbHost = process.env.DB_HOST;
-    const dbName = process.env.DB_NAME;
-    const dbUser = process.env.DB_USER;
-    const dbPassword = process.env.DB_PASSWORD;
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error(
+    'Missing required Supabase environment variables: SUPABASE_URL, SUPABASE_ANON_KEY'
+  );
+}
 
-    if (!dbHost || !dbName || !dbUser || !dbPassword) {
-      throw new Error(
-        'Missing required database environment variables: DB_HOST, DB_NAME, DB_USER, DB_PASSWORD'
-      );
-    }
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-    pool = mysql.createPool({
-      host: dbHost,
-      database: dbName,
-      user: dbUser,
-      password: dbPassword,
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-      charset: 'utf8mb4',
-    });
-  }
-  return pool;
+// Legacy function name for backward compatibility during migration
+export function getDbConnection() {
+  return supabase;
 }
 

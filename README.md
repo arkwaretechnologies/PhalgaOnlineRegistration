@@ -7,14 +7,14 @@ A Next.js-based online registration system for the 17th Mindanao Geographic Conf
 - Dynamic registration form with participant management
 - Province and LGU selection with auto-population
 - Real-time registration status checking
-- MySQL database integration
+- Supabase (PostgreSQL) database integration
 - Responsive design with Tailwind CSS
 
 ## Prerequisites
 
 - Node.js 18+ and npm
-- MySQL database access (cPanel)
-- Database credentials
+- Supabase account and project
+- Supabase project URL and anon key
 
 ## Installation
 
@@ -23,13 +23,13 @@ A Next.js-based online registration system for the 17th Mindanao Geographic Conf
 npm install
 ```
 
-2. Create a `.env.local` file in the root directory with your database credentials:
+2. Create a `.env.local` file in the root directory with your Supabase credentials:
 ```
-DB_HOST=localhost
-DB_NAME=PHALGA
-DB_USER=fulzjdjlrc8c
-DB_PASSWORD=Masterkey2024@ph
+SUPABASE_URL=https://voitsxjrfqylbeebdaqq.supabase.co
+SUPABASE_ANON_KEY=sb_publishable_DLnf9Uad5xi5fDwzqUwpRA_xRe6Xwhb
 ```
+
+**Note:** The default values are already configured in `lib/db.ts`, but it's recommended to use environment variables for production.
 
 3. Run the development server:
 ```bash
@@ -40,10 +40,11 @@ npm run dev
 
 ## Database Schema
 
-The application uses the following MySQL tables:
+The application uses Supabase (PostgreSQL) with the following tables:
 
 ### REGH (Registration Header)
-- REGNUM (Primary Key, Auto Increment)
+- REGNUM (Primary Key, SERIAL - Auto Increment)
+- TRANSID (Unique 6-character identifier)
 - CONFCODE
 - PROVINCE
 - LGU
@@ -75,23 +76,25 @@ The application uses the following MySQL tables:
 
 ## Setting Up the Database
 
-### Option 1: Import the Full Database (Recommended)
-If you have the `PHALGA.sql` file with all the data:
+### Step 1: Run Migration in Supabase
 
-```bash
-mysql -u root -p < PHALGA.sql
-```
+1. Go to your Supabase project dashboard
+2. Navigate to SQL Editor
+3. Run the migration file: `supabase/migrations/20260109000000_create_tables.sql`
 
-This will create the database with all tables and data including the complete LGUS list.
+This will create all tables with proper indexes and Row Level Security policies.
 
-### Option 2: Create Empty Database
-Use the `database-setup.sql` script to create the structure only:
+### Step 2: Import LGUS Data (Optional)
 
-```bash
-mysql -u root -p < database-setup.sql
-```
+If you have LGUS data from the original MySQL database, you can import it using:
 
-Note: You'll need to populate the LGUS table with data for the LGU dropdown to work.
+1. Supabase Dashboard → Table Editor → LGUS
+2. Use the import feature or run INSERT statements
+3. Or use the Supabase CLI: `supabase db push`
+
+### Step 3: Configure Row Level Security
+
+The migration includes basic RLS policies for public read/insert access. Adjust these policies in Supabase Dashboard → Authentication → Policies based on your security requirements.
 
 ## API Routes
 
@@ -108,8 +111,18 @@ npm start
 
 ## Notes
 
-- Registration closes when the participant count exceeds 20 (check) or 30 (submit)
+- Registration closes when the participant count exceeds 50
 - T-shirt sizes are limited to: S, M, L, XL, XXL
 - All text fields are automatically converted to uppercase
 - Date validation is performed on expiry dates
+- Each registration gets a unique TRANSID (6-character alphanumeric code)
+- The application uses Supabase for database operations (PostgreSQL)
+
+## Migration from MySQL
+
+This application has been migrated from MySQL to Supabase. The database schema has been converted to PostgreSQL syntax with:
+- SERIAL for auto-increment columns
+- VARCHAR instead of CHAR (with length constraints where needed)
+- Proper foreign key relationships
+- Row Level Security (RLS) policies
 

@@ -3,8 +3,15 @@ const { parse } = require('url');
 const next = require('next');
 
 const dev = process.env.NODE_ENV !== 'production';
-const hostname = process.env.HOSTNAME || 'localhost';
+// Bind to 0.0.0.0 for Railway (accepts connections from any network interface)
+// Use localhost only for local development when PORT is not set by Railway
+const hostname = process.env.HOSTNAME || (process.env.PORT ? '0.0.0.0' : 'localhost');
 const port = parseInt(process.env.PORT || '3000', 10);
+
+if (!port) {
+  console.error('PORT environment variable is required');
+  process.exit(1);
+}
 
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
@@ -20,7 +27,10 @@ app.prepare().then(() => {
       res.end('internal server error');
     }
   }).listen(port, hostname, (err) => {
-    if (err) throw err;
+    if (err) {
+      console.error('Failed to start server:', err);
+      process.exit(1);
+    }
     console.log(`> Ready on http://${hostname}:${port}`);
   });
 });

@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+body {
+  color: #171717;
+  background: #f9fafb;
+  font-family: Calibri, sans-serif;
+  font-size: 14px;
+}
+
+/* Ensure all inputs have visible text */
+input, textarea, select {
+  color: #111827 !important;
+  background-color: #ffffff;
+}
+
+input::placeholder {
+  color: #9ca3af !important;
+}
+
+/* Override dark mode for form elements */
+@media (prefers-color-scheme: dark) {
+  body {
+    color: #171717;
+    background: #f9fafb;
+  }
+  
+  input, textarea, select {
+    color: #111827 !important;
+    background-color: #ffffff !important;
+  }
+  
+  .bg-blue-50 {
+    background-color: #eff6ff !important;
+  }
+  
+  .bg-gray-50 {
+    background-color: #f9fafb !important;
+  }
+  
+  .bg-white {
+    background-color: #ffffff !important;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+

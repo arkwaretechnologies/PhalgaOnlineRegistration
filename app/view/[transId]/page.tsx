@@ -16,6 +16,7 @@ interface RegistrationHeader {
   regdate: string;
   status?: string;
   payment_proof_url?: string;
+  remarks?: string;
 }
 
 interface RegistrationDetail {
@@ -379,6 +380,18 @@ export default function ViewRegistration() {
               </div>
             </div>
           </div>
+
+          {/* Remarks Section */}
+          {header.remarks && (
+            <div className="col-span-1 md:col-span-2 mt-4 pt-4 border-t border-gray-200">
+              <span className="text-sm font-medium text-gray-500 block mb-2">
+                Remarks
+              </span>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <p className="text-gray-800 whitespace-pre-wrap">{header.remarks}</p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Participants */}

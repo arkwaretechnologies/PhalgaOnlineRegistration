@@ -39,9 +39,15 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 - `REGISTRATION_LIMIT` (optional): Maximum number of participants allowed before registration closes. Default: 3
 - `RESEND_API_KEY` (optional): Resend API key for sending confirmation emails. If not set, email functionality will be disabled.
 - `RESEND_FROM_EMAIL` (optional): Email address to send from. Default: `onboarding@resend.dev` (for testing)
-- `NEXT_PUBLIC_APP_URL` (optional): Base URL of your application for email links. Default: `http://localhost:3000`
+- `NEXT_PUBLIC_APP_URL` (required for production): Base URL of your application for email links and images. 
+  - **IMPORTANT:** Must be set in production (Railway) to your production domain (e.g., `https://registration.phalga.org`)
+  - Default: `http://localhost:3000` (only for local development)
+  - **Without this, email images will not load correctly!**
 
-**Note:** For production (Railway), set these environment variables in your Railway project settings.
+**Note:** For production (Railway), set these environment variables in your Railway project settings:
+1. Go to your Railway project → Variables
+2. Add `NEXT_PUBLIC_APP_URL` with your production URL (e.g., `https://registration.phalga.org`)
+3. Redeploy your application after adding the variable
 
 3. Run the development server:
 ```bash

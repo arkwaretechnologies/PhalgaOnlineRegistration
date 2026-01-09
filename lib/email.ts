@@ -70,7 +70,34 @@ export async function sendRegistrationConfirmation(
     };
 
     const formattedDate = formatDate(data.regdate);
-    const viewUrl = data.viewUrl || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/view/${data.transId}`;
+    
+    // Get base URL for images - must be absolute URL for email clients
+    // In Next.js, files in public folder are served from root
+    // Remove trailing slash if present to avoid double slashes
+    let baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').trim();
+    if (baseUrl.endsWith('/')) {
+      baseUrl = baseUrl.slice(0, -1);
+    }
+    
+    // Warn if using localhost in production (likely means NEXT_PUBLIC_APP_URL is not set)
+    if (baseUrl.includes('localhost') && process.env.NODE_ENV === 'production') {
+      console.error('⚠️ WARNING: NEXT_PUBLIC_APP_URL is not set or is using localhost in production!');
+      console.error('   Email images will not load correctly. Please set NEXT_PUBLIC_APP_URL in Railway to your production URL.');
+      console.error('   Example: NEXT_PUBLIC_APP_URL=https://registration.phalga.org');
+    }
+    
+    const leftImageUrl = `${baseUrl}/left.png`;
+    const rightImageUrl = `${baseUrl}/right.png`;
+    const viewUrl = data.viewUrl || `${baseUrl}/view/${data.transId}`;
+    
+    console.log('Email image URLs:', { 
+      leftImageUrl, 
+      rightImageUrl, 
+      baseUrl,
+      viewUrl,
+      nextPublicAppUrl: process.env.NEXT_PUBLIC_APP_URL,
+      nodeEnv: process.env.NODE_ENV
+    });
 
     // Create HTML email template
     const htmlContent = `
@@ -88,13 +115,41 @@ export async function sendRegistrationConfirmation(
         <table role="presentation" style="width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
           <!-- Header -->
           <tr>
-            <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: bold;">
-                17th Mindanao Geographic Conference
-              </h1>
-              <p style="margin: 10px 0 0 0; color: #ffffff; font-size: 16px;">
-                Registration Confirmation
-              </p>
+            <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0; position: relative;">
+              <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                <tr>
+                  <td style="width: 30%; vertical-align: middle; text-align: left; padding: 0 10px;">
+                    <!--[if mso]>
+                    <v:image src="${leftImageUrl}" style="width:120px;height:auto;" />
+                    <![endif]-->
+                    <img 
+                      src="${leftImageUrl}" 
+                      alt="PHALGA" 
+                      width="120"
+                      style="max-width: 120px; width: 120px; height: auto; display: block; border: 0; outline: none; text-decoration: none; -ms-interpolation-mode: bicubic;" 
+                    />
+                  </td>
+                  <td style="width: 40%; vertical-align: middle; text-align: center; padding: 0 10px;">
+                    <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: bold; line-height: 1.2;">
+                      17th Mindanao Geographic Conference
+                    </h1>
+                    <p style="margin: 10px 0 0 0; color: #ffffff; font-size: 16px;">
+                      Registration Confirmation
+                    </p>
+                  </td>
+                  <td style="width: 30%; vertical-align: middle; text-align: right; padding: 0 10px;">
+                    <!--[if mso]>
+                    <v:image src="${rightImageUrl}" style="width:120px;height:auto;" />
+                    <![endif]-->
+                    <img 
+                      src="${rightImageUrl}" 
+                      alt="PHALGA" 
+                      width="120"
+                      style="max-width: 120px; width: 120px; height: auto; display: block; margin-left: auto; border: 0; outline: none; text-decoration: none; -ms-interpolation-mode: bicubic;" 
+                    />
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
           

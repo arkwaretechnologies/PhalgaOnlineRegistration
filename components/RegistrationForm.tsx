@@ -560,6 +560,7 @@ export default function RegistrationForm() {
                         value={participant.lastName}
                         onChange={(e) => updateParticipant(participant.id, 'lastName', e.target.value.toUpperCase())}
                         className="w-full px-1 py-0.5 border-0 bg-transparent uppercase text-gray-900"
+                        required
                       />
                     </td>
                     <td className="border border-gray-300 p-1 bg-blue-50">
@@ -568,6 +569,7 @@ export default function RegistrationForm() {
                         value={participant.firstName}
                         onChange={(e) => updateParticipant(participant.id, 'firstName', e.target.value.toUpperCase())}
                         className="w-full px-1 py-0.5 border-0 bg-transparent uppercase text-gray-900"
+                        required
                       />
                     </td>
                     <td className="border border-gray-300 p-1 bg-blue-50 w-12">

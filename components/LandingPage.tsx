@@ -94,13 +94,13 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-3 sm:p-4">
+      <div className="bg-white rounded-lg shadow-xl p-4 sm:p-6 md:p-8 w-full max-w-md">
+        <div className="text-center mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
             PhALGA Online Registration
           </h1>
-          <p className="text-gray-600">
+          <p className="text-sm sm:text-base text-gray-600">
             18th Mindanao Geographic Conference
           </p>
         </div>
@@ -108,20 +108,21 @@ export default function LandingPage() {
         <div className="space-y-6">
           {/* Success Message */}
           {successMessage && (
-            <div className="bg-green-50 border-2 border-green-200 text-green-800 px-6 py-4 rounded-lg">
-              <div className="flex items-start">
-                <div className="flex-shrink-0">
+            <div className="bg-green-50 border-2 border-green-200 text-green-800 px-3 sm:px-4 md:px-6 py-3 sm:py-4 rounded-lg">
+              <div className="flex items-start gap-2 sm:gap-3">
+                <div className="flex-shrink-0 mt-0.5">
                   <svg className="h-5 w-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
                 </div>
-                <div className="ml-3 flex-1">
-                  <p className="text-sm font-semibold text-green-800">{successMessage}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-semibold text-green-800 break-words">{successMessage}</p>
                   <p className="mt-1 text-xs text-green-700">You can use this Transaction ID to view your registration details.</p>
                 </div>
                 <button
                   onClick={() => setSuccessMessage('')}
-                  className="ml-4 flex-shrink-0 text-green-600 hover:text-green-800"
+                  className="flex-shrink-0 text-green-600 hover:text-green-800 touch-target no-touch-target p-1"
+                  aria-label="Close message"
                 >
                   <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -133,10 +134,10 @@ export default function LandingPage() {
 
           {/* Transaction ID Lookup */}
           <div>
-            <h2 className="text-xl font-semibold text-gray-700 mb-4">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-700 mb-3 sm:mb-4">
               Lookup Registration
             </h2>
-            <form onSubmit={handleLookup} className="space-y-4">
+            <form onSubmit={handleLookup} className="space-y-3 sm:space-y-4">
               <div>
                 <label htmlFor="transId" className="block text-sm font-medium text-gray-700 mb-2">
                   Transaction ID
@@ -147,20 +148,20 @@ export default function LandingPage() {
                   value={transId}
                   onChange={(e) => setTransId(e.target.value.toUpperCase())}
                   placeholder="Enter Transaction ID"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  className="w-full px-3 sm:px-4 py-3 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-base sm:text-sm"
                   maxLength={6}
                   disabled={loading}
                 />
               </div>
               {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                <div className="bg-red-50 border border-red-200 text-red-700 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg text-xs sm:text-sm break-words">
                   {error}
                 </div>
               )}
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200"
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-3 sm:py-2.5 px-4 rounded-lg transition-colors duration-200 touch-target text-sm sm:text-base"
               >
                 {loading ? 'Looking up...' : 'Lookup Registration'}
               </button>
@@ -180,17 +181,17 @@ export default function LandingPage() {
           {/* New Registration Link */}
           <div>
             {checkingStatus ? (
-              <div className="block w-full bg-gray-400 text-white font-semibold py-3 px-4 rounded-lg text-center">
+              <div className="block w-full bg-gray-400 text-white font-semibold py-3 sm:py-3 px-4 rounded-lg text-center touch-target text-sm sm:text-base">
                 Checking availability...
               </div>
             ) : registrationStatus && !registrationStatus.isOpen ? (
-              <div className="space-y-2">
-                <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg text-sm text-center">
+              <div className="space-y-2 sm:space-y-3">
+                <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg text-xs sm:text-sm text-center break-words">
                   Thank you for your interest in joining the conference. We regret to inform you that all available slots are already filled.
                 </div>
                 <button
                   disabled
-                  className="block w-full bg-gray-400 text-white font-semibold py-3 px-4 rounded-lg text-center cursor-not-allowed"
+                  className="block w-full bg-gray-400 text-white font-semibold py-3 px-4 rounded-lg text-center cursor-not-allowed touch-target text-sm sm:text-base"
                 >
                   Add New Registration
                 </button>
@@ -198,7 +199,7 @@ export default function LandingPage() {
             ) : (
               <button
                 onClick={handleNewRegistration}
-                className="block w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg text-center transition-colors duration-200"
+                className="block w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg text-center transition-colors duration-200 touch-target text-sm sm:text-base"
               >
                 Add New Registration
               </button>
@@ -206,7 +207,7 @@ export default function LandingPage() {
           </div>
         </div>
 
-        <div className="mt-8 text-center text-sm text-gray-500">
+        <div className="mt-6 sm:mt-8 text-center text-xs sm:text-sm text-gray-500">
           <p>Need help? Contact the registration team.</p>
         </div>
       </div>

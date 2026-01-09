@@ -491,29 +491,29 @@ export default function RegistrationForm() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-[95%] mx-auto">
-        <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-lg p-8">
+    <div className="min-h-screen bg-gray-50 py-4 sm:py-6 md:py-8 px-3 sm:px-4">
+      <div className="max-w-[100%] sm:max-w-[95%] mx-auto">
+        <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-lg p-4 sm:p-6 md:p-8">
           {/* Header with Logos */}
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex-shrink-0">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-2 mb-6 sm:mb-8">
+            <div className="flex-shrink-0 hidden sm:block">
               <img
                 src="/left.png"
                 alt="PHALGA Logo Left"
-                className="h-24 w-auto object-contain"
+                className="h-16 sm:h-20 md:h-24 w-auto object-contain"
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = 'none';
                 }}
               />
             </div>
-            <div className="flex-1 text-center">
-              <h1 className="text-3xl font-bold text-gray-900">PhALGA Registration Form</h1>
+            <div className="flex-1 text-center order-2 sm:order-1">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">PhALGA Registration Form</h1>
             </div>
-            <div className="flex-shrink-0">
+            <div className="flex-shrink-0 hidden sm:block order-1 sm:order-2">
               <img
                 src="/right.png"
                 alt="PHALGA Logo Right"
-                className="h-24 w-auto object-contain"
+                className="h-16 sm:h-20 md:h-24 w-auto object-contain"
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = 'none';
                 }}
@@ -521,8 +521,86 @@ export default function RegistrationForm() {
             </div>
           </div>
 
-          {/* Header Section */}
-          <table className="w-full border-collapse border border-gray-300 mb-6">
+          {/* Header Section - Mobile Card Layout, Desktop Table Layout */}
+          <div className="block sm:hidden mb-6 space-y-3">
+            {/* Mobile Card Layout */}
+            <div className="border border-gray-300 rounded-lg p-3 bg-gray-50">
+              <div className="font-semibold text-sm text-gray-900 mb-1">CONFERENCE</div>
+              <div className="text-sm text-gray-900">18TH MINDANAO GEOGRAPHIC CONFERENCE</div>
+            </div>
+            <div className="border border-gray-300 rounded-lg p-3 bg-blue-50">
+              <label className="block font-semibold text-sm text-gray-900 mb-2">PROVINCE *</label>
+              <input
+                type="text"
+                list="provinces-list-mobile"
+                value={province}
+                onChange={(e) => setProvince(e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
+                required
+              />
+              <datalist id="provinces-list-mobile">
+                {PROVINCES.map(p => <option key={p} value={p} />)}
+              </datalist>
+            </div>
+            <div className="border border-gray-300 rounded-lg p-3 bg-blue-50">
+              <label className="block font-semibold text-sm text-gray-900 mb-2">LGU *</label>
+              <input
+                type="text"
+                list="lgu-list-mobile"
+                value={lgu}
+                onChange={(e) => setLgu(e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
+                required
+              />
+              <datalist id="lgu-list-mobile">
+                {lguOptions.map(l => <option key={l} value={l} />)}
+              </datalist>
+            </div>
+            <div className="border border-gray-300 rounded-lg p-3 bg-blue-50">
+              <label className="block font-semibold text-sm text-gray-900 mb-2">CONTACT PERSON *</label>
+              <input
+                type="text"
+                value={contactPerson}
+                onChange={(e) => setContactPerson(e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
+                required
+              />
+            </div>
+            <div className="border border-gray-300 rounded-lg p-3 bg-blue-50">
+              <label className="block font-semibold text-sm text-gray-900 mb-2">CONTACT NO. *</label>
+              <input
+                type="text"
+                value={contactNo}
+                onChange={(e) => setContactNo(formatContactNumber(e.target.value))}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded text-gray-900 bg-white text-base"
+                required
+                maxLength={11}
+                pattern="[0-9]{11}"
+                title="Contact number must be exactly 11 digits"
+              />
+              {contactNo && contactNo.length !== 11 && (
+                <p className="text-xs text-red-600 mt-1">Contact number must be exactly 11 digits</p>
+              )}
+            </div>
+            <div className="border border-gray-300 rounded-lg p-3 bg-blue-50">
+              <label className="block font-semibold text-sm text-gray-900 mb-2">EMAIL ADDRESS *</label>
+              <input
+                type="email"
+                value={emailAddress}
+                onChange={(e) => setEmailAddress(e.target.value)}
+                className={`w-full px-3 py-2.5 border border-gray-300 rounded text-gray-900 bg-white text-base ${
+                  emailAddress && !validateEmail(emailAddress) ? 'border-red-500' : ''
+                }`}
+                required
+              />
+              {emailAddress && !validateEmail(emailAddress) && (
+                <p className="text-xs text-red-600 mt-1">Please enter a valid email address</p>
+              )}
+            </div>
+          </div>
+
+          {/* Desktop Table Layout */}
+          <table className="hidden sm:table w-full border-collapse border border-gray-300 mb-6">
             <tbody>
               <tr>
                 <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">CONFERENCE</td>
@@ -610,12 +688,185 @@ export default function RegistrationForm() {
             </tbody>
           </table>
 
-          <p className="mb-4 text-sm text-gray-600">
+          <p className="mb-4 text-xs sm:text-sm text-gray-600">
             <strong>NOTE:</strong> T-shirt size is limited to S, M, L, XL, XXL
           </p>
 
-          {/* Participants Table */}
-          <div className="overflow-x-auto mb-6">
+          {/* Participants Section - Mobile Card Layout */}
+          <div className="block md:hidden mb-6">
+            <div className="bg-gray-200 border border-gray-300 rounded-t-lg p-3 text-center mb-2">
+              <span className="text-base font-bold text-gray-900">LIST OF PARTICIPANTS</span>
+              <span className="block text-sm font-normal text-gray-700 mt-1">
+                (Total: {participants.length} {participants.length === 1 ? 'participant' : 'participants'})
+              </span>
+            </div>
+            <div className="space-y-4">
+              {participants.map((participant, index) => (
+                <div key={participant.id} className="border border-gray-300 rounded-lg p-4 bg-blue-50 space-y-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-bold text-sm text-gray-900">Participant #{index + 1}</span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => deleteParticipant(participant.id)}
+                        className="px-3 py-1.5 bg-red-500 text-white text-xs rounded hover:bg-red-600 touch-target"
+                        disabled={participants.length === 1}
+                      >
+                        Delete
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => insertParticipant(participant.id)}
+                        className="px-3 py-1.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 touch-target"
+                      >
+                        Insert
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Last Name *</label>
+                      <input
+                        type="text"
+                        value={participant.lastName}
+                        onChange={(e) => updateParticipant(participant.id, 'lastName', e.target.value.toUpperCase())}
+                        className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
+                        required
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">First Name *</label>
+                        <input
+                          type="text"
+                          value={participant.firstName}
+                          onChange={(e) => updateParticipant(participant.id, 'firstName', e.target.value.toUpperCase())}
+                          className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">M.I.</label>
+                        <input
+                          type="text"
+                          value={participant.middleInit}
+                          onChange={(e) => updateParticipant(participant.id, 'middleInit', e.target.value.toUpperCase())}
+                          className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
+                          maxLength={1}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Position</label>
+                      <input
+                        type="text"
+                        value={participant.position}
+                        onChange={(e) => updateParticipant(participant.id, 'position', e.target.value.toUpperCase())}
+                        className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">LGU</label>
+                        <input
+                          type="text"
+                          value={participant.lgu || lgu}
+                          onChange={(e) => {
+                            const newValue = e.target.value.toUpperCase();
+                            updateParticipant(participant.id, 'lgu', newValue === lgu ? '' : newValue);
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
+                          placeholder={lgu || 'Enter LGU'}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">Barangay</label>
+                        <input
+                          type="text"
+                          value={participant.barangay}
+                          onChange={(e) => updateParticipant(participant.id, 'barangay', e.target.value.toUpperCase())}
+                          className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">T-Shirt Size</label>
+                      <select
+                        value={participant.tshirt}
+                        onChange={(e) => updateParticipant(participant.id, 'tshirt', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
+                      >
+                        <option value="">Select Size</option>
+                        {TSHIRT_SIZES.map(size => (
+                          <option key={size} value={size}>{size}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Contact No.</label>
+                      <input
+                        type="text"
+                        value={participant.contactNo}
+                        onChange={(e) => updateParticipant(participant.id, 'contactNo', formatContactNumber(e.target.value))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900 bg-white text-base"
+                        maxLength={11}
+                        pattern="[0-9]{11}"
+                        title="Contact number must be exactly 11 digits"
+                      />
+                      {participant.contactNo && participant.contactNo.length !== 11 && (
+                        <p className="text-xs text-red-600 mt-1">Must be 11 digits</p>
+                      )}
+                    </div>
+                    
+                    {/* FOR CPAs ONLY Section */}
+                    <div className="bg-blue-200 border border-blue-300 rounded p-3 mt-2">
+                      <div className="text-xs font-bold text-gray-900 mb-2 text-center">FOR CPAs ONLY</div>
+                      <div className="grid grid-cols-1 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 mb-1">PRC No.</label>
+                          <input
+                            type="text"
+                            value={participant.prcNo}
+                            onChange={(e) => updateParticipant(participant.id, 'prcNo', formatPRCNumber(e.target.value))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900 bg-white text-base"
+                            pattern="[0-9]*"
+                            title="PRC number must contain only numbers"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 mb-1">Expiry Date</label>
+                          <input
+                            type="date"
+                            value={participant.expiryDate}
+                            onChange={(e) => updateParticipant(participant.id, 'expiryDate', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900 bg-white text-base"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 mb-1">Email Address</label>
+                          <input
+                            type="email"
+                            value={participant.email}
+                            onChange={(e) => updateParticipant(participant.id, 'email', e.target.value)}
+                            className={`w-full px-3 py-2 border border-gray-300 rounded text-gray-900 bg-white text-base ${
+                              participant.email && !validateEmail(participant.email) ? 'border-red-500' : ''
+                            }`}
+                          />
+                          {participant.email && !validateEmail(participant.email) && (
+                            <p className="text-xs text-red-600 mt-1">Invalid email</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Participants Table - Desktop Layout */}
+          <div className="hidden md:block overflow-x-auto mb-6">
             <table className="w-full border-collapse border border-gray-300">
               <thead>
                 <tr>
@@ -651,39 +902,39 @@ export default function RegistrationForm() {
               <tbody>
                 {participants.map((participant) => (
                   <tr key={participant.id}>
-                    <td className="border border-gray-300 p-1 bg-blue-50">
+                    <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50">
                       <input
                         type="text"
                         value={participant.lastName}
                         onChange={(e) => updateParticipant(participant.id, 'lastName', e.target.value.toUpperCase())}
-                        className="w-full px-1 py-0.5 border-0 bg-transparent uppercase text-gray-900"
+                        className="w-full px-2 py-1.5 md:py-1 border-0 bg-transparent uppercase text-gray-900 text-sm"
                         required
                       />
                     </td>
-                    <td className="border border-gray-300 p-1 bg-blue-50">
+                    <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50">
                       <input
                         type="text"
                         value={participant.firstName}
                         onChange={(e) => updateParticipant(participant.id, 'firstName', e.target.value.toUpperCase())}
-                        className="w-full px-1 py-0.5 border-0 bg-transparent uppercase text-gray-900"
+                        className="w-full px-2 py-1.5 md:py-1 border-0 bg-transparent uppercase text-gray-900 text-sm"
                         required
                       />
                     </td>
-                    <td className="border border-gray-300 p-1 bg-blue-50 w-12">
+                    <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 w-12">
                       <input
                         type="text"
                         value={participant.middleInit}
                         onChange={(e) => updateParticipant(participant.id, 'middleInit', e.target.value.toUpperCase())}
-                        className="w-full px-1 py-0.5 border-0 bg-transparent uppercase text-gray-900"
+                        className="w-full px-2 py-1.5 md:py-1 border-0 bg-transparent uppercase text-gray-900 text-sm"
                         maxLength={1}
                       />
                     </td>
-                    <td className="border border-gray-300 p-1 bg-blue-50 w-48">
+                    <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 w-48">
                       <input
                         type="text"
                         value={participant.position}
                         onChange={(e) => updateParticipant(participant.id, 'position', e.target.value.toUpperCase())}
-                        className="w-full px-1 py-0.5 border-0 bg-transparent uppercase text-gray-900"
+                        className="w-full px-2 py-1.5 md:py-1 border-0 bg-transparent uppercase text-gray-900 text-sm"
                       />
                     </td>
                     <td className="border border-gray-300 p-1 bg-blue-50">
@@ -789,10 +1040,10 @@ export default function RegistrationForm() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-4 items-center relative">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center relative mt-6">
             <Link
               href="/"
-              className="text-blue-600 hover:text-blue-700 transition-colors flex items-center gap-1 font-medium"
+              className="order-3 sm:order-1 text-blue-600 hover:text-blue-700 transition-colors flex items-center justify-center sm:justify-start gap-1 font-medium py-2 px-4 touch-target text-sm sm:text-base"
               title="Back to Home"
             >
               <svg
@@ -811,18 +1062,18 @@ export default function RegistrationForm() {
               </svg>
               <span>Back</span>
             </Link>
-            <div className="flex gap-4 justify-center flex-1">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center flex-1 order-1 sm:order-2">
               <button
                 type="button"
                 onClick={addParticipant}
-                className="px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                className="w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors touch-target text-sm sm:text-base font-semibold"
               >
                 Add New Row
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400"
+                className="w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-400 transition-colors touch-target text-sm sm:text-base font-semibold"
               >
                 {isSubmitting ? 'Submitting...' : 'Submit'}
               </button>
@@ -872,16 +1123,44 @@ export default function RegistrationForm() {
 
         {/* Confirmation Modal */}
         {showConfirmation && pendingFormData && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-6">
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">Confirm Registration Details</h2>
-                <p className="text-gray-700 mb-6">Please review all details below. Click &quot;Confirm and Submit&quot; if everything is correct.</p>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-[95vw] sm:max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+              <div className="p-3 sm:p-4 md:p-6">
+                <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">Confirm Registration Details</h2>
+                <p className="text-sm sm:text-base text-gray-700 mb-4 sm:mb-6">Please review all details below. Click &quot;Confirm and Submit&quot; if everything is correct.</p>
                 
                 {/* Header Details */}
-                <div className="mb-6">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-3">Header Information</h3>
-                  <table className="w-full border-collapse border border-gray-300">
+                <div className="mb-4 sm:mb-6">
+                  <h3 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900 mb-2 sm:mb-3">Header Information</h3>
+                  {/* Mobile Card Layout */}
+                  <div className="block sm:hidden space-y-2">
+                    <div className="border border-gray-300 rounded p-2 bg-gray-100">
+                      <div className="text-xs font-semibold text-gray-900 mb-1">Conference</div>
+                      <div className="text-xs text-gray-900">18TH MINDANAO GEOGRAPHIC CONFERENCE</div>
+                    </div>
+                    <div className="border border-gray-300 rounded p-2">
+                      <div className="text-xs font-semibold text-gray-900 mb-1">Province</div>
+                      <div className="text-xs text-gray-900">{pendingFormData.PROVINCE || 'Not provided'}</div>
+                    </div>
+                    <div className="border border-gray-300 rounded p-2">
+                      <div className="text-xs font-semibold text-gray-900 mb-1">LGU</div>
+                      <div className="text-xs text-gray-900">{pendingFormData.LGU || 'Not provided'}</div>
+                    </div>
+                    <div className="border border-gray-300 rounded p-2">
+                      <div className="text-xs font-semibold text-gray-900 mb-1">Contact Person</div>
+                      <div className="text-xs text-gray-900">{pendingFormData.CONTACTPERSON || 'Not provided'}</div>
+                    </div>
+                    <div className="border border-gray-300 rounded p-2">
+                      <div className="text-xs font-semibold text-gray-900 mb-1">Contact Number</div>
+                      <div className="text-xs text-gray-900">{pendingFormData.CONTACTNUMBER || 'Not provided'}</div>
+                    </div>
+                    <div className="border border-gray-300 rounded p-2">
+                      <div className="text-xs font-semibold text-gray-900 mb-1">Email Address</div>
+                      <div className="text-xs text-gray-900 break-words">{pendingFormData.EMAILADDRESS || 'Not provided'}</div>
+                    </div>
+                  </div>
+                  {/* Desktop Table Layout */}
+                  <table className="hidden sm:table w-full border-collapse border border-gray-300">
                     <tbody>
                       <tr>
                         <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900 w-1/3">Conference</td>
@@ -912,10 +1191,42 @@ export default function RegistrationForm() {
                 </div>
 
                 {/* Participants Details */}
-                <div className="mb-6">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-3">Participants ({pendingFormData.DETAILCOUNT})</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse border border-gray-300 text-sm">
+                <div className="mb-4 sm:mb-6">
+                  <h3 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900 mb-2 sm:mb-3">Participants ({pendingFormData.DETAILCOUNT})</h3>
+                  {/* Mobile Card Layout */}
+                  <div className="block md:hidden space-y-3">
+                    {Array.from({ length: parseInt(pendingFormData.DETAILCOUNT) }).map((_, index) => {
+                      const formatDate = (dateStr: string) => {
+                        if (!dateStr) return '';
+                        const date = new Date(dateStr);
+                        return isNaN(date.getTime()) ? dateStr : date.toLocaleDateString('en-US');
+                      };
+                      return (
+                        <div key={index} className="border border-gray-300 rounded-lg p-3 bg-gray-50">
+                          <div className="font-bold text-xs text-gray-900 mb-2">Participant #{index + 1}</div>
+                          <div className="space-y-1.5 text-xs">
+                            <div><span className="font-semibold text-gray-700">Name:</span> <span className="text-gray-900">{pendingFormData[`LASTNAME|${index}`] || '-'}, {pendingFormData[`FIRSTNAME|${index}`] || '-'} {pendingFormData[`MI|${index}`] || ''}</span></div>
+                            <div><span className="font-semibold text-gray-700">Position:</span> <span className="text-gray-900">{pendingFormData[`DESIGNATION|${index}`] || '-'}</span></div>
+                            <div><span className="font-semibold text-gray-700">LGU:</span> <span className="text-gray-900">{pendingFormData[`LGU|${index}`] || '-'}</span></div>
+                            <div><span className="font-semibold text-gray-700">Barangay:</span> <span className="text-gray-900">{pendingFormData[`BRGY|${index}`] || '-'}</span></div>
+                            <div><span className="font-semibold text-gray-700">T-Shirt:</span> <span className="text-gray-900">{pendingFormData[`TSHIRTSIZE|${index}`] || '-'}</span></div>
+                            <div><span className="font-semibold text-gray-700">Contact:</span> <span className="text-gray-900">{pendingFormData[`CONTACTNUMBER|${index}`] || '-'}</span></div>
+                            {(pendingFormData[`PRCNUM|${index}`] || pendingFormData[`EXPIRYDATE|${index}`] || pendingFormData[`EMAIL|${index}`]) && (
+                              <div className="mt-2 pt-2 border-t border-gray-300">
+                                <div className="text-xs font-bold text-gray-900 mb-1">FOR CPAs ONLY</div>
+                                {pendingFormData[`PRCNUM|${index}`] && <div><span className="font-semibold text-gray-700">PRC No:</span> <span className="text-gray-900">{pendingFormData[`PRCNUM|${index}`]}</span></div>}
+                                {pendingFormData[`EXPIRYDATE|${index}`] && <div><span className="font-semibold text-gray-700">Expiry:</span> <span className="text-gray-900">{formatDate(pendingFormData[`EXPIRYDATE|${index}`])}</span></div>}
+                                {pendingFormData[`EMAIL|${index}`] && <div><span className="font-semibold text-gray-700">Email:</span> <span className="text-gray-900 break-words">{pendingFormData[`EMAIL|${index}`]}</span></div>}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {/* Desktop/Tablet Table Layout with horizontal scroll */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full border-collapse border border-gray-300 text-sm min-w-[800px]">
                       <thead>
                         <tr>
                           <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">#</th>
@@ -962,11 +1273,11 @@ export default function RegistrationForm() {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex gap-4 justify-end mt-6">
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-end mt-4 sm:mt-6">
                   <button
                     type="button"
                     onClick={handleCancelSubmit}
-                    className="px-6 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+                    className="w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors touch-target text-sm sm:text-base font-semibold"
                     disabled={isSubmitting}
                   >
                     Cancel
@@ -974,7 +1285,7 @@ export default function RegistrationForm() {
                   <button
                     type="button"
                     onClick={handleConfirmSubmit}
-                    className="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400"
+                    className="w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-400 transition-colors touch-target text-sm sm:text-base font-semibold"
                     disabled={isSubmitting}
                   >
                     {isSubmitting ? 'Submitting...' : 'Confirm and Submit'}

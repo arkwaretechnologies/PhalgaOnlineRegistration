@@ -2,45 +2,83 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
 import { isRegistrationOpen, getRegistrationLimit } from '@/lib/config';
 
+// Disable caching for this route to ensure fresh data
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET() {
   try {
-    // Primary method: Fetch data and count manually
-    // This method works reliably with RLS policies
-    const { data, error } = await supabase
-      .from('regd')
-      .select('regnum, linenum');
+    // Use direct SELECT query matching the SQL:
+    // SELECT COUNT(*) FROM "regd" d LEFT JOIN "regh" h ON d."regnum" = h."regnum"
+    // WHERE h."status" IS NULL OR UPPER(TRIM(h."status")) = 'PENDING' OR UPPER(TRIM(h."status")) = 'APPROVED'
     
-    if (error) {
-      console.error('Database error checking registration count:', error);
-      console.error('Error details:', JSON.stringify(error, null, 2));
-      
+    // Step 1: Get all regd records with their regh data
+    const { data: regdData, error: regdError } = await supabase
+      .from('regd')
+      .select(`
+        regnum,
+        regh!left(regnum, status)
+      `);
+    
+    console.log('=== Direct Query Result ===');
+    console.log('regdData length:', regdData?.length || 0);
+    console.log('regdError:', regdError);
+    
+    if (regdError) {
+      console.error('Database error with direct query:', regdError);
       return NextResponse.json(
         { 
           error: 'Failed to check registration status', 
-          details: error.message
+          details: regdError.message
         },
         { status: 500 }
       );
     }
     
-    // Count total rows (participants)
-    const registrationCount = data?.length || 0;
+    // Step 2: Filter records where status is NULL, PENDING, or APPROVED (case-insensitive)
+    const validRecords = (regdData || []).filter((record: any) => {
+      const regh = Array.isArray(record.regh) ? record.regh[0] : record.regh;
+      if (!regh) {
+        // If no regh record, include it (matches LEFT JOIN behavior with NULL status)
+        return true;
+      }
+      const status = (regh.status || '').toString().toUpperCase().trim();
+      return !status || status === 'PENDING' || status === 'APPROVED';
+    });
     
-    // Check if registration is open based on configured limit
+    const registrationCount = validRecords.length;
+    
+    console.log('=== Registration Count Check ===');
+    console.log(`Total regd records: ${regdData?.length || 0}`);
+    console.log(`Valid records (PENDING/APPROVED/NULL): ${registrationCount}`);
+    console.log('Sample records:', regdData?.slice(0, 3).map((r: any) => ({
+      regnum: r.regnum,
+      regh_status: Array.isArray(r.regh) ? r.regh[0]?.status : r.regh?.status
+    })));
+    
     const limit = getRegistrationLimit();
     const isOpen = isRegistrationOpen(registrationCount);
     
-    // Log for debugging
-    console.log(
-      `Registration check: count=${registrationCount}, limit=${limit}, ` +
-      `isOpen=${isOpen}, records=${data?.length || 0}`
-    );
+    console.log(`Registration Count: ${registrationCount}`);
+    console.log(`Registration Limit: ${limit}`);
+    console.log(`Is Open: ${isOpen}`);
+    console.log('================================');
     
-    return NextResponse.json({ 
-      count: registrationCount,
-      limit: limit,
-      isOpen: isOpen
-    });
+    // Return response with no-cache headers to ensure fresh data
+    return NextResponse.json(
+      { 
+        count: registrationCount,
+        limit: limit,
+        isOpen: isOpen
+      },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      }
+    );
   } catch (error: any) {
     console.error('API error checking registration:', error);
     return NextResponse.json(

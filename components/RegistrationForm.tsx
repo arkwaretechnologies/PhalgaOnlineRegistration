@@ -67,6 +67,8 @@ export default function RegistrationForm() {
   const [isRegistrationOpen, setIsRegistrationOpen] = useState(true);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [pendingFormData, setPendingFormData] = useState<any>(null);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorModalMessage, setErrorModalMessage] = useState('');
 
   useEffect(() => {
     // Check if registration is open
@@ -216,7 +218,6 @@ export default function RegistrationForm() {
     if (!pendingFormData) return;
 
     setIsSubmitting(true);
-    setShowConfirmation(false);
     setSubmitMessage(null);
 
     try {
@@ -226,10 +227,12 @@ export default function RegistrationForm() {
 
       if (!checkResponse.ok) {
         setIsSubmitting(false);
-        setSubmitMessage({ 
-          type: 'error', 
-          text: 'Failed to check registration status. Please try again.' 
-        });
+        setShowConfirmation(false); // Close confirmation modal first
+        // Use setTimeout to ensure confirmation modal closes before error modal shows
+        setTimeout(() => {
+          setErrorModalMessage('Failed to check registration status. Please try again.');
+          setShowErrorModal(true);
+        }, 100);
         return;
       }
 
@@ -237,29 +240,45 @@ export default function RegistrationForm() {
       const limit = checkData.limit || 3;
       const participantsToAdd = parseInt(pendingFormData.DETAILCOUNT) || 0;
       const totalAfterSubmission = currentCount + participantsToAdd;
-
-      // Check if adding these participants would exceed the limit
-      if (totalAfterSubmission > limit) {
-        const availableSlots = limit - currentCount;
-        setIsSubmitting(false);
-        setSubmitMessage({ 
-          type: 'error', 
-          text: `Cannot submit registration. Only ${availableSlots} slot${availableSlots === 1 ? '' : 's'} available, but you are trying to register ${participantsToAdd} participant${participantsToAdd === 1 ? '' : 's'}. (Current: ${currentCount}/${limit} participants)` 
-        });
-        return;
-      }
+      const availableSlots = limit - currentCount;
 
       // Check if registration is already closed
       if (!checkData.isOpen) {
         setIsSubmitting(false);
-        setSubmitMessage({ 
-          type: 'error', 
-          text: `Registration is closed. All slots are full. (Current: ${currentCount}/${limit} participants)` 
-        });
+        setShowConfirmation(false); // Close confirmation modal first
+        // Use setTimeout to ensure confirmation modal closes before error modal shows
+        setTimeout(() => {
+          setErrorModalMessage(
+            `Registration is closed. All slots are full.\n\n` +
+            `Current: ${currentCount}/${limit} participants\n` +
+            `Available slots: 0`
+          );
+          setShowErrorModal(true);
+        }, 100);
         return;
       }
 
-      // Proceed with submission
+      // Check if adding these participants would exceed the limit
+      if (totalAfterSubmission > limit) {
+        setIsSubmitting(false);
+        setShowConfirmation(false); // Close confirmation modal first
+        // Use setTimeout to ensure confirmation modal closes before error modal shows
+        setTimeout(() => {
+          setErrorModalMessage(
+            `Cannot submit registration. Not enough slots available.\n\n` +
+            `Current: ${currentCount}/${limit} participants\n` +
+            `Available slots: ${availableSlots}\n` +
+            `Participants to register: ${participantsToAdd}\n\n` +
+            `Please reduce the number of participants to ${availableSlots} or less.`
+          );
+          setShowErrorModal(true);
+        }, 100);
+        return;
+      }
+
+      // All checks passed - proceed with submission
+      setShowConfirmation(false);
+
       const response = await fetch('/api/submit-registration', {
         method: 'POST',
         headers: {
@@ -274,22 +293,31 @@ export default function RegistrationForm() {
         // Redirect to landing page with transaction ID
         router.push(`/?success=true&transId=${encodeURIComponent(data.transId)}`);
       } else {
+        setIsSubmitting(false);
         // Check if the error is about registration being closed
         if (data.error && data.error.includes('closed')) {
           const errorCurrentCount = data.currentCount || currentCount;
           const errorLimit = data.limit || limit;
-          setSubmitMessage({ 
-            type: 'error', 
-            text: `Registration is closed. All slots are full. (Current: ${errorCurrentCount}/${errorLimit} participants)` 
-          });
+          // Use setTimeout to ensure any modals close before error modal shows
+          setTimeout(() => {
+            setErrorModalMessage(
+              `Registration is closed. All slots are full.\n\n` +
+              `Current: ${errorCurrentCount}/${errorLimit} participants`
+            );
+            setShowErrorModal(true);
+          }, 100);
         } else {
           setSubmitMessage({ type: 'error', text: data.error || 'Registration failed' });
         }
       }
     } catch (error) {
-      setSubmitMessage({ type: 'error', text: 'An error occurred while submitting the form.' });
-    } finally {
       setIsSubmitting(false);
+      setShowConfirmation(false); // Close confirmation modal if open
+      // Use setTimeout to ensure confirmation modal closes before error modal shows
+      setTimeout(() => {
+        setErrorModalMessage('An error occurred while submitting the form. Please try again.');
+        setShowErrorModal(true);
+      }, 100);
     }
   };
 
@@ -607,6 +635,39 @@ export default function RegistrationForm() {
           )}
         </form>
 
+        {/* Error Modal */}
+        {showErrorModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+              <div className="p-6">
+                <div className="flex items-center mb-4">
+                  <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <h2 className="text-xl font-bold text-gray-900 ml-3">Registration Error</h2>
+                </div>
+                <div className="mb-6">
+                  <p className="text-gray-700 whitespace-pre-line">{errorModalMessage}</p>
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowErrorModal(false);
+                      setErrorModalMessage('');
+                    }}
+                    className="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                  >
+                    OK
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Confirmation Modal */}
         {showConfirmation && pendingFormData && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -721,54 +782,6 @@ export default function RegistrationForm() {
             </div>
           </div>
         )}
-
-        {/* Notes Section */}
-        <div className="mt-8 bg-white rounded-lg shadow-lg p-8">
-          <h2 className="text-xl font-bold mb-4 text-gray-900">NOTES</h2>
-          <div className="space-y-3 text-sm text-gray-900">
-            <p><strong>REGISTRATION PROCEDURES:</strong></p>
-            
-            <p><strong>A.</strong> Fill in the details provided that the required columns/details are present.</p>
-            
-            <p><strong>B.</strong> Deposit your Registration Fees to either of the following:</p>
-            <table className="w-3/4 border-collapse border border-gray-300 my-4">
-              <tbody>
-                <tr>
-                  <td className="border border-gray-300 p-2 text-gray-900">
-                    <strong>PAYEE:</strong> Philippine Association of Local Government Accountants, Inc.
-                  </td>
-                  <td className="border border-gray-300 p-2 text-gray-900">
-                    <strong>PAYEE:</strong> Philippine Association of Local Government Accountants, Inc.
-                  </td>
-                </tr>
-                <tr>
-                  <td className="border border-gray-300 p-2 text-gray-900">
-                    <strong>(1) BDO - Tarlac-Gerona</strong><br />
-                    Account No. 0114-8800-2515
-                  </td>
-                  <td className="border border-gray-300 p-2 text-gray-900">
-                    <strong>(2) Landbank - Imus, Cavite</strong><br />
-                    Account No. 1422-1064-60
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-            
-            <p><strong>C.</strong> The duly-accomplished Registration Form &quot;IN EXCEL FORMAT&quot; AND THE scanned/photographed Validated Bank Deposit Slip shall be emailed directly at <a href="mailto:visgeo@phalga.org" className="text-blue-600 hover:underline">visgeo@phalga.org</a>.</p>
-            
-            <p>
-              An e-mail reply-confirmation would be received for successful registration. Print a copy of the confirmation and attach the validated deposit slip for reference during the conference.
-            </p>
-            
-            <p>
-              <strong>Deadline for registration is on August 29, 2025. Walk-in participants are NOT allowed.</strong>
-            </p>
-            
-            <p>
-              For other issues and concerns, please contact the VP for VISAYAS, Atty. Jose Neil D. Lumongsod at his mobile number <strong>0977-813-0510</strong>.
-            </p>
-          </div>
-        </div>
       </div>
     </div>
   );

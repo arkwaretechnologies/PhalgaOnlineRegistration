@@ -220,6 +220,46 @@ export default function RegistrationForm() {
     setSubmitMessage(null);
 
     try {
+      // Check registration count before submitting
+      const checkResponse = await fetch('/api/check-registration');
+      const checkData = await checkResponse.json();
+
+      if (!checkResponse.ok) {
+        setIsSubmitting(false);
+        setSubmitMessage({ 
+          type: 'error', 
+          text: 'Failed to check registration status. Please try again.' 
+        });
+        return;
+      }
+
+      const currentCount = checkData.count || 0;
+      const limit = checkData.limit || 3;
+      const participantsToAdd = parseInt(pendingFormData.DETAILCOUNT) || 0;
+      const totalAfterSubmission = currentCount + participantsToAdd;
+
+      // Check if adding these participants would exceed the limit
+      if (totalAfterSubmission > limit) {
+        const availableSlots = limit - currentCount;
+        setIsSubmitting(false);
+        setSubmitMessage({ 
+          type: 'error', 
+          text: `Cannot submit registration. Only ${availableSlots} slot${availableSlots === 1 ? '' : 's'} available, but you are trying to register ${participantsToAdd} participant${participantsToAdd === 1 ? '' : 's'}. (Current: ${currentCount}/${limit} participants)` 
+        });
+        return;
+      }
+
+      // Check if registration is already closed
+      if (!checkData.isOpen) {
+        setIsSubmitting(false);
+        setSubmitMessage({ 
+          type: 'error', 
+          text: `Registration is closed. All slots are full. (Current: ${currentCount}/${limit} participants)` 
+        });
+        return;
+      }
+
+      // Proceed with submission
       const response = await fetch('/api/submit-registration', {
         method: 'POST',
         headers: {
@@ -234,7 +274,17 @@ export default function RegistrationForm() {
         // Redirect to landing page with transaction ID
         router.push(`/?success=true&transId=${encodeURIComponent(data.transId)}`);
       } else {
-        setSubmitMessage({ type: 'error', text: data.error || 'Registration failed' });
+        // Check if the error is about registration being closed
+        if (data.error && data.error.includes('closed')) {
+          const errorCurrentCount = data.currentCount || currentCount;
+          const errorLimit = data.limit || limit;
+          setSubmitMessage({ 
+            type: 'error', 
+            text: `Registration is closed. All slots are full. (Current: ${errorCurrentCount}/${errorLimit} participants)` 
+          });
+        } else {
+          setSubmitMessage({ type: 'error', text: data.error || 'Registration failed' });
+        }
       }
     } catch (error) {
       setSubmitMessage({ type: 'error', text: 'An error occurred while submitting the form.' });

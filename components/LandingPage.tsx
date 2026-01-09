@@ -83,7 +83,7 @@ export default function LandingPage() {
       if (response.ok && data.isOpen) {
         router.push('/register');
       } else {
-        setError(`Registration is currently closed. (${data.count || 0} participants registered)`);
+        setError(`Registration is currently closed. Slots is already full.`);
         setRegistrationStatus(data);
       }
     } catch (err) {
@@ -186,7 +186,7 @@ export default function LandingPage() {
             ) : registrationStatus && !registrationStatus.isOpen ? (
               <div className="space-y-2">
                 <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg text-sm text-center">
-                  Registration is currently closed. ({registrationStatus.count} participants registered)
+                  Thank you for your interest in joining the conference. We regret to inform you that all available slots are already filled.
                 </div>
                 <button
                   disabled

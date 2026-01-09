@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
 import { isRegistrationOpen, getRegistrationLimit } from '@/lib/config';
+import { sendRegistrationConfirmation } from '@/lib/email';
 
 // Disable caching for this route to ensure fresh data
 export const dynamic = 'force-dynamic';
@@ -241,6 +242,33 @@ export async function POST(request: Request) {
         { error: 'Failed to submit registration details' },
         { status: 500 }
       );
+    }
+
+    // Send confirmation email (non-blocking - registration succeeds even if email fails)
+    try {
+      const emailResult = await sendRegistrationConfirmation({
+        transId: transId,
+        email: email,
+        contactPerson: contactperson,
+        province: province,
+        lgu: lgu,
+        contactNumber: contactnum,
+        regdate: regdate,
+        participantCount: detailcount,
+        viewUrl: process.env.NEXT_PUBLIC_APP_URL 
+          ? `${process.env.NEXT_PUBLIC_APP_URL}/view/${transId}`
+          : undefined
+      });
+
+      if (emailResult.success) {
+        console.log('Confirmation email sent successfully to:', email);
+      } else {
+        console.warn('Failed to send confirmation email:', emailResult.error);
+        // Don't fail registration if email fails
+      }
+    } catch (emailError) {
+      console.error('Error sending confirmation email:', emailError);
+      // Don't fail registration if email fails
     }
 
     return NextResponse.json({

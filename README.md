@@ -28,12 +28,18 @@ npm install
 SUPABASE_URL=https://voitsxjrfqylbeebdaqq.supabase.co
 SUPABASE_ANON_KEY=sb_publishable_DLnf9Uad5xi5fDwzqUwpRA_xRe6Xwhb
 REGISTRATION_LIMIT=3
+RESEND_API_KEY=re_your_api_key_here
+RESEND_FROM_EMAIL=noreply@yourdomain.com
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
 **Environment Variables:**
 - `SUPABASE_URL` (required): Your Supabase project URL
 - `SUPABASE_ANON_KEY` (required): Your Supabase anonymous/publishable key
 - `REGISTRATION_LIMIT` (optional): Maximum number of participants allowed before registration closes. Default: 3
+- `RESEND_API_KEY` (optional): Resend API key for sending confirmation emails. If not set, email functionality will be disabled.
+- `RESEND_FROM_EMAIL` (optional): Email address to send from. Default: `onboarding@resend.dev` (for testing)
+- `NEXT_PUBLIC_APP_URL` (optional): Base URL of your application for email links. Default: `http://localhost:3000`
 
 **Note:** For production (Railway), set these environment variables in your Railway project settings.
 
@@ -80,6 +86,41 @@ The application uses Supabase (PostgreSQL) with the following tables:
 - LGUNAME
 - GEOLEVEL
 
+## Email Configuration (Resend)
+
+The application sends confirmation emails after successful registration using [Resend](https://resend.com).
+
+### Setting Up Resend
+
+1. **Create a Resend Account:**
+   - Go to [https://resend.com](https://resend.com)
+   - Sign up for a free account
+   - Verify your email address
+
+2. **Get Your API Key:**
+   - Navigate to API Keys in your Resend dashboard
+   - Create a new API key
+   - Copy the API key (starts with `re_`)
+
+3. **Configure Your Domain (Production):**
+   - Add and verify your domain in Resend dashboard
+   - This allows you to send emails from your own domain
+   - For testing, you can use `onboarding@resend.dev` (default)
+
+4. **Set Environment Variables:**
+   - Add `RESEND_API_KEY` to your `.env.local` file
+   - Optionally set `RESEND_FROM_EMAIL` to your verified domain email
+   - Set `NEXT_PUBLIC_APP_URL` to your production URL for email links
+
+### Email Features
+
+- Automatic confirmation email sent after successful registration
+- Includes transaction ID, registration details, and link to view registration
+- Professional HTML email template
+- Email sending is non-blocking (registration succeeds even if email fails)
+
+**Note:** If `RESEND_API_KEY` is not set, the application will continue to work but emails will not be sent. Check the console logs for email status.
+
 ## Setting Up the Database
 
 ### Step 1: Run Migration in Supabase
@@ -124,6 +165,9 @@ npm start
 | `SUPABASE_URL` | Yes | - | Your Supabase project URL |
 | `SUPABASE_ANON_KEY` | Yes | - | Your Supabase anonymous/publishable key |
 | `REGISTRATION_LIMIT` | No | 3 | Maximum number of participants before registration closes |
+| `RESEND_API_KEY` | No | - | Resend API key for sending confirmation emails |
+| `RESEND_FROM_EMAIL` | No | `onboarding@resend.dev` | Email address to send confirmation emails from |
+| `NEXT_PUBLIC_APP_URL` | No | `http://localhost:3000` | Base URL of your application for email links |
 
 ## Notes
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
+import { isRegistrationOpen, getRegistrationLimit } from '@/lib/config';
 
 export async function GET() {
   try {
@@ -25,15 +26,19 @@ export async function GET() {
     // Count total rows (participants)
     const registrationCount = data?.length || 0;
     
-    // Registration closes when count >= 3 (matches submit-registration logic)
-    // So isOpen = true when count < 3, false when count >= 3
-    const isOpen = registrationCount <= 3;
+    // Check if registration is open based on configured limit
+    const limit = getRegistrationLimit();
+    const isOpen = isRegistrationOpen(registrationCount);
     
     // Log for debugging
-    console.log(`Registration check: count=${registrationCount}, isOpen=${isOpen}, records=${data?.length || 0}`);
+    console.log(
+      `Registration check: count=${registrationCount}, limit=${limit}, ` +
+      `isOpen=${isOpen}, records=${data?.length || 0}`
+    );
     
     return NextResponse.json({ 
       count: registrationCount,
+      limit: limit,
       isOpen: isOpen
     });
   } catch (error: any) {

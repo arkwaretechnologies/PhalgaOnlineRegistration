@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
+import { isRegistrationOpen, getRegistrationLimit } from '@/lib/config';
 
 interface RegistrationData {
   CONFERENCE: string;
@@ -75,11 +76,19 @@ export async function POST(request: Request) {
     }
 
     const regcount = regData?.length || 0;
+    const limit = getRegistrationLimit();
     
-  
-    if (regcount > 3) {
+    // Check if registration is open (registration closes when count >= limit)
+    if (!isRegistrationOpen(regcount)) {
+      console.log(
+        `Registration closed: current count=${regcount}, limit=${limit}`
+      );
       return NextResponse.json(
-        { error: 'Registration is already closed' },
+        { 
+          error: 'Registration is already closed',
+          currentCount: regcount,
+          limit: limit
+        },
         { status: 400 }
       );
     }

@@ -23,13 +23,19 @@ A Next.js-based online registration system for the 17th Mindanao Geographic Conf
 npm install
 ```
 
-2. Create a `.env.local` file in the root directory with your Supabase credentials:
+2. Create a `.env.local` file in the root directory with your configuration:
 ```
 SUPABASE_URL=https://voitsxjrfqylbeebdaqq.supabase.co
 SUPABASE_ANON_KEY=sb_publishable_DLnf9Uad5xi5fDwzqUwpRA_xRe6Xwhb
+REGISTRATION_LIMIT=3
 ```
 
-**Note:** The default values are already configured in `lib/db.ts`, but it's recommended to use environment variables for production.
+**Environment Variables:**
+- `SUPABASE_URL` (required): Your Supabase project URL
+- `SUPABASE_ANON_KEY` (required): Your Supabase anonymous/publishable key
+- `REGISTRATION_LIMIT` (optional): Maximum number of participants allowed before registration closes. Default: 3
+
+**Note:** For production (Railway), set these environment variables in your Railway project settings.
 
 3. Run the development server:
 ```bash
@@ -109,9 +115,19 @@ npm run build
 npm start
 ```
 
+## Configuration
+
+### Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `SUPABASE_URL` | Yes | - | Your Supabase project URL |
+| `SUPABASE_ANON_KEY` | Yes | - | Your Supabase anonymous/publishable key |
+| `REGISTRATION_LIMIT` | No | 3 | Maximum number of participants before registration closes |
+
 ## Notes
 
-- Registration closes when the participant count exceeds 50
+- Registration closes when the participant count reaches or exceeds the configured limit (default: 3)
 - T-shirt sizes are limited to: S, M, L, XL, XXL
 - All text fields are automatically converted to uppercase
 - Date validation is performed on expiry dates

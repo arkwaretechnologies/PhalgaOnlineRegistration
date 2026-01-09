@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
-import { isRegistrationOpen, getRegistrationLimit } from '@/lib/config';
+import { isRegistrationOpen, getRegistrationLimit, isProvinceLguRegistrationOpen, getProvinceLguLimit } from '@/lib/config';
 import { sendRegistrationConfirmation } from '@/lib/email';
 
 // Disable caching for this route to ensure fresh data
@@ -128,6 +128,64 @@ export async function POST(request: Request) {
     const confcode = '2026-GCMIN';
     const province = formData.PROVINCE.toUpperCase();
     const lgu = formData.LGU.toUpperCase();
+
+    // Check Province-LGU specific limit
+    const { data: provinceLguData, error: provinceLguError } = await supabase
+      .from('regd')
+      .select(`
+        regnum,
+        regh!left(regnum, status)
+      `)
+      .eq('province', province)
+      .eq('lgu', lgu);
+
+    if (provinceLguError) {
+      console.error('Database error checking Province-LGU:', provinceLguError);
+      return NextResponse.json(
+        { error: 'Failed to check Province-LGU registration status' },
+        { status: 500 }
+      );
+    }
+
+    // Filter records where status is NULL, PENDING, or APPROVED (case-insensitive)
+    const validProvinceLguRecords = (provinceLguData || []).filter((record: any) => {
+      const regh = Array.isArray(record.regh) ? record.regh[0] : record.regh;
+      if (!regh) {
+        return true;
+      }
+      const status = (regh.status || '').toString().toUpperCase().trim();
+      return !status || status === 'PENDING' || status === 'APPROVED';
+    });
+
+    const provinceLguCount = validProvinceLguRecords.length;
+    const provinceLguLimit = getProvinceLguLimit();
+    const participantsToAdd = parseInt(formData.DETAILCOUNT);
+
+    console.log('=== Province-LGU Count Check (Submit) ===');
+    console.log(`Province: ${province}, LGU: ${lgu}`);
+    console.log(`Current Province-LGU Count: ${provinceLguCount}`);
+    console.log(`Province-LGU Limit: ${provinceLguLimit}`);
+    console.log(`Participants to add: ${participantsToAdd}`);
+    console.log(`Total after submission: ${provinceLguCount + participantsToAdd}`);
+    console.log('==========================================');
+
+    // Check if adding these participants would exceed the Province-LGU limit
+    if (!isProvinceLguRegistrationOpen(provinceLguCount + participantsToAdd)) {
+      console.log(
+        `Province-LGU registration closed: current count=${provinceLguCount}, limit=${provinceLguLimit}, trying to add=${participantsToAdd}`
+      );
+      return NextResponse.json(
+        { 
+          error: `Registration limit reached for ${province} - ${lgu}. Maximum ${provinceLguLimit} participants allowed per Province-LGU combination.`,
+          currentCount: provinceLguCount,
+          limit: provinceLguLimit,
+          province: province,
+          lgu: lgu
+        },
+        { status: 400 }
+      );
+    }
+
     const contactperson = formData.CONTACTPERSON.toUpperCase();
     const contactnum = formData.CONTACTNUMBER.toUpperCase();
     const email = formData.EMAILADDRESS.toLowerCase();

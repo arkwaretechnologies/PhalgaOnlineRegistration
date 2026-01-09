@@ -28,6 +28,7 @@ npm install
 SUPABASE_URL=https://voitsxjrfqylbeebdaqq.supabase.co
 SUPABASE_ANON_KEY=sb_publishable_DLnf9Uad5xi5fDwzqUwpRA_xRe6Xwhb
 REGISTRATION_LIMIT=3
+PROVINCE_LGU_LIMIT=10
 RESEND_API_KEY=re_your_api_key_here
 RESEND_FROM_EMAIL=noreply@yourdomain.com
 NEXT_PUBLIC_APP_URL=http://localhost:3000
@@ -37,6 +38,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 - `SUPABASE_URL` (required): Your Supabase project URL
 - `SUPABASE_ANON_KEY` (required): Your Supabase anonymous/publishable key
 - `REGISTRATION_LIMIT` (optional): Maximum number of participants allowed before registration closes. Default: 3
+- `PROVINCE_LGU_LIMIT` (optional): Maximum number of participants allowed per Province-LGU combination. Default: 10
 - `RESEND_API_KEY` (optional): Resend API key for sending confirmation emails. If not set, email functionality will be disabled.
 - `RESEND_FROM_EMAIL` (optional): Email address to send from. Default: `onboarding@resend.dev` (for testing)
 - `NEXT_PUBLIC_APP_URL` (required for production): Base URL of your application for email links and images. 

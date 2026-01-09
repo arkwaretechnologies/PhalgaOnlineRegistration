@@ -240,6 +240,46 @@ export default function RegistrationForm() {
       }
     }
 
+    // Check Province-LGU limit before proceeding
+    if (province && lgu) {
+      try {
+        const checkResponse = await fetch(
+          `/api/check-province-lgu?province=${encodeURIComponent(province)}&lgu=${encodeURIComponent(lgu)}`
+        );
+        const checkData = await checkResponse.json();
+
+        if (!checkResponse.ok) {
+          setErrorModalMessage('Failed to check registration limit. Please try again.');
+          setShowErrorModal(true);
+          return;
+        }
+
+        const currentCount = checkData.count || 0;
+        const limit = checkData.limit || 10;
+        const participantsToAdd = participants.filter(p => 
+          p.lastName && p.lastName.trim() !== '' && 
+          p.firstName && p.firstName.trim() !== ''
+        ).length;
+        const totalAfterSubmission = currentCount + participantsToAdd;
+
+        if (!checkData.isOpen || totalAfterSubmission > limit) {
+          setErrorModalMessage(
+            `Registration limit reached for ${province} - ${lgu}.\n\n` +
+            `Current: ${currentCount}/${limit} participants\n` +
+            `Trying to add: ${participantsToAdd} participants\n` +
+            `Maximum ${limit} participants allowed per Province-LGU combination.`
+          );
+          setShowErrorModal(true);
+          return;
+        }
+      } catch (error) {
+        console.error('Error checking Province-LGU limit:', error);
+        setErrorModalMessage('Failed to check registration limit. Please try again.');
+        setShowErrorModal(true);
+        return;
+      }
+    }
+
     // Build form data
     const formData: any = {
       CONFERENCE: 'NL',
@@ -332,6 +372,43 @@ export default function RegistrationForm() {
         return;
       }
 
+      // Check Province-LGU limit before submitting
+      if (pendingFormData.PROVINCE && pendingFormData.LGU) {
+        const provinceLguResponse = await fetch(
+          `/api/check-province-lgu?province=${encodeURIComponent(pendingFormData.PROVINCE)}&lgu=${encodeURIComponent(pendingFormData.LGU)}`
+        );
+        const provinceLguData = await provinceLguResponse.json();
+
+        if (!provinceLguResponse.ok) {
+          setIsSubmitting(false);
+          setShowConfirmation(false);
+          setTimeout(() => {
+            setErrorModalMessage('Failed to check Province-LGU registration limit. Please try again.');
+            setShowErrorModal(true);
+          }, 100);
+          return;
+        }
+
+        const provinceLguCount = provinceLguData.count || 0;
+        const provinceLguLimit = provinceLguData.limit || 10;
+        const provinceLguTotalAfter = provinceLguCount + participantsToAdd;
+
+        if (!provinceLguData.isOpen || provinceLguTotalAfter > provinceLguLimit) {
+          setIsSubmitting(false);
+          setShowConfirmation(false);
+          setTimeout(() => {
+            setErrorModalMessage(
+              `Registration limit reached for ${pendingFormData.PROVINCE} - ${pendingFormData.LGU}.\n\n` +
+              `Current: ${provinceLguCount}/${provinceLguLimit} participants\n` +
+              `Trying to add: ${participantsToAdd} participants\n` +
+              `Maximum ${provinceLguLimit} participants allowed per Province-LGU combination.`
+            );
+            setShowErrorModal(true);
+          }, 100);
+          return;
+        }
+      }
+
       // All checks passed - proceed with submission
       setShowConfirmation(false);
 
@@ -362,8 +439,27 @@ export default function RegistrationForm() {
             );
             setShowErrorModal(true);
           }, 100);
+        } else if (data.error && (data.error.includes('Registration limit reached') || data.error.includes('Province-LGU'))) {
+          // Handle Province-LGU limit error
+          const errorProvince = data.province || pendingFormData.PROVINCE;
+          const errorLgu = data.lgu || pendingFormData.LGU;
+          const errorCurrentCount = data.currentCount || 0;
+          const errorLimit = data.limit || 10;
+          // Use setTimeout to ensure any modals close before error modal shows
+          setTimeout(() => {
+            setErrorModalMessage(
+              `Registration limit reached for ${errorProvince} - ${errorLgu}.\n\n` +
+              `Current: ${errorCurrentCount}/${errorLimit} participants\n` +
+              `Maximum ${errorLimit} participants allowed per Province-LGU combination.`
+            );
+            setShowErrorModal(true);
+          }, 100);
         } else {
-          setSubmitMessage({ type: 'error', text: data.error || 'Registration failed' });
+          // Use setTimeout to ensure any modals close before error modal shows
+          setTimeout(() => {
+            setErrorModalMessage(data.error || 'Registration failed. Please try again.');
+            setShowErrorModal(true);
+          }, 100);
         }
       }
     } catch (error) {

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && node scripts/copy-assets.js",
     "start": "node railway-server.js",
     "start:standalone": "node .next/standalone/server.js",
     "start:custom": "node server.js",

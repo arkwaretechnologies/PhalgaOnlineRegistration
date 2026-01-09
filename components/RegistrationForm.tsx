@@ -152,6 +152,25 @@ export default function RegistrationForm() {
     setParticipants([...participants, newParticipant]);
   };
 
+  // Validation helper functions
+  const validateEmail = (email: string): boolean => {
+    if (!email) return true; // Allow empty (optional field)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const formatContactNumber = (value: string): string => {
+    // Remove all non-numeric characters
+    const numbersOnly = value.replace(/\D/g, '');
+    // Limit to 11 digits
+    return numbersOnly.slice(0, 11);
+  };
+
+  const formatPRCNumber = (value: string): string => {
+    // Remove all non-numeric characters
+    return value.replace(/\D/g, '');
+  };
+
   const updateParticipant = (id: number, field: keyof Participant, value: string) => {
     setParticipants(participants.map(p => 
       p.id === id ? { ...p, [field]: value } : p
@@ -161,6 +180,21 @@ export default function RegistrationForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitMessage(null);
+    setShowErrorModal(false);
+
+    // Validate main contact number (must be exactly 11 digits)
+    if (!contactNo || contactNo.length !== 11) {
+      setErrorModalMessage('Contact number must be exactly 11 digits.');
+      setShowErrorModal(true);
+      return;
+    }
+
+    // Validate main email address
+    if (!validateEmail(emailAddress)) {
+      setErrorModalMessage('Please enter a valid email address.');
+      setShowErrorModal(true);
+      return;
+    }
 
     // Validate that at least one participant is filled out (requires both Last Name and First Name)
     const filledParticipants = participants.filter(p => 
@@ -169,8 +203,29 @@ export default function RegistrationForm() {
     );
 
     if (filledParticipants.length === 0) {
-      setSubmitMessage({ type: 'error', text: 'Please fill out at least one participant with both Last Name and First Name.' });
+      setErrorModalMessage('Please fill out at least one participant with both Last Name and First Name.');
+      setShowErrorModal(true);
       return;
+    }
+
+    // Validate participant contact numbers and emails
+    for (const participant of participants) {
+      // Only validate if participant has at least a name (filled participant)
+      if (participant.lastName || participant.firstName) {
+        // Validate contact number if provided (must be exactly 11 digits or empty)
+        if (participant.contactNo && participant.contactNo.length !== 11) {
+          setErrorModalMessage(`Participant ${participant.firstName || participant.lastName || 'row'}: Contact number must be exactly 11 digits or left empty.`);
+          setShowErrorModal(true);
+          return;
+        }
+
+        // Validate email if provided
+        if (participant.email && !validateEmail(participant.email)) {
+          setErrorModalMessage(`Participant ${participant.firstName || participant.lastName || 'row'}: Please enter a valid email address or leave it empty.`);
+          setShowErrorModal(true);
+          return;
+        }
+      }
     }
 
     // Validate expiry dates
@@ -178,7 +233,8 @@ export default function RegistrationForm() {
       if (participant.expiryDate) {
         const dateObj = new Date(participant.expiryDate);
         if (isNaN(dateObj.getTime())) {
-          setSubmitMessage({ type: 'error', text: 'Invalid date format in expiry date field.' });
+          setErrorModalMessage('Invalid date format in expiry date field.');
+          setShowErrorModal(true);
           return;
         }
       }
@@ -425,10 +481,16 @@ export default function RegistrationForm() {
                   <input
                     type="text"
                     value={contactNo}
-                    onChange={(e) => setContactNo(e.target.value)}
+                    onChange={(e) => setContactNo(formatContactNumber(e.target.value))}
                     className="w-full px-2 py-1 border border-gray-300 rounded text-gray-900 bg-white"
                     required
+                    maxLength={11}
+                    pattern="[0-9]{11}"
+                    title="Contact number must be exactly 11 digits"
                   />
+                  {contactNo && contactNo.length !== 11 && (
+                    <p className="text-xs text-red-600 mt-1">Contact number must be exactly 11 digits</p>
+                  )}
                 </td>
               </tr>
               <tr>
@@ -438,9 +500,14 @@ export default function RegistrationForm() {
                     type="email"
                     value={emailAddress}
                     onChange={(e) => setEmailAddress(e.target.value)}
-                    className="w-full px-2 py-1 border border-gray-300 rounded text-gray-900 bg-white"
+                    className={`w-full px-2 py-1 border border-gray-300 rounded text-gray-900 bg-white ${
+                      emailAddress && !validateEmail(emailAddress) ? 'border-red-500' : ''
+                    }`}
                     required
                   />
+                  {emailAddress && !validateEmail(emailAddress) && (
+                    <p className="text-xs text-red-600 mt-1">Please enter a valid email address</p>
+                  )}
                 </td>
               </tr>
             </tbody>
@@ -557,16 +624,24 @@ export default function RegistrationForm() {
                       <input
                         type="text"
                         value={participant.contactNo}
-                        onChange={(e) => updateParticipant(participant.id, 'contactNo', e.target.value)}
+                        onChange={(e) => updateParticipant(participant.id, 'contactNo', formatContactNumber(e.target.value))}
                         className="w-full px-1 py-0.5 border-0 bg-transparent text-gray-900"
+                        maxLength={11}
+                        pattern="[0-9]{11}"
+                        title="Contact number must be exactly 11 digits"
                       />
+                      {participant.contactNo && participant.contactNo.length !== 11 && (
+                        <p className="text-xs text-red-600">11 digits</p>
+                      )}
                     </td>
                     <td className="border border-gray-300 p-1 bg-blue-50">
                       <input
                         type="text"
                         value={participant.prcNo}
-                        onChange={(e) => updateParticipant(participant.id, 'prcNo', e.target.value.toUpperCase())}
-                        className="w-full px-1 py-0.5 border-0 bg-transparent uppercase text-gray-900"
+                        onChange={(e) => updateParticipant(participant.id, 'prcNo', formatPRCNumber(e.target.value))}
+                        className="w-full px-1 py-0.5 border-0 bg-transparent text-gray-900"
+                        pattern="[0-9]*"
+                        title="PRC number must contain only numbers"
                       />
                     </td>
                     <td className="border border-gray-300 p-1 bg-blue-50">
@@ -582,8 +657,13 @@ export default function RegistrationForm() {
                         type="email"
                         value={participant.email}
                         onChange={(e) => updateParticipant(participant.id, 'email', e.target.value)}
-                        className="w-full px-1 py-0.5 border-0 bg-transparent text-gray-900"
+                        className={`w-full px-1 py-0.5 border-0 bg-transparent text-gray-900 ${
+                          participant.email && !validateEmail(participant.email) ? 'border border-red-500' : ''
+                        }`}
                       />
+                      {participant.email && !validateEmail(participant.email) && (
+                        <p className="text-xs text-red-600">Invalid email</p>
+                      )}
                     </td>
                     <td className="border border-gray-300 p-1">
                       <div className="flex gap-1">

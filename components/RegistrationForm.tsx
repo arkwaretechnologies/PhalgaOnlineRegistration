@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 interface Participant {
   id: number;
@@ -788,21 +789,44 @@ export default function RegistrationForm() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-4 justify-center">
-            <button
-              type="button"
-              onClick={addParticipant}
-              className="px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+          <div className="flex gap-4 items-center relative">
+            <Link
+              href="/"
+              className="text-blue-600 hover:text-blue-700 transition-colors flex items-center gap-1 font-medium"
+              title="Back to Home"
             >
-              Add New Row
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400"
-            >
-              {isSubmitting ? 'Submitting...' : 'Submit'}
-            </button>
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                />
+              </svg>
+              <span>Back</span>
+            </Link>
+            <div className="flex gap-4 justify-center flex-1">
+              <button
+                type="button"
+                onClick={addParticipant}
+                className="px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+              >
+                Add New Row
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400"
+              >
+                {isSubmitting ? 'Submitting...' : 'Submit'}
+              </button>
+            </div>
           </div>
 
           {/* Submit Message */}

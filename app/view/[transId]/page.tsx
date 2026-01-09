@@ -437,8 +437,6 @@ export default function ViewRegistration() {
           <div className="space-y-3 text-sm text-gray-900">
             <p><strong>REGISTRATION PROCEDURES:</strong></p>
             
-            <p><strong>A.</strong> Fill in the details provided that the required columns/details are present.</p>
-            
             <p><strong>B.</strong> Deposit your Registration Fees to either of the following:</p>
             <table className="w-3/4 border-collapse border border-gray-300 my-4">
               <tbody>
@@ -452,29 +450,27 @@ export default function ViewRegistration() {
                 </tr>
                 <tr>
                   <td className="border border-gray-300 p-2 text-gray-900">
-                    <strong>(1) BDO - Tarlac-Gerona</strong><br />
-                    Account No. 0114-8800-2515
+                    <strong>(1) BDO - CDO</strong><br />
+                    Account No. 0119 4800 6438
                   </td>
                   <td className="border border-gray-300 p-2 text-gray-900">
                     <strong>(2) Landbank - Imus, Cavite</strong><br />
-                    Account No. 1422-1064-60
+                    Account No. 1422 1089 19
                   </td>
                 </tr>
               </tbody>
             </table>
-            
-            <p><strong>C.</strong> The duly-accomplished Registration Form &quot;IN EXCEL FORMAT&quot; AND THE scanned/photographed Validated Bank Deposit Slip shall be emailed directly at <a href="mailto:visgeo@phalga.org" className="text-blue-600 hover:underline">visgeo@phalga.org</a>.</p>
+
+            <p>
+              Upload the scanned/photographed Validated Bank Deposit Slip to the system.
+            </p>
             
             <p>
               An e-mail reply-confirmation would be received for successful registration. Print a copy of the confirmation and attach the validated deposit slip for reference during the conference.
             </p>
             
             <p>
-              <strong>Deadline for registration is on August 29, 2025. Walk-in participants are NOT allowed.</strong>
-            </p>
-            
-            <p>
-              For other issues and concerns, please contact the VP for VISAYAS, Atty. Jose Neil D. Lumongsod at his mobile number <strong>0977-813-0510</strong>.
+              For other issues and concerns, please contact the VP for MINDANAO, Ritchleen Grace Jasebelle A. Buray, CPA at her mobile number <strong>09177-7189-615</strong>.
             </p>
           </div>
         </div>

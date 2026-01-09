@@ -525,7 +525,7 @@ export default function RegistrationForm() {
             <tbody>
               <tr>
                 <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">CONFERENCE</td>
-                <td className="border border-gray-300 p-2 text-gray-900">17TH MINDANAO GEOGRAPHIC CONFERENCE</td>
+                <td className="border border-gray-300 p-2 text-gray-900">18TH MINDANAO GEOGRAPHIC CONFERENCE</td>
               </tr>
               <tr>
                 <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">PROVINCE</td>
@@ -861,7 +861,7 @@ export default function RegistrationForm() {
                     <tbody>
                       <tr>
                         <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900 w-1/3">Conference</td>
-                        <td className="border border-gray-300 p-2 text-gray-900">17TH MINDANAO GEOGRAPHIC CONFERENCE</td>
+                        <td className="border border-gray-300 p-2 text-gray-900">18TH MINDANAO GEOGRAPHIC CONFERENCE</td>
                       </tr>
                       <tr>
                         <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">Province</td>

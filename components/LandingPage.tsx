@@ -101,7 +101,7 @@ export default function LandingPage() {
             PhALGA Online Registration
           </h1>
           <p className="text-gray-600">
-            17th Mindanao Geographic Conference
+            18th Mindanao Geographic Conference
           </p>
         </div>
 

@@ -131,7 +131,7 @@ export async function sendRegistrationConfirmation(
                   </td>
                   <td style="width: 40%; vertical-align: middle; text-align: center; padding: 0 10px;">
                     <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: bold; line-height: 1.2;">
-                      17th Mindanao Geographic Conference
+                      18th Mindanao Geographic Conference
                     </h1>
                     <p style="margin: 10px 0 0 0; color: #ffffff; font-size: 16px;">
                       Registration Confirmation
@@ -161,7 +161,7 @@ export async function sendRegistrationConfirmation(
               </p>
               
               <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
-                Thank you for registering for the <strong>17th Mindanao Geographic Conference</strong>. Your registration has been successfully submitted and is currently under review.
+                Thank you for registering for the <strong>18th Mindanao Geographic Conference</strong>. Your registration has been successfully submitted and is currently under review.
               </p>
               
               <!-- Transaction ID Highlight -->
@@ -266,7 +266,7 @@ export async function sendRegistrationConfirmation(
     const result = await resend.emails.send({
       from: fromEmail,
       to: data.email,
-      subject: 'Registration Confirmation - 17th Mindanao Geographic Conference',
+      subject: 'Registration Confirmation - 18th Mindanao Geographic Conference',
       html: htmlContent,
     });
 

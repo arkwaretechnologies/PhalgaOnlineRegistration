@@ -1,6 +1,6 @@
 # PHALGA Online Registration
 
-A Next.js-based online registration system for the 17th Mindanao Geographic Conference.
+A Next.js-based online registration system for the 18th Mindanao Geographic Conference.
 
 ## Features
 

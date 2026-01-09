@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "PhALGA Online Registration",
-  description: "17th Mindanao Geographic Conference Registration",
+  description: "18th Mindanao Geographic Conference Registration",
   icons: {
     icon: '/logo.png',
     shortcut: '/logo.png',

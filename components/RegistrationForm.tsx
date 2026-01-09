@@ -410,7 +410,7 @@ export default function RegistrationForm() {
               />
             </div>
             <div className="flex-1 text-center">
-              <h1 className="text-3xl font-bold text-gray-900">PHALGA Registration Form</h1>
+              <h1 className="text-3xl font-bold text-gray-900">PhALGA Registration Form</h1>
             </div>
             <div className="flex-shrink-0">
               <img

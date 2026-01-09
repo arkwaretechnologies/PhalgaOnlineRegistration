@@ -143,6 +143,25 @@ If you have LGUS data from the original MySQL database, you can import it using:
 
 The migration includes basic RLS policies for public read/insert access. Adjust these policies in Supabase Dashboard → Authentication → Policies based on your security requirements.
 
+### Step 4: Set Up Storage for Payment Proofs
+
+1. Go to Supabase Dashboard → SQL Editor
+2. Run the migration file: `supabase/migrations/20260113000001_setup_payment_proofs_storage.sql`
+   - This creates the `payment-proofs` storage bucket
+   - Sets up RLS policies to allow public uploads and reads
+   - Configures file size limit (5MB) and allowed file types
+
+Alternatively, you can manually create the bucket:
+1. Go to Supabase Dashboard → Storage
+2. Click "New bucket"
+3. Name: `payment-proofs`
+4. Set to Public
+5. Add RLS policies in Storage → Policies:
+   - Allow INSERT for public
+   - Allow SELECT for public
+   - Allow UPDATE for public (optional, for replacing files)
+   - Allow DELETE for public (optional, for cleanup)
+
 ## API Routes
 
 - `GET /api/check-registration` - Check if registration is open

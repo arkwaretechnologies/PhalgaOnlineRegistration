@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -15,6 +15,7 @@ interface RegistrationHeader {
   email: string;
   regdate: string;
   status?: string;
+  payment_proof_url?: string;
 }
 
 interface RegistrationDetail {
@@ -43,6 +44,12 @@ export default function ViewRegistration() {
   const [details, setDetails] = useState<RegistrationDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [paymentProofUrl, setPaymentProofUrl] = useState<string | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fetchRegistration = async () => {
@@ -67,6 +74,10 @@ export default function ViewRegistration() {
         if (response.ok && data) {
           setHeader(data.header);
           setDetails(data.details);
+          // Set payment proof URL if available
+          if (data.header?.payment_proof_url) {
+            setPaymentProofUrl(data.header.payment_proof_url);
+          }
         } else {
           setError(data.error || 'Registration not found');
         }
@@ -82,6 +93,74 @@ export default function ViewRegistration() {
       fetchRegistration();
     }
   }, [transId]);
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type (images and PDFs)
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      setUploadError('Please upload an image (JPEG, PNG, GIF) or PDF file.');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      setUploadError('File size must be less than 5MB.');
+      return;
+    }
+
+    setUploading(true);
+    setUploadError('');
+    setUploadSuccess(false);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('transId', transId);
+
+      const response = await fetch('/api/upload-payment-proof', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setUploadSuccess(true);
+        setPaymentProofUrl(data.url);
+        // Refresh registration data to get updated payment proof URL
+        const timestamp = new Date().getTime();
+        const refreshResponse = await fetch(
+          `/api/get-registration?transId=${encodeURIComponent(transId)}&_t=${timestamp}`,
+          {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache' }
+          }
+        );
+        const refreshData = await refreshResponse.json();
+        if (refreshData.header) {
+          setHeader(refreshData.header);
+          setPaymentProofUrl(refreshData.header.payment_proof_url || null);
+        }
+        // Clear success message after 3 seconds
+        setTimeout(() => setUploadSuccess(false), 3000);
+      } else {
+        setUploadError(data.error || 'Failed to upload file. Please try again.');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      setUploadError('An error occurred while uploading. Please try again.');
+    } finally {
+      setUploading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
 
   if (loading) {
     return (
@@ -220,6 +299,86 @@ export default function ViewRegistration() {
               </p>
             </div>
           </div>
+
+          {/* Payment Proof Upload Section */}
+          <div className="col-span-1 md:col-span-2 mt-4 pt-4 border-t border-gray-200">
+            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+              <div className="flex-1">
+                <span className="text-sm font-medium text-gray-500 block mb-2">
+                  Proof of Payment
+                </span>
+                {paymentProofUrl ? (
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!paymentProofUrl || paymentProofUrl.includes('undefined')) {
+                          setUploadError('Invalid file URL. Please re-upload the file.');
+                        } else {
+                          setShowPaymentModal(true);
+                        }
+                      }}
+                      className="text-blue-600 hover:text-blue-700 underline text-sm inline-flex items-center gap-1"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                      View Uploaded File
+                    </button>
+                    <p className="text-xs text-gray-500">Payment proof has been uploaded</p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-600 mb-2">
+                    Upload a scanned copy or photo of your validated bank deposit slip
+                  </p>
+                )}
+                {uploadError && (
+                  <p className="text-sm text-red-600 mt-2">{uploadError}</p>
+                )}
+                {uploadSuccess && (
+                  <p className="text-sm text-green-600 mt-2">✓ File uploaded successfully!</p>
+                )}
+              </div>
+              <div>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                  accept="image/*,.pdf"
+                  className="hidden"
+                  disabled={uploading}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm flex items-center gap-2"
+                >
+                  {uploading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Uploading...
+                    </>
+                  ) : paymentProofUrl ? (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      </svg>
+                      Replace File
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                      Upload Proof of Payment
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Participants */}
@@ -323,6 +482,83 @@ export default function ViewRegistration() {
           </Link>
         </div>
       </div>
+
+      {/* Payment Proof Modal */}
+      {showPaymentModal && paymentProofUrl && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowPaymentModal(false)}
+        >
+          <div 
+            className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex justify-between items-center p-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-800">Proof of Payment</h3>
+              <button
+                type="button"
+                onClick={() => setShowPaymentModal(false)}
+                className="text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 overflow-auto p-4 bg-gray-100">
+              {paymentProofUrl.toLowerCase().endsWith('.pdf') || paymentProofUrl.includes('application/pdf') ? (
+                // PDF Viewer
+                <div className="w-full h-full min-h-[500px]">
+                  <iframe
+                    src={paymentProofUrl}
+                    className="w-full h-full border-0 rounded"
+                    title="Proof of Payment PDF"
+                  />
+                </div>
+              ) : (
+                // Image Viewer
+                <div className="flex items-center justify-center">
+                  <img
+                    src={paymentProofUrl}
+                    alt="Proof of Payment"
+                    className="max-w-full max-h-[70vh] object-contain rounded"
+                    onError={(e) => {
+                      console.error('Failed to load image:', paymentProofUrl);
+                      setUploadError('Failed to load payment proof image. The file may have been deleted or the URL is invalid.');
+                      setShowPaymentModal(false);
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex justify-end gap-3 p-4 border-t border-gray-200 bg-gray-50">
+              <a
+                href={paymentProofUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-700 text-sm font-medium inline-flex items-center gap-1"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+                Open in New Tab
+              </a>
+              <button
+                type="button"
+                onClick={() => setShowPaymentModal(false)}
+                className="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

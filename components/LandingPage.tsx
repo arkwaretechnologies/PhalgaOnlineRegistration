@@ -8,8 +8,10 @@ export default function LandingPage() {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
-  const [registrationStatus, setRegistrationStatus] = useState<{ count: number; isOpen: boolean } | null>(null);
+  const [registrationStatus, setRegistrationStatus] = useState<{ count: number; limit: number; isOpen: boolean } | null>(null);
   const [checkingStatus, setCheckingStatus] = useState(true);
+  const [showRemainingSlotsModal, setShowRemainingSlotsModal] = useState(false);
+  const [remainingSlots, setRemainingSlots] = useState<number | null>(null);
   const [conference, setConference] = useState<{
     confcode: string;
     name: string | null;
@@ -72,6 +74,15 @@ export default function LandingPage() {
           // Update conference from registration status if available
           if (data.conference) {
             setConference(prev => prev ? { ...prev, ...data.conference } : null);
+          }
+          
+          // Check if remaining slots are 100 or less (only if registration is open)
+          if (data.count !== undefined && data.limit !== undefined && data.isOpen) {
+            const remaining = data.limit - data.count;
+            setRemainingSlots(remaining);
+            if (remaining > 0 && remaining <= 100) {
+              setShowRemainingSlotsModal(true);
+            }
           }
         } else {
           console.error('Failed to check registration status:', data);
@@ -158,6 +169,44 @@ export default function LandingPage() {
         </div>
 
         <div className="space-y-6">
+          {/* New Registration Button - Moved to Top */}
+          <div>
+            {checkingStatus ? (
+              <div className="block w-full bg-gray-400 text-white font-semibold py-3 sm:py-3 px-4 rounded-lg text-center touch-target text-sm sm:text-base">
+                Checking availability...
+              </div>
+            ) : registrationStatus && !registrationStatus.isOpen ? (
+              <div className="space-y-2 sm:space-y-3">
+                <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg text-xs sm:text-sm text-center break-words">
+                  Thank you for your interest in joining the conference. We regret to inform you that all available slots are already filled.
+                </div>
+                <button
+                  disabled
+                  className="block w-full bg-gray-400 text-white font-semibold py-3 px-4 rounded-lg text-center cursor-not-allowed touch-target text-sm sm:text-base"
+                >
+                  Register
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleNewRegistration}
+                className="block w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg text-center transition-colors duration-200 touch-target text-sm sm:text-base"
+              >
+                Register
+              </button>
+            )}
+          </div>
+
+          {/* Divider */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white text-gray-500">OR</span>
+            </div>
+          </div>
+
           {/* Success Message */}
           {successMessage && (
             <div className="bg-green-50 border-2 border-green-200 text-green-800 px-3 sm:px-4 md:px-6 py-3 sm:py-4 rounded-lg">
@@ -187,82 +236,91 @@ export default function LandingPage() {
           {/* Registration ID Lookup */}
           <div>
             <h2 className="text-lg sm:text-xl font-semibold text-gray-700 mb-3 sm:mb-4">
-              Lookup Registration
+              Registration Verification
             </h2>
             <form onSubmit={handleLookup} className="space-y-3 sm:space-y-4">
               <div>
-                <label htmlFor="transId" className="block text-sm font-medium text-gray-700 mb-2">
-                  Registration ID
-                </label>
-                <input
-                  type="text"
-                  id="transId"
-                  value={transId}
-                  onChange={(e) => setTransId(e.target.value.toUpperCase())}
-                  placeholder="Enter Registration ID"
-                  className="w-full px-3 sm:px-4 py-3 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-base sm:text-sm"
-                  maxLength={6}
-                  disabled={loading}
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    id="transId"
+                    value={transId}
+                    onChange={(e) => setTransId(e.target.value.toUpperCase())}
+                    placeholder=" Enter your Registration ID to verify status"
+                    className="w-full pl-3 sm:pl-4 pr-10 sm:pr-11 py-3 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-base sm:text-sm"
+                    maxLength={10}
+                    disabled={loading}
+                  />
+                  <button
+                    type="submit"
+                    disabled={loading || !transId.trim()}
+                    className="absolute right-3 sm:right-3 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-blue-600 disabled:text-gray-300 disabled:cursor-not-allowed transition-colors touch-target"
+                    aria-label="Search registration"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </button>
+                </div>
               </div>
               {error && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg text-xs sm:text-sm break-words">
                   {error}
                 </div>
               )}
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-3 sm:py-2.5 px-4 rounded-lg transition-colors duration-200 touch-target text-sm sm:text-base"
-              >
-                {loading ? 'Looking up...' : 'Lookup Registration'}
-              </button>
             </form>
           </div>
 
-          {/* Divider */}
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">OR</span>
-            </div>
-          </div>
-
-          {/* New Registration Link */}
-          <div>
-            {checkingStatus ? (
-              <div className="block w-full bg-gray-400 text-white font-semibold py-3 sm:py-3 px-4 rounded-lg text-center touch-target text-sm sm:text-base">
-                Checking availability...
-              </div>
-            ) : registrationStatus && !registrationStatus.isOpen ? (
-              <div className="space-y-2 sm:space-y-3">
-                <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg text-xs sm:text-sm text-center break-words">
-                  Thank you for your interest in joining the conference. We regret to inform you that all available slots are already filled.
-                </div>
-                <button
-                  disabled
-                  className="block w-full bg-gray-400 text-white font-semibold py-3 px-4 rounded-lg text-center cursor-not-allowed touch-target text-sm sm:text-base"
-                >
-                  Add New Registration
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={handleNewRegistration}
-                className="block w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg text-center transition-colors duration-200 touch-target text-sm sm:text-base"
-              >
-                Add New Registration
-              </button>
-            )}
-          </div>
         </div>
 
         <div className="mt-6 sm:mt-8 text-center text-xs sm:text-sm text-gray-500">
           <p>Need help? Contact the registration team.</p>
         </div>
       </div>
+
+      {/* Remaining Slots Modal */}
+      {showRemainingSlotsModal && remainingSlots !== null && remainingSlots > 0 && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setShowRemainingSlotsModal(false)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 sm:p-8" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-center mb-4">
+              <div className="bg-yellow-100 rounded-full p-3">
+                <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 text-center mb-4">
+              Limited Slots Available!
+            </h2>
+            <div className="text-center mb-6">
+              <p className="text-base sm:text-lg text-gray-700 mb-2">
+                Only <span className="font-bold text-red-600 text-xl sm:text-2xl">{remainingSlots}</span> {remainingSlots === 1 ? 'slot' : 'slots'} remaining
+              </p>
+              <p className="text-sm sm:text-base text-gray-600">
+                Register now to secure your spot for the conference.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+              <button
+                onClick={() => setShowRemainingSlotsModal(false)}
+                className="flex-1 px-4 py-2.5 sm:py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-lg transition-colors duration-200 touch-target text-sm sm:text-base"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setShowRemainingSlotsModal(false);
+                  handleNewRegistration();
+                }}
+                className="flex-1 px-4 py-2.5 sm:py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors duration-200 touch-target text-sm sm:text-base disabled:bg-gray-400 disabled:cursor-not-allowed"
+                disabled={loading || (registrationStatus !== null && !registrationStatus.isOpen)}
+              >
+                Register Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

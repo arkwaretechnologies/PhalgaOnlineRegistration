@@ -22,6 +22,7 @@ interface RegistrationEmailData {
   regdate: string;
   participantCount: number;
   viewUrl?: string;
+  conferenceName?: string;
 }
 
 /**
@@ -71,6 +72,9 @@ export async function sendRegistrationConfirmation(
 
     const formattedDate = formatDate(data.regdate);
     
+    // Get conference name from data or use default
+    const conferenceName = data.conferenceName || '18th Mindanao Geographic Conference';
+    
     // Get base URL for images - must be absolute URL for email clients
     // In Next.js, files in public folder are served from root
     // Remove trailing slash if present to avoid double slashes
@@ -96,7 +100,8 @@ export async function sendRegistrationConfirmation(
       baseUrl,
       viewUrl,
       nextPublicAppUrl: process.env.NEXT_PUBLIC_APP_URL,
-      nodeEnv: process.env.NODE_ENV
+      nodeEnv: process.env.NODE_ENV,
+      conferenceName
     });
 
     // Create HTML email template
@@ -131,7 +136,7 @@ export async function sendRegistrationConfirmation(
                   </td>
                   <td style="width: 40%; vertical-align: middle; text-align: center; padding: 0 10px;">
                     <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: bold; line-height: 1.2;">
-                      18th Mindanao Geographical Conference
+                      ${conferenceName}
                     </h1>
                     <p style="margin: 10px 0 0 0; color: #ffffff; font-size: 16px;">
                       Registration Confirmation
@@ -161,7 +166,7 @@ export async function sendRegistrationConfirmation(
               </p>
               
               <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
-                Thank you for registering for the <strong>18th Mindanao Geographic Conference</strong>. Your registration has been successfully submitted and is currently under review.
+                Thank you for registering for the <strong>${conferenceName}</strong>. Your registration has been successfully submitted and is currently under review.
               </p>
               
               <!-- Transaction ID Highlight -->
@@ -266,7 +271,7 @@ export async function sendRegistrationConfirmation(
     const result = await resend.emails.send({
       from: fromEmail,
       to: data.email,
-      subject: 'Registration Confirmation - 18th Mindanao Geographic Conference',
+      subject: `Registration Confirmation - ${conferenceName}`,
       html: htmlContent,
     });
 

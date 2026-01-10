@@ -13,10 +13,6 @@ interface Participant {
   lgu: string;
   barangay: string;
   tshirt: string;
-  contactNo: string;
-  prcNo: string;
-  expiryDate: string;
-  email: string;
 }
 
 // Default provinces list as fallback if API fails
@@ -59,11 +55,7 @@ export default function RegistrationForm() {
     position: '',
     lgu: '',
     barangay: '',
-    tshirt: '',
-    contactNo: '',
-    prcNo: '',
-    expiryDate: '',
-    email: ''
+    tshirt: ''
   }]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -220,11 +212,7 @@ export default function RegistrationForm() {
       position: '',
       lgu: lgu, // Default to header LGU
       barangay: '',
-      tshirt: '',
-      contactNo: '',
-      prcNo: '',
-      expiryDate: '',
-      email: ''
+      tshirt: ''
     }]);
   };
 
@@ -244,11 +232,7 @@ export default function RegistrationForm() {
       position: '',
       lgu: lgu, // Default to header LGU
       barangay: '',
-      tshirt: '',
-      contactNo: '',
-      prcNo: '',
-      expiryDate: '',
-      email: ''
+      tshirt: ''
     };
     setParticipants([...participants, newParticipant]);
   };
@@ -297,49 +281,65 @@ export default function RegistrationForm() {
       return;
     }
 
-    // Validate that at least one participant is filled out (requires both Last Name and First Name)
-    const filledParticipants = participants.filter(p => 
-      p.lastName && p.lastName.trim() !== '' && 
-      p.firstName && p.firstName.trim() !== ''
-    );
+    // Validate that all participants have all required fields filled
+    for (let i = 0; i < participants.length; i++) {
+      const p = participants[i];
+      if (!p.lastName || p.lastName.trim() === '') {
+        setErrorModalMessage(`Participant ${i + 1}: Last Name is required.`);
+        setShowErrorModal(true);
+        return;
+      }
+      if (!p.firstName || p.firstName.trim() === '') {
+        setErrorModalMessage(`Participant ${i + 1}: First Name is required.`);
+        setShowErrorModal(true);
+        return;
+      }
+      if (!p.middleInit || p.middleInit.trim() === '') {
+        setErrorModalMessage(`Participant ${i + 1}: Middle Initial is required.`);
+        setShowErrorModal(true);
+        return;
+      }
+      if (!p.position || p.position.trim() === '') {
+        setErrorModalMessage(`Participant ${i + 1}: Position is required.`);
+        setShowErrorModal(true);
+        return;
+      }
+      // LGU validation: participant LGU can be empty if header LGU is set (it will default)
+      const effectiveLgu = p.lgu && p.lgu.trim() !== '' ? p.lgu : lgu;
+      if (!effectiveLgu || effectiveLgu.trim() === '') {
+        setErrorModalMessage(`Participant ${i + 1}: LGU is required.`);
+        setShowErrorModal(true);
+        return;
+      }
+      if (!p.barangay || p.barangay.trim() === '') {
+        setErrorModalMessage(`Participant ${i + 1}: Barangay is required.`);
+        setShowErrorModal(true);
+        return;
+      }
+      if (!p.tshirt || p.tshirt.trim() === '') {
+        setErrorModalMessage(`Participant ${i + 1}: T-Shirt Size is required.`);
+        setShowErrorModal(true);
+        return;
+      }
+    }
 
-    if (filledParticipants.length === 0) {
-      setErrorModalMessage('Please fill out at least one participant with both Last Name and First Name.');
+    // Validate header fields
+    if (!province || province.trim() === '') {
+      setErrorModalMessage('Province is required.');
+      setShowErrorModal(true);
+      return;
+    }
+    if (!lgu || lgu.trim() === '') {
+      setErrorModalMessage('LGU is required.');
+      setShowErrorModal(true);
+      return;
+    }
+    if (!contactPerson || contactPerson.trim() === '') {
+      setErrorModalMessage('Contact Person is required.');
       setShowErrorModal(true);
       return;
     }
 
-    // Validate participant contact numbers and emails
-    for (const participant of participants) {
-      // Only validate if participant has at least a name (filled participant)
-      if (participant.lastName || participant.firstName) {
-        // Validate contact number if provided (must be exactly 11 digits or empty)
-        if (participant.contactNo && participant.contactNo.length !== 11) {
-          setErrorModalMessage(`Participant ${participant.firstName || participant.lastName || 'row'}: Contact number must be exactly 11 digits or left empty.`);
-          setShowErrorModal(true);
-          return;
-        }
-
-        // Validate email if provided
-        if (participant.email && !validateEmail(participant.email)) {
-          setErrorModalMessage(`Participant ${participant.firstName || participant.lastName || 'row'}: Please enter a valid email address or leave it empty.`);
-          setShowErrorModal(true);
-          return;
-        }
-      }
-    }
-
-    // Validate expiry dates
-    for (const participant of participants) {
-      if (participant.expiryDate) {
-        const dateObj = new Date(participant.expiryDate);
-        if (isNaN(dateObj.getTime())) {
-          setErrorModalMessage('Invalid date format in expiry date field.');
-          setShowErrorModal(true);
-          return;
-        }
-      }
-    }
 
     // Build form data
     const formData: any = {
@@ -360,10 +360,6 @@ export default function RegistrationForm() {
       formData[`LGU|${index}`] = p.lgu || lgu; // Use header LGU if participant LGU is empty
       formData[`BRGY|${index}`] = p.barangay;
       formData[`TSHIRTSIZE|${index}`] = p.tshirt;
-      formData[`CONTACTNUMBER|${index}`] = p.contactNo;
-      formData[`PRCNUM|${index}`] = p.prcNo;
-      formData[`EXPIRYDATE|${index}`] = p.expiryDate;
-      formData[`EMAIL|${index}`] = p.email;
     });
 
     // Store form data and show confirmation
@@ -755,28 +751,30 @@ export default function RegistrationForm() {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-gray-700 mb-1">M.I.</label>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">M.I. *</label>
                         <input
                           type="text"
                           value={participant.middleInit}
                           onChange={(e) => updateParticipant(participant.id, 'middleInit', e.target.value.toUpperCase())}
                           className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
                           maxLength={1}
+                          required
                         />
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">Position</label>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Position *</label>
                       <input
                         type="text"
                         value={participant.position}
                         onChange={(e) => updateParticipant(participant.id, 'position', e.target.value.toUpperCase())}
                         className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
+                        required
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="block text-xs font-semibold text-gray-700 mb-1">LGU</label>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">LGU *</label>
                         <input
                           type="text"
                           value={participant.lgu || lgu}
@@ -786,10 +784,11 @@ export default function RegistrationForm() {
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
                           placeholder={lgu || 'Enter LGU'}
+                          required
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-gray-700 mb-1">Barangay</label>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">Barangay *</label>
                         <input
                           type="text"
                           list={`barangay-list-mobile-${participant.id}`}
@@ -797,6 +796,7 @@ export default function RegistrationForm() {
                           onChange={(e) => updateParticipant(participant.id, 'barangay', e.target.value.toUpperCase())}
                           className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
                           disabled={!lgu}
+                          required
                         />
                         <datalist id={`barangay-list-mobile-${participant.id}`}>
                           {barangayOptions.map(b => <option key={b} value={b} />)}
@@ -804,73 +804,18 @@ export default function RegistrationForm() {
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">T-Shirt Size</label>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">T-Shirt Size *</label>
                       <select
                         value={participant.tshirt}
                         onChange={(e) => updateParticipant(participant.id, 'tshirt', e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
+                        required
                       >
                         <option value="">Select Size</option>
                         {TSHIRT_SIZES.map(size => (
                           <option key={size} value={size}>{size}</option>
                         ))}
                       </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">Contact No.</label>
-                      <input
-                        type="text"
-                        value={participant.contactNo}
-                        onChange={(e) => updateParticipant(participant.id, 'contactNo', formatContactNumber(e.target.value))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900 bg-white text-base"
-                        maxLength={11}
-                        pattern="[0-9]{11}"
-                        title="Contact number must be exactly 11 digits"
-                      />
-                      {participant.contactNo && participant.contactNo.length !== 11 && (
-                        <p className="text-xs text-red-600 mt-1">Must be 11 digits</p>
-                      )}
-                    </div>
-                    
-                    {/* FOR CPAs ONLY Section */}
-                    <div className="bg-blue-200 border border-blue-300 rounded p-3 mt-2">
-                      <div className="text-xs font-bold text-gray-900 mb-2 text-center">FOR CPAs ONLY</div>
-                      <div className="grid grid-cols-1 gap-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">PRC No.</label>
-                          <input
-                            type="text"
-                            value={participant.prcNo}
-                            onChange={(e) => updateParticipant(participant.id, 'prcNo', formatPRCNumber(e.target.value))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900 bg-white text-base"
-                            pattern="[0-9]*"
-                            title="PRC number must contain only numbers"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Expiry Date</label>
-                          <input
-                            type="date"
-                            value={participant.expiryDate}
-                            onChange={(e) => updateParticipant(participant.id, 'expiryDate', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900 bg-white text-base"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Email Address</label>
-                          <input
-                            type="email"
-                            value={participant.email}
-                            onChange={(e) => updateParticipant(participant.id, 'email', e.target.value)}
-                            className={`w-full px-3 py-2 border border-gray-300 rounded text-gray-900 bg-white text-base ${
-                              participant.email && !validateEmail(participant.email) ? 'border-red-500' : ''
-                            }`}
-                          />
-                          {participant.email && !validateEmail(participant.email) && (
-                            <p className="text-xs text-red-600 mt-1">Invalid email</p>
-                          )}
-                        </div>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -883,19 +828,12 @@ export default function RegistrationForm() {
             <table className="w-full border-collapse border border-gray-300">
               <thead>
                 <tr>
-                  <th colSpan={12} className="border border-gray-300 p-2 bg-gray-200 text-center">
+                  <th colSpan={8} className="border border-gray-300 p-2 bg-gray-200 text-center">
                     <span className="text-lg font-bold text-gray-900">LIST OF PARTICIPANTS</span>
                     <span className="ml-4 text-base font-normal text-gray-700">
                       (Total: {participants.length} {participants.length === 1 ? 'participant' : 'participants'})
                     </span>
                   </th>
-                </tr>
-                <tr>
-                  <th colSpan={8} className="border border-gray-300 p-2"></th>
-                  <th colSpan={3} className="border border-gray-300 p-2 bg-blue-200 text-center text-gray-900">
-                    FOR CPAs ONLY
-                  </th>
-                  <th className="border border-gray-300 p-2 w-40"></th>
                 </tr>
                 <tr>
                   <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">LAST NAME</th>
@@ -905,10 +843,6 @@ export default function RegistrationForm() {
                   <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">LGU</th>
                   <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">BARANGAY</th>
                   <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-32">T-SHIRT</th>
-                  <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">CONTACT NO.</th>
-                  <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">PRC NO.</th>
-                  <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">EXPIRY DATE</th>
-                  <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">EMAIL ADDRESS</th>
                   <th className="border border-gray-300 p-2 bg-gray-200 w-40 text-gray-900">ACTIONS</th>
                 </tr>
               </thead>
@@ -940,6 +874,7 @@ export default function RegistrationForm() {
                         onChange={(e) => updateParticipant(participant.id, 'middleInit', e.target.value.toUpperCase())}
                         className="w-full px-2 py-1.5 md:py-1 border-0 bg-transparent uppercase text-gray-900 text-sm"
                         maxLength={1}
+                        required
                       />
                     </td>
                     <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 w-48">
@@ -948,6 +883,7 @@ export default function RegistrationForm() {
                         value={participant.position}
                         onChange={(e) => updateParticipant(participant.id, 'position', e.target.value.toUpperCase())}
                         className="w-full px-2 py-1.5 md:py-1 border-0 bg-transparent uppercase text-gray-900 text-sm"
+                        required
                       />
                     </td>
                     <td className="border border-gray-300 p-1 bg-blue-50">
@@ -961,6 +897,7 @@ export default function RegistrationForm() {
                         }}
                         className="w-full px-1 py-0.5 border-0 bg-transparent uppercase text-gray-900"
                         placeholder={lgu || 'Enter LGU'}
+                        required
                       />
                     </td>
                     <td className="border border-gray-300 p-1 bg-blue-50">
@@ -972,6 +909,7 @@ export default function RegistrationForm() {
                         className="w-full px-1 py-0.5 border-0 bg-transparent uppercase text-gray-900"
                         disabled={!lgu}
                         title={!lgu ? 'Please select an LGU first' : ''}
+                        required
                       />
                       <datalist id={`barangay-list-${participant.id}`}>
                         {barangayOptions.map(b => <option key={b} value={b} />)}
@@ -982,57 +920,13 @@ export default function RegistrationForm() {
                         value={participant.tshirt}
                         onChange={(e) => updateParticipant(participant.id, 'tshirt', e.target.value)}
                         className="w-full px-1 py-0.5 border-0 bg-transparent uppercase text-gray-900"
+                        required
                       >
                         <option value="">Select Size</option>
                         {TSHIRT_SIZES.map(size => (
                           <option key={size} value={size}>{size}</option>
                         ))}
                       </select>
-                    </td>
-                    <td className="border border-gray-300 p-1 bg-blue-50">
-                      <input
-                        type="text"
-                        value={participant.contactNo}
-                        onChange={(e) => updateParticipant(participant.id, 'contactNo', formatContactNumber(e.target.value))}
-                        className="w-full px-1 py-0.5 border-0 bg-transparent text-gray-900"
-                        maxLength={11}
-                        pattern="[0-9]{11}"
-                        title="Contact number must be exactly 11 digits"
-                      />
-                      {participant.contactNo && participant.contactNo.length !== 11 && (
-                        <p className="text-xs text-red-600">11 digits</p>
-                      )}
-                    </td>
-                    <td className="border border-gray-300 p-1 bg-blue-50">
-                      <input
-                        type="text"
-                        value={participant.prcNo}
-                        onChange={(e) => updateParticipant(participant.id, 'prcNo', formatPRCNumber(e.target.value))}
-                        className="w-full px-1 py-0.5 border-0 bg-transparent text-gray-900"
-                        pattern="[0-9]*"
-                        title="PRC number must contain only numbers"
-                      />
-                    </td>
-                    <td className="border border-gray-300 p-1 bg-blue-50">
-                      <input
-                        type="date"
-                        value={participant.expiryDate}
-                        onChange={(e) => updateParticipant(participant.id, 'expiryDate', e.target.value)}
-                        className="w-full px-1 py-0.5 border-0 bg-transparent text-gray-900"
-                      />
-                    </td>
-                    <td className="border border-gray-300 p-1 bg-blue-50">
-                      <input
-                        type="email"
-                        value={participant.email}
-                        onChange={(e) => updateParticipant(participant.id, 'email', e.target.value)}
-                        className={`w-full px-1 py-0.5 border-0 bg-transparent text-gray-900 ${
-                          participant.email && !validateEmail(participant.email) ? 'border border-red-500' : ''
-                        }`}
-                      />
-                      {participant.email && !validateEmail(participant.email) && (
-                        <p className="text-xs text-red-600">Invalid email</p>
-                      )}
                     </td>
                     <td className="border border-gray-300 p-1">
                       <div className="flex gap-1">
@@ -1119,7 +1013,7 @@ export default function RegistrationForm() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
                   </div>
-                  <h2 className="text-xl font-bold text-gray-900 ml-3">Registration Error</h2>
+                  <h2 className="text-xl font-bold text-gray-900 ml-3">Unable to submit registration</h2>
                 </div>
                 <div className="mb-6">
                   <p className="text-gray-700 whitespace-pre-line">{errorModalMessage}</p>
@@ -1230,15 +1124,6 @@ export default function RegistrationForm() {
                             <div><span className="font-semibold text-gray-700">LGU:</span> <span className="text-gray-900">{pendingFormData[`LGU|${index}`] || '-'}</span></div>
                             <div><span className="font-semibold text-gray-700">Barangay:</span> <span className="text-gray-900">{pendingFormData[`BRGY|${index}`] || '-'}</span></div>
                             <div><span className="font-semibold text-gray-700">T-Shirt:</span> <span className="text-gray-900">{pendingFormData[`TSHIRTSIZE|${index}`] || '-'}</span></div>
-                            <div><span className="font-semibold text-gray-700">Contact:</span> <span className="text-gray-900">{pendingFormData[`CONTACTNUMBER|${index}`] || '-'}</span></div>
-                            {(pendingFormData[`PRCNUM|${index}`] || pendingFormData[`EXPIRYDATE|${index}`] || pendingFormData[`EMAIL|${index}`]) && (
-                              <div className="mt-2 pt-2 border-t border-gray-300">
-                                <div className="text-xs font-bold text-gray-900 mb-1">FOR CPAs ONLY</div>
-                                {pendingFormData[`PRCNUM|${index}`] && <div><span className="font-semibold text-gray-700">PRC No:</span> <span className="text-gray-900">{pendingFormData[`PRCNUM|${index}`]}</span></div>}
-                                {pendingFormData[`EXPIRYDATE|${index}`] && <div><span className="font-semibold text-gray-700">Expiry:</span> <span className="text-gray-900">{formatDate(pendingFormData[`EXPIRYDATE|${index}`])}</span></div>}
-                                {pendingFormData[`EMAIL|${index}`] && <div><span className="font-semibold text-gray-700">Email:</span> <span className="text-gray-900 break-words">{pendingFormData[`EMAIL|${index}`]}</span></div>}
-                              </div>
-                            )}
                           </div>
                         </div>
                       );
@@ -1257,10 +1142,6 @@ export default function RegistrationForm() {
                           <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">LGU</th>
                           <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">Barangay</th>
                           <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-32">T-Shirt</th>
-                          <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">Contact No.</th>
-                          <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">PRC No.</th>
-                          <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">Expiry Date</th>
-                          <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">Email</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1280,10 +1161,6 @@ export default function RegistrationForm() {
                               <td className="border border-gray-300 p-2 text-gray-900">{pendingFormData[`LGU|${index}`] || '-'}</td>
                               <td className="border border-gray-300 p-2 text-gray-900">{pendingFormData[`BRGY|${index}`] || '-'}</td>
                               <td className="border border-gray-300 p-2 text-gray-900 w-32">{pendingFormData[`TSHIRTSIZE|${index}`] || '-'}</td>
-                              <td className="border border-gray-300 p-2 text-gray-900">{pendingFormData[`CONTACTNUMBER|${index}`] || '-'}</td>
-                              <td className="border border-gray-300 p-2 text-gray-900">{pendingFormData[`PRCNUM|${index}`] || '-'}</td>
-                              <td className="border border-gray-300 p-2 text-gray-900">{formatDate(pendingFormData[`EXPIRYDATE|${index}`]) || '-'}</td>
-                              <td className="border border-gray-300 p-2 text-gray-900">{pendingFormData[`EMAIL|${index}`] || '-'}</td>
                             </tr>
                           );
                         })}

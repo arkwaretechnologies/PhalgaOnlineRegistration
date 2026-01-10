@@ -163,6 +163,80 @@ export async function POST(request: Request) {
     const contactperson = formData.CONTACTPERSON.toUpperCase();
     const contactnum = formData.CONTACTNUMBER.toUpperCase();
     const email = formData.EMAILADDRESS.toLowerCase();
+    const detailcount = parseInt(formData.DETAILCOUNT);
+
+    // Check for duplicate participants (same last name, first name, middle initial in same province and LGU)
+    console.log('=== Checking for Duplicate Participants ===');
+    console.log(`Province: ${province}, LGU: ${lgu}, Conference: ${confcode}, Participant Count: ${detailcount}`);
+    
+    for (let i = 0; i < detailcount; i++) {
+      const lastname = (formData[`LASTNAME|${i}`] || '').toUpperCase().trim();
+      const firstname = (formData[`FIRSTNAME|${i}`] || '').toUpperCase().trim();
+      const middleinit = (formData[`MI|${i}`] || '').toUpperCase().trim();
+      
+      if (!lastname || !firstname || !middleinit) {
+        continue; // Skip validation if required fields are empty (handled by client-side validation)
+      }
+      
+      // Get participant's LGU (use participant LGU if provided, otherwise use header LGU)
+      const participantLgu = (formData[`LGU|${i}`] || lgu).toUpperCase().trim();
+      
+      // Query existing participants in the same province and LGU with matching name
+      const { data: existingParticipants, error: duplicateError } = await supabase
+        .from('regd')
+        .select(`
+          regid,
+          confcode,
+          province,
+          lgu,
+          lastname,
+          firstname,
+          middleinit,
+          regh!left(regid, status, confcode)
+        `)
+        .eq('confcode', confcode)
+        .eq('province', province)
+        .eq('lgu', participantLgu)
+        .eq('lastname', lastname)
+        .eq('firstname', firstname)
+        .eq('middleinit', middleinit);
+      
+      if (duplicateError) {
+        console.error('Error checking for duplicates:', duplicateError);
+        return NextResponse.json(
+          { error: 'Failed to validate registration data' },
+          { status: 500 }
+        );
+      }
+      
+      // Filter to only include records with PENDING or APPROVED status (or NULL status)
+      const validDuplicates = (existingParticipants || []).filter((record: any) => {
+        const regh = Array.isArray(record.regh) ? record.regh[0] : record.regh;
+        if (!regh) {
+          return true; // Include records with NULL status
+        }
+        if (regh.confcode && regh.confcode !== confcode) {
+          return false;
+        }
+        const status = (regh.status || '').toString().toUpperCase().trim();
+        return !status || status === 'PENDING' || status === 'APPROVED';
+      });
+      
+      if (validDuplicates.length > 0) {
+        console.log(`Duplicate found: ${firstname} ${middleinit} ${lastname} in ${province} - ${participantLgu}`);
+        return NextResponse.json(
+          { 
+            error: `Participant "${firstname} ${middleinit} ${lastname}" already exists in ${province} - ${participantLgu}. Each participant can only register once per Province-LGU combination.`,
+            duplicateParticipant: `${firstname} ${middleinit} ${lastname}`,
+            province: province,
+            lgu: participantLgu
+          },
+          { status: 400 }
+        );
+      }
+    }
+    
+    console.log('✓ No duplicate participants found');
 
     // Generate unique REGID with conference prefix
     const prefix = conference.prefix || null;
@@ -219,7 +293,6 @@ export async function POST(request: Request) {
     }
 
     const regidFromHeader = headerData.regid || regId; // Use regid from header or fallback to generated regId
-    const detailcount = parseInt(formData.DETAILCOUNT);
 
     // Prepare detail records
     const detailRecords = [];
@@ -244,6 +317,9 @@ export async function POST(request: Request) {
         }
       }
 
+      // Get participant's LGU (use participant LGU if provided, otherwise use header LGU)
+      const participantLguForRecord = (formData[`LGU|${i}`] || lgu).toUpperCase();
+      
       // Note: regd table now uses regid (not regnum) as foreign key to regh
       detailRecords.push({
         confcode: confcode,
@@ -254,7 +330,7 @@ export async function POST(request: Request) {
         middleinit: middleinit,
         designation: designation,
         brgy: brgy,
-        lgu: lgu,
+        lgu: participantLguForRecord, // Use participant's LGU if different from header
         province: province,
         tshirtsize: tshirtsize,
         contactnum: contactnumDetail,
@@ -292,7 +368,8 @@ export async function POST(request: Request) {
         participantCount: detailcount,
         viewUrl: process.env.NEXT_PUBLIC_APP_URL 
           ? `${process.env.NEXT_PUBLIC_APP_URL}/view/${regId}`
-          : undefined
+          : undefined,
+        conferenceName: conference.name || undefined
       });
 
       if (emailResult.success) {

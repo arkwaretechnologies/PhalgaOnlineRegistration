@@ -55,3 +55,100 @@ input::placeholder {
   }
 }
 
+/* Responsive typography and touch targets */
+@layer base {
+  /* Minimum touch target size (44x44px for accessibility) */
+  button, a, input[type="button"], input[type="submit"], input[type="file"], 
+  select, label {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Ensure inputs don't trigger unwanted zoom on iOS (min 16px) */
+  input, select, textarea {
+    font-size: 16px;
+  }
+
+  @media (min-width: 640px) {
+    input, select, textarea {
+      font-size: 14px;
+    }
+  }
+
+  /* Responsive font sizes for headings */
+  h1 {
+    font-size: 1.5rem;
+    line-height: 1.5;
+  }
+
+  @media (min-width: 640px) {
+    h1 {
+      font-size: 1.875rem;
+    }
+  }
+
+  h2 {
+    font-size: 1.25rem;
+    line-height: 1.5;
+  }
+
+  @media (min-width: 640px) {
+    h2 {
+      font-size: 1.5rem;
+    }
+  }
+
+  /* Safe area insets for mobile devices */
+  body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* Custom utilities for responsive design */
+@layer utilities {
+  /* Prevent horizontal scrolling */
+  .no-horizontal-scroll {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
+  /* Touch-friendly spacing */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 12px 16px;
+  }
+
+  /* Responsive padding */
+  .mobile-padding {
+    padding: 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .mobile-padding {
+      padding: 1.5rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .mobile-padding {
+      padding: 2rem;
+    }
+  }
+}
+
+/* Extra small screens (320px - 375px) */
+@media (max-width: 375px) {
+  body {
+    font-size: 13px;
+  }
+
+  h1 {
+    font-size: 1.25rem;
+  }
+
+  h2 {
+    font-size: 1.125rem;
+  }
+}

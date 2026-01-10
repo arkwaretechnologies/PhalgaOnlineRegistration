@@ -61,8 +61,8 @@ export async function GET(request: Request) {
     });
 
     const registrationCount = validRecords.length;
-    const limit = getProvinceLguLimit();
-    const isOpen = isProvinceLguRegistrationOpen(registrationCount);
+    const limit = await getProvinceLguLimit();
+    const isOpen = await isProvinceLguRegistrationOpen(registrationCount);
 
     console.log(`Province-LGU Registration Count: ${registrationCount}`);
     console.log(`Province-LGU Limit: ${limit}`);

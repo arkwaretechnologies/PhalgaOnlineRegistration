@@ -102,7 +102,7 @@ export async function POST(request: Request) {
     });
 
     const regcount = validRecords.length;
-    const limit = getRegistrationLimit();
+    const limit = await getRegistrationLimit();
 
     console.log(`Total regd records: ${regdData?.length || 0}`);
     console.log(`Valid records (PENDING/APPROVED/NULL): ${regcount}`);
@@ -111,7 +111,7 @@ export async function POST(request: Request) {
     console.log('==========================================');
 
     // Check if registration is open (registration closes when count >= limit)
-    if (!isRegistrationOpen(regcount)) {
+    if (!(await isRegistrationOpen(regcount))) {
       console.log(
         `Registration closed: current count=${regcount}, limit=${limit}`
       );
@@ -158,7 +158,7 @@ export async function POST(request: Request) {
     });
 
     const provinceLguCount = validProvinceLguRecords.length;
-    const provinceLguLimit = getProvinceLguLimit();
+    const provinceLguLimit = await getProvinceLguLimit();
     const participantsToAdd = parseInt(formData.DETAILCOUNT);
 
     console.log('=== Province-LGU Count Check (Submit) ===');
@@ -170,7 +170,7 @@ export async function POST(request: Request) {
     console.log('==========================================');
 
     // Check if adding these participants would exceed the Province-LGU limit
-    if (!isProvinceLguRegistrationOpen(provinceLguCount + participantsToAdd)) {
+    if (!(await isProvinceLguRegistrationOpen(provinceLguCount + participantsToAdd))) {
       console.log(
         `Province-LGU registration closed: current count=${provinceLguCount}, limit=${provinceLguLimit}, trying to add=${participantsToAdd}`
       );

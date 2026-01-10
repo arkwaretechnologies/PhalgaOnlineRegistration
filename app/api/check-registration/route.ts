@@ -56,8 +56,8 @@ export async function GET() {
       regh_status: Array.isArray(r.regh) ? r.regh[0]?.status : r.regh?.status
     })));
     
-    const limit = getRegistrationLimit();
-    const isOpen = isRegistrationOpen(registrationCount);
+    const limit = await getRegistrationLimit();
+    const isOpen = await isRegistrationOpen(registrationCount);
     
     console.log(`Registration Count: ${registrationCount}`);
     console.log(`Registration Limit: ${limit}`);

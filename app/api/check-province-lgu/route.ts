@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
-import { getProvinceLguLimit } from '@/lib/config';
 import { getConferenceCode } from '@/lib/conference';
 
 // Disable caching for this route to ensure fresh data
@@ -76,19 +75,15 @@ export async function GET(request: Request) {
     });
 
     const registrationCount = validRecords.length;
-    const limit = await getProvinceLguLimit();
-    const isOpen = registrationCount < limit;
 
     console.log(`Province-LGU Registration Count: ${registrationCount}`);
-    console.log(`Province-LGU Limit: ${limit}`);
-    console.log(`Is Open: ${isOpen}`);
+    console.log('Note: Province-LGU limit checking has been removed');
     console.log('================================');
 
+    // Return count only (limit checking removed)
     return NextResponse.json(
       { 
         count: registrationCount,
-        limit: limit,
-        isOpen: isOpen,
         province: province.toUpperCase(),
         lgu: lgu.toUpperCase(),
         conference: {

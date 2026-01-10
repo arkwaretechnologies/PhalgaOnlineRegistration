@@ -44,11 +44,26 @@ export async function GET(request: Request) {
 
       const provinces = allProvinces?.map((row) => row.lguname) || [];
       
+      // Add fixed city class provinces at the top
+      const fixedCityClasses = [
+        'HIGHLY URBANIZED CITY',
+        'INDEPENDENT COMPONENT CITY',
+        'COMPONENT CITY'
+      ];
+      
+      // Sort provinces alphabetically
+      provinces.sort((a, b) => a.localeCompare(b));
+      
+      // Combine fixed provinces at the top with fetched provinces
+      const finalProvinces = [...fixedCityClasses, ...provinces];
+      
       console.log(`Fetched ${provinces.length} provinces (all provinces):`);
-      console.log(provinces);
+      console.log(`Fixed city class provinces: ${fixedCityClasses.length}`);
+      console.log(`Total provinces: ${finalProvinces.length}`);
+      console.log('Provinces list:', finalProvinces);
       console.log('========================');
       
-      return NextResponse.json(provinces, {
+      return NextResponse.json(finalProvinces, {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
           'Pragma': 'no-cache',
@@ -123,12 +138,24 @@ export async function GET(request: Request) {
     // Sort provinces alphabetically
     allProvinces.sort((a, b) => a.localeCompare(b));
 
+    // Add fixed city class provinces at the top
+    const fixedCityClasses = [
+      'HIGHLY URBANIZED CITY',
+      'INDEPENDENT COMPONENT CITY',
+      'COMPONENT CITY'
+    ];
+    
+    // Combine fixed provinces at the top with fetched provinces
+    const finalProvinces = [...fixedCityClasses, ...allProvinces];
+
     console.log(`=== Final Result ===`);
-    console.log(`Total unique provinces fetched: ${allProvinces.length}`);
-    console.log('Provinces list:', allProvinces);
+    console.log(`Fixed city class provinces: ${fixedCityClasses.length}`);
+    console.log(`Regular provinces fetched: ${allProvinces.length}`);
+    console.log(`Total provinces: ${finalProvinces.length}`);
+    console.log('Provinces list:', finalProvinces);
     console.log('===================');
 
-    return NextResponse.json(allProvinces, {
+    return NextResponse.json(finalProvinces, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
         'Pragma': 'no-cache',

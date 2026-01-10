@@ -1,15 +1,28 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
+import { getConferenceByDomain } from '@/lib/conference';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function GET(request: Request) {
   try {
+    // Detect conference from domain
+    const hostname = request.headers.get('host') || request.headers.get('x-forwarded-host');
+    const conference = await getConferenceByDomain(hostname || undefined);
+
+    if (!conference) {
+      return NextResponse.json(
+        { error: 'Conference not found for this domain. Please check your configuration.' },
+        { status: 400 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const province = searchParams.get('province');
 
     console.log('=== Fetching LGUs ===');
+    console.log('Conference:', conference.confcode);
     console.log('Province selected:', province);
 
     if (!province) {
@@ -19,6 +32,108 @@ export async function GET(request: Request) {
       );
     }
 
+    const provinceUpper = province.trim().toUpperCase();
+
+    // Check if it's one of the special city class provinces
+    let cityClass: string | null = null;
+    if (provinceUpper === 'HIGHLY URBANIZED CITY') {
+      cityClass = 'HUC';
+    } else if (provinceUpper === 'INDEPENDENT COMPONENT CITY') {
+      cityClass = 'ICC';
+    } else if (provinceUpper === 'COMPONENT CITY') {
+      cityClass = 'CC';
+    }
+
+    // If it's a city class selection, filter by city_class AND PSGC prefix
+    if (cityClass) {
+      console.log(`Fetching LGUs by city_class: ${cityClass}`);
+      console.log('Conference PSGC filter:', conference.psgc || 'none');
+
+      let allLGUs: string[] = [];
+      const seenLGUs = new Set<string>();
+
+      // If no PSGC filter is set, return all LGUs with the city class
+      if (!conference.psgc || conference.psgc.trim() === '') {
+        console.log('No PSGC filter set - fetching all LGUs with city_class');
+        const { data: lguData, error: lguError } = await supabase
+          .from('lgus')
+          .select('lguname, psgc, geolevel, city_class')
+          .eq('city_class', cityClass)
+          .in('geolevel', ['MUN', 'CITY'])
+          .order('lguname', { ascending: true });
+
+        if (lguError) {
+          console.error('Database error fetching LGUs by city_class:', lguError);
+          return NextResponse.json(
+            { error: 'Failed to fetch LGUs' },
+            { status: 500 }
+          );
+        }
+
+        allLGUs = lguData?.map((row) => row.lguname) || [];
+      } else {
+        // Parse comma-separated PSGC prefixes
+        const psgcPrefixes = conference.psgc
+          .split(',')
+          .map(p => p.trim())
+          .filter(p => p !== '');
+
+        console.log('PSGC Prefixes parsed:', psgcPrefixes);
+
+        // Query for each PSGC prefix
+        for (const prefix of psgcPrefixes) {
+          console.log(`Querying LGUs for PSGC prefix: "${prefix}" with city_class=${cityClass}`);
+          const { data: lguData, error: lguError } = await supabase
+            .from('lgus')
+            .select('lguname, psgc, geolevel, city_class')
+            .eq('city_class', cityClass)
+            .in('geolevel', ['MUN', 'CITY'])
+            .ilike('psgc', `${prefix}%`)
+            .order('lguname', { ascending: true });
+
+          if (lguError) {
+            console.error(`Database error fetching LGUs for PSGC prefix ${prefix}:`, lguError);
+            continue; // Skip this prefix if there's an error
+          }
+
+          if (lguData) {
+            for (const row of lguData) {
+              // Check if PSGC starts with the prefix and has matching city_class
+              if (row.psgc && row.psgc.startsWith(prefix) && row.lguname) {
+                if (!seenLGUs.has(row.lguname)) {
+                  seenLGUs.add(row.lguname);
+                  allLGUs.push(row.lguname);
+                  console.log(`  ✓ Added LGU: "${row.lguname}" (PSGC: ${row.psgc}, city_class: ${row.city_class})`);
+                }
+              }
+            }
+          }
+        }
+
+        // Sort LGUs alphabetically
+        allLGUs.sort((a, b) => a.localeCompare(b));
+      }
+
+      console.log(`Found ${allLGUs.length} LGUs with city_class=${cityClass}`);
+      
+      if (allLGUs.length > 0) {
+        console.log('LGUs (first 20):', allLGUs.slice(0, 20));
+      }
+
+      console.log('=== Final LGUs List ===');
+      console.log('Total LGUs:', allLGUs.length);
+      console.log('======================');
+
+      return NextResponse.json(allLGUs, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
+    }
+
+    // Otherwise, use the normal province-based filtering
     // Get PSGC for the province (must have geolevel = 'PROV')
     // Using ilike for case-insensitive matching of province name
     const { data: psgcData, error: psgcError } = await supabase

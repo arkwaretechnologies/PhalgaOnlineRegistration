@@ -19,7 +19,8 @@ interface Participant {
   email: string;
 }
 
-const PROVINCES = [
+// Default provinces list as fallback if API fails
+const DEFAULT_PROVINCES = [
   'ABRA', 'AGUSAN DEL NORTE', 'AGUSAN DEL SUR', 'AKLAN', 'ALBAY', 'ANTIQUE',
   'APAYAO', 'AURORA', 'BASILAN', 'BATAAN', 'BATANES', 'BATANGAS', 'BENGUET',
   'BILIRAN', 'BOHOL', 'BUKIDNON', 'BULACAN', 'CAGAYAN', 'CAMARINES NORTE',
@@ -49,6 +50,7 @@ export default function RegistrationForm() {
   const [contactNo, setContactNo] = useState('');
   const [emailAddress, setEmailAddress] = useState('');
   const [lguOptions, setLguOptions] = useState<string[]>([]);
+  const [barangayOptions, setBarangayOptions] = useState<string[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([{
     id: 1,
     lastName: '',
@@ -76,7 +78,9 @@ export default function RegistrationForm() {
     date_from: string | null;
     date_to: string | null;
     venue: string | null;
+    psgc: string | null;
   } | null>(null);
+  const [provinces, setProvinces] = useState<string[]>([]); // Start with empty array - only show fetched provinces
 
   useEffect(() => {
     // Fetch conference information
@@ -93,7 +97,8 @@ export default function RegistrationForm() {
             name: '18th Mindanao Geographic Conference',
             date_from: null,
             date_to: null,
-            venue: null
+            venue: null,
+            psgc: null
           });
         }
       })
@@ -105,8 +110,31 @@ export default function RegistrationForm() {
           name: '18th Mindanao Geographic Conference',
           date_from: null,
           date_to: null,
-          venue: null
+          venue: null,
+          psgc: null
         });
+      });
+
+    // Fetch provinces filtered by conference PSGC
+    console.log('=== Fetching Provinces from API ===');
+    fetch('/api/get-provinces')
+      .then(res => res.json())
+      .then(data => {
+        console.log('API Response:', data);
+        if (data && !data.error && Array.isArray(data)) {
+          console.log(`✓ Successfully fetched ${data.length} provinces from API`);
+          console.log('Provinces list:', data);
+          setProvinces(data);
+        } else {
+          console.warn('✗ Failed to fetch provinces from API:', data);
+          // Keep empty array - only show fetched provinces, no fallback
+          setProvinces([]);
+        }
+      })
+      .catch(err => {
+        console.error('✗ Error fetching provinces:', err);
+        // Keep empty array - only show fetched provinces, no fallback
+        setProvinces([]);
       });
 
     // Check if registration is open
@@ -136,19 +164,54 @@ export default function RegistrationForm() {
     }
   }, [province]);
 
+  // Fetch barangays when LGU changes
+  useEffect(() => {
+    if (lgu) {
+      console.log('=== Fetching Barangays for LGU ===');
+      console.log('LGU selected:', lgu);
+      fetch(`/api/get-barangays?lgu=${encodeURIComponent(lgu)}`)
+        .then(res => res.json())
+        .then(data => {
+          console.log('Barangays API Response:', data);
+          if (data && !data.error && Array.isArray(data)) {
+            console.log(`✓ Successfully fetched ${data.length} barangays for LGU: ${lgu}`);
+            console.log('Barangays list:', data);
+            setBarangayOptions(data);
+          } else {
+            console.warn('✗ Failed to fetch barangays from API:', data);
+            setBarangayOptions([]);
+          }
+        })
+        .catch(err => {
+          console.error('✗ Error fetching barangays:', err);
+          setBarangayOptions([]);
+        });
+    } else {
+      setBarangayOptions([]);
+    }
+  }, [lgu]);
+
   // Update all participant LGUs when header LGU changes
   useEffect(() => {
     if (lgu) {
       setParticipants(prevParticipants => 
         prevParticipants.map(p => ({
           ...p,
-          lgu: lgu // Update all participant LGUs to match header LGU
+          lgu: lgu, // Update all participant LGUs to match header LGU
+          barangay: '' // Reset barangay when LGU changes
         }))
       );
     }
   }, [lgu]);
 
+  const MAX_PARTICIPANTS = 20;
+
   const addParticipant = () => {
+    if (participants.length >= MAX_PARTICIPANTS) {
+      setErrorModalMessage(`Maximum ${MAX_PARTICIPANTS} participants allowed per registration.`);
+      setShowErrorModal(true);
+      return;
+    }
     setParticipants([...participants, {
       id: participants.length + 1,
       lastName: '',
@@ -278,46 +341,6 @@ export default function RegistrationForm() {
       }
     }
 
-    // Check Province-LGU limit before proceeding
-    if (province && lgu) {
-      try {
-        const checkResponse = await fetch(
-          `/api/check-province-lgu?province=${encodeURIComponent(province)}&lgu=${encodeURIComponent(lgu)}`
-        );
-        const checkData = await checkResponse.json();
-
-        if (!checkResponse.ok) {
-          setErrorModalMessage('Failed to check registration limit. Please try again.');
-          setShowErrorModal(true);
-          return;
-        }
-
-        const currentCount = checkData.count || 0;
-        const limit = checkData.limit || 10;
-        const participantsToAdd = participants.filter(p => 
-          p.lastName && p.lastName.trim() !== '' && 
-          p.firstName && p.firstName.trim() !== ''
-        ).length;
-        const totalAfterSubmission = currentCount + participantsToAdd;
-
-        if (!checkData.isOpen || totalAfterSubmission > limit) {
-          setErrorModalMessage(
-            `Registration limit reached for ${province} - ${lgu}.\n\n` +
-            `Current: ${currentCount}/${limit} participants\n` +
-            `Trying to add: ${participantsToAdd} participants\n` +
-            `Maximum ${limit} participants allowed per Province-LGU combination.`
-          );
-          setShowErrorModal(true);
-          return;
-        }
-      } catch (error) {
-        console.error('Error checking Province-LGU limit:', error);
-        setErrorModalMessage('Failed to check registration limit. Please try again.');
-        setShowErrorModal(true);
-        return;
-      }
-    }
-
     // Build form data
     const formData: any = {
       CONFERENCE: conference?.confcode || '2026-GCMIN', // Use conference code from database
@@ -410,43 +433,6 @@ export default function RegistrationForm() {
         return;
       }
 
-      // Check Province-LGU limit before submitting
-      if (pendingFormData.PROVINCE && pendingFormData.LGU) {
-        const provinceLguResponse = await fetch(
-          `/api/check-province-lgu?province=${encodeURIComponent(pendingFormData.PROVINCE)}&lgu=${encodeURIComponent(pendingFormData.LGU)}`
-        );
-        const provinceLguData = await provinceLguResponse.json();
-
-        if (!provinceLguResponse.ok) {
-          setIsSubmitting(false);
-          setShowConfirmation(false);
-          setTimeout(() => {
-            setErrorModalMessage('Failed to check Province-LGU registration limit. Please try again.');
-            setShowErrorModal(true);
-          }, 100);
-          return;
-        }
-
-        const provinceLguCount = provinceLguData.count || 0;
-        const provinceLguLimit = provinceLguData.limit || 10;
-        const provinceLguTotalAfter = provinceLguCount + participantsToAdd;
-
-        if (!provinceLguData.isOpen || provinceLguTotalAfter > provinceLguLimit) {
-          setIsSubmitting(false);
-          setShowConfirmation(false);
-          setTimeout(() => {
-            setErrorModalMessage(
-              `Registration limit reached for ${pendingFormData.PROVINCE} - ${pendingFormData.LGU}.\n\n` +
-              `Current: ${provinceLguCount}/${provinceLguLimit} participants\n` +
-              `Trying to add: ${participantsToAdd} participants\n` +
-              `Maximum ${provinceLguLimit} participants allowed per Province-LGU combination.`
-            );
-            setShowErrorModal(true);
-          }, 100);
-          return;
-        }
-      }
-
       // All checks passed - proceed with submission
       setShowConfirmation(false);
 
@@ -461,7 +447,7 @@ export default function RegistrationForm() {
       const data = await response.json();
 
       if (response.ok && data.transId) {
-        // Redirect to landing page with transaction ID
+        // Redirect to landing page with registration ID
         router.push(`/?success=true&transId=${encodeURIComponent(data.transId)}`);
       } else {
         setIsSubmitting(false);
@@ -474,21 +460,6 @@ export default function RegistrationForm() {
             setErrorModalMessage(
               `Registration is closed. All slots are full.\n\n` +
               `Current: ${errorCurrentCount}/${errorLimit} participants`
-            );
-            setShowErrorModal(true);
-          }, 100);
-        } else if (data.error && (data.error.includes('Registration limit reached') || data.error.includes('Province-LGU'))) {
-          // Handle Province-LGU limit error
-          const errorProvince = data.province || pendingFormData.PROVINCE;
-          const errorLgu = data.lgu || pendingFormData.LGU;
-          const errorCurrentCount = data.currentCount || 0;
-          const errorLimit = data.limit || 10;
-          // Use setTimeout to ensure any modals close before error modal shows
-          setTimeout(() => {
-            setErrorModalMessage(
-              `Registration limit reached for ${errorProvince} - ${errorLgu}.\n\n` +
-              `Current: ${errorCurrentCount}/${errorLimit} participants\n` +
-              `Maximum ${errorLimit} participants allowed per Province-LGU combination.`
             );
             setShowErrorModal(true);
           }, 100);
@@ -576,7 +547,7 @@ export default function RegistrationForm() {
                 required
               />
               <datalist id="provinces-list-mobile">
-                {PROVINCES.map(p => <option key={p} value={p} />)}
+                {provinces.map(p => <option key={p} value={p} />)}
               </datalist>
             </div>
             <div className="border border-gray-300 rounded-lg p-3 bg-blue-50">
@@ -655,7 +626,7 @@ export default function RegistrationForm() {
                     required
                   />
                   <datalist id="provinces-list">
-                    {PROVINCES.map(p => <option key={p} value={p} />)}
+                    {provinces.map(p => <option key={p} value={p} />)}
                   </datalist>
                 </td>
               </tr>
@@ -821,10 +792,15 @@ export default function RegistrationForm() {
                         <label className="block text-xs font-semibold text-gray-700 mb-1">Barangay</label>
                         <input
                           type="text"
+                          list={`barangay-list-mobile-${participant.id}`}
                           value={participant.barangay}
                           onChange={(e) => updateParticipant(participant.id, 'barangay', e.target.value.toUpperCase())}
                           className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
+                          disabled={!lgu}
                         />
+                        <datalist id={`barangay-list-mobile-${participant.id}`}>
+                          {barangayOptions.map(b => <option key={b} value={b} />)}
+                        </datalist>
                       </div>
                     </div>
                     <div>
@@ -990,10 +966,16 @@ export default function RegistrationForm() {
                     <td className="border border-gray-300 p-1 bg-blue-50">
                       <input
                         type="text"
+                        list={`barangay-list-${participant.id}`}
                         value={participant.barangay}
                         onChange={(e) => updateParticipant(participant.id, 'barangay', e.target.value.toUpperCase())}
                         className="w-full px-1 py-0.5 border-0 bg-transparent uppercase text-gray-900"
+                        disabled={!lgu}
+                        title={!lgu ? 'Please select an LGU first' : ''}
                       />
+                      <datalist id={`barangay-list-${participant.id}`}>
+                        {barangayOptions.map(b => <option key={b} value={b} />)}
+                      </datalist>
                     </td>
                     <td className="border border-gray-300 p-1 bg-blue-50 w-32">
                       <select
@@ -1100,20 +1082,21 @@ export default function RegistrationForm() {
               <span>Back</span>
             </Link>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center flex-1 order-1 sm:order-2">
-              <button
-                type="button"
-                onClick={addParticipant}
-                className="w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors touch-target text-sm sm:text-base font-semibold"
-              >
-                Add New Row
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
+            <button
+              type="button"
+              onClick={addParticipant}
+              disabled={participants.length >= MAX_PARTICIPANTS}
+              className="w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors touch-target text-sm sm:text-base font-semibold"
+            >
+              Add New Row {participants.length >= MAX_PARTICIPANTS && `(Max ${MAX_PARTICIPANTS})`}
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
                 className="w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-400 transition-colors touch-target text-sm sm:text-base font-semibold"
-              >
-                {isSubmitting ? 'Submitting...' : 'Submit'}
-              </button>
+            >
+              {isSubmitting ? 'Submitting...' : 'Submit'}
+            </button>
             </div>
           </div>
 

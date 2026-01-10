@@ -63,18 +63,18 @@ npm run dev
 The application uses Supabase (PostgreSQL) with the following tables:
 
 ### REGH (Registration Header)
-- REGNUM (Primary Key, SERIAL - Auto Increment)
-- TRANSID (Unique 6-character identifier)
+- REGID (Primary Key - unique 6-character alphanumeric identifier)
 - CONFCODE
 - PROVINCE
 - LGU
 - CONTACTPERSON
 - CONTACTNUM
 - EMAIL
-- REGDATE (date type)
+- REGDATE (timestamp type)
 
 ### regd (Registration Details)
-- CONFCODE, REGNUM, LINENUM (Composite Primary Key)
+- CONFCODE, REGID, LINENUM (Composite Primary Key)
+- REGID (Foreign Key to REGH.REGID)
 - LASTNAME
 - FIRSTNAME
 - MIDDLEINIT
@@ -123,7 +123,7 @@ The application sends confirmation emails after successful registration using [R
 ### Email Features
 
 - Automatic confirmation email sent after successful registration
-- Includes transaction ID, registration details, and link to view registration
+- Includes registration ID, registration details, and link to view registration
 - Professional HTML email template
 - Email sending is non-blocking (registration succeeds even if email fails)
 
@@ -202,7 +202,7 @@ npm start
 - T-shirt sizes are limited to: S, M, L, XL, XXL
 - All text fields are automatically converted to uppercase
 - Date validation is performed on expiry dates
-- Each registration gets a unique TRANSID (6-character alphanumeric code)
+- Each registration gets a unique REGID (Registration ID - 6-character alphanumeric code)
 - The application uses Supabase for database operations (PostgreSQL)
 
 ## Migration from MySQL

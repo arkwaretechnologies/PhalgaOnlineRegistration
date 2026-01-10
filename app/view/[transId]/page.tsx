@@ -5,8 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 interface RegistrationHeader {
-  regnum: number;
-  transid: string;
+  regid: string;
   confcode: string;
   province: string;
   lgu: string;
@@ -21,7 +20,7 @@ interface RegistrationHeader {
 
 interface RegistrationDetail {
   confcode: string;
-  regnum: number;
+  regid: string;
   linenum: number;
   lastname: string;
   firstname: string;
@@ -202,7 +201,7 @@ export default function ViewRegistration() {
               <h1 className="text-xl sm:text-2xl font-bold text-gray-800 mb-1 sm:mb-2">
                 Registration Details
               </h1>
-              <p className="text-sm sm:text-base text-gray-600">18th Mindanao Geographic Conference</p>
+              <p className="text-sm sm:text-base text-gray-600">18th Mindanao Geographical Conference</p>
             </div>
             <Link
               href="/"
@@ -217,12 +216,8 @@ export default function ViewRegistration() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 mt-4 sm:mt-6">
             <div>
-              <span className="text-xs sm:text-sm font-medium text-gray-500">Transaction ID</span>
-              <p className="text-base sm:text-lg font-semibold text-gray-800 break-all">{header.transid}</p>
-            </div>
-            <div>
-              <span className="text-xs sm:text-sm font-medium text-gray-500">Registration Number</span>
-              <p className="text-base sm:text-lg font-semibold text-gray-800">{header.regnum.toString().padStart(4, '0')}</p>
+              <span className="text-xs sm:text-sm font-medium text-gray-500">Registration ID</span>
+              <p className="text-base sm:text-lg font-semibold text-gray-800 break-all">{header.regid}</p>
             </div>
             <div>
               <span className="text-xs sm:text-sm font-medium text-gray-500">Status</span>

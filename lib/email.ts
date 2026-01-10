@@ -167,10 +167,10 @@ export async function sendRegistrationConfirmation(
               <!-- Transaction ID Highlight -->
               <div style="background-color: #f8f9fa; border-left: 4px solid #667eea; padding: 15px; margin: 20px 0; border-radius: 4px;">
                 <p style="margin: 0 0 5px 0; color: #666666; font-size: 14px; font-weight: bold;">
-                  TRANSACTION ID
+                  REGISTRATION ID
                 </p>
                 <p style="margin: 0; color: #333333; font-size: 24px; font-weight: bold; letter-spacing: 2px;">
-                  ${data.transId}
+                  ${data.transId || 'N/A'}
                 </p>
               </div>
               

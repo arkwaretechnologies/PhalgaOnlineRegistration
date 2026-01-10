@@ -9,6 +9,8 @@ export interface ConferenceInfo {
   venue: string | null;
   reg_limit: number | null;
   domain: string | null;
+  prefix: string | null;
+  psgc: string | null;
 }
 
 /**

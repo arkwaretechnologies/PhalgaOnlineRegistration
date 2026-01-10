@@ -8,11 +8,11 @@ export const revalidate = 0;
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const transId = searchParams.get('transId');
+    const regId = searchParams.get('transId') || searchParams.get('regId'); // Support both for backward compatibility
 
-    if (!transId) {
+    if (!regId) {
       return NextResponse.json(
-        { error: 'Transaction ID parameter is required' },
+        { error: 'Registration ID parameter is required' },
         { status: 400 }
       );
     }
@@ -21,26 +21,27 @@ export async function GET(request: Request) {
     const { data: headerData, error: headerError } = await supabase
       .from('regh')
       .select('*')
-      .eq('transid', transId.toUpperCase())
+      .eq('regid', regId.toUpperCase())
       .single();
 
     console.log('=== Get Registration Debug ===');
-    console.log('transId:', transId);
+    console.log('regId:', regId);
     console.log('headerData:', JSON.stringify(headerData, null, 2));
     console.log('headerError:', headerError);
 
     if (headerError || !headerData) {
       return NextResponse.json(
-        { error: 'Transaction ID not found' },
+        { error: 'Registration ID not found' },
         { status: 404 }
       );
     }
 
     // Get registration details - ensure fresh data
+    // Note: regd table now uses regid (not regnum) as foreign key to regh
     const { data: detailData, error: detailError } = await supabase
       .from('regd')
       .select('*')
-      .eq('regnum', headerData.regnum)
+      .eq('regid', headerData.regid)
       .order('linenum', { ascending: true });
 
     if (detailError) {

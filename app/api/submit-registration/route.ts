@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
-import { getRegistrationLimitByConference, isProvinceLguRegistrationOpen, getProvinceLguLimit } from '@/lib/config';
+import { getRegistrationLimitByConference } from '@/lib/config';
 import { getConferenceByDomain, getConferenceCode } from '@/lib/conference';
 import { sendRegistrationConfirmation } from '@/lib/email';
 
@@ -19,35 +19,46 @@ interface RegistrationData {
   [key: string]: string; // For dynamic participant fields
 }
 
-// Function to generate random 6-character alphanumeric string
-function generateTransId(): string {
+// Function to generate random alphanumeric string
+// If prefix is provided, it will be prepended to the generated string
+// Total length will be: prefix.length + randomLength
+function generateRegId(prefix: string | null = null, randomLength: number = 6): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let result = '';
-  for (let i = 0; i < 6; i++) {
+  
+  // Generate random part
+  for (let i = 0; i < randomLength; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
+  
+  // Prepend prefix if provided
+  if (prefix && prefix.trim() !== '') {
+    return prefix.trim().toUpperCase() + result;
+  }
+  
   return result;
 }
 
-// Function to generate unique TRANSID that doesn't exist in database
-async function generateUniqueTransId(): Promise<string> {
-  let transId: string;
+// Function to generate unique REGID that doesn't exist in database
+// Prefix from conference table will be prepended if available
+async function generateUniqueRegId(prefix: string | null = null): Promise<string> {
+  let regId: string;
   let isUnique = false;
   let attempts = 0;
   const maxAttempts = 100; // Prevent infinite loop
 
   while (!isUnique && attempts < maxAttempts) {
-    transId = generateTransId();
+    regId = generateRegId(prefix);
     
-    // Check if TRANSID already exists
+    // Check if REGID already exists
     const { data, error } = await supabase
       .from('regh')
-      .select('transid')
-      .eq('transid', transId)
+      .select('regid')
+      .eq('regid', regId)
       .limit(1);
     
     if (error) {
-      throw new Error(`Failed to check transid uniqueness: ${error.message}`);
+      throw new Error(`Failed to check regid uniqueness: ${error.message}`);
     }
     
     if (!data || data.length === 0) {
@@ -58,10 +69,10 @@ async function generateUniqueTransId(): Promise<string> {
   }
 
   if (!isUnique) {
-    throw new Error('Failed to generate unique transid after multiple attempts');
+    throw new Error('Failed to generate unique regid after multiple attempts');
   }
 
-  return transId!;
+  return regId!;
 }
 
 export async function POST(request: Request) {
@@ -83,12 +94,13 @@ export async function POST(request: Request) {
     const formData: RegistrationData = await request.json();
     
     // Check registration count - filter by conference
+    // Note: regd table now uses regid (not regnum) as foreign key to regh
     const { data: regdData, error: regdError } = await supabase
       .from('regd')
       .select(`
-        regnum,
+        regid,
         confcode,
-        regh!left(regnum, status, confcode)
+        regh!left(regid, status, confcode)
       `)
       .eq('confcode', confcode); // Add conference filter
 
@@ -148,80 +160,15 @@ export async function POST(request: Request) {
     const province = formData.PROVINCE.toUpperCase();
     const lgu = formData.LGU.toUpperCase();
 
-    // Check Province-LGU specific limit - filter by conference
-    const { data: provinceLguData, error: provinceLguError } = await supabase
-      .from('regd')
-      .select(`
-        regnum,
-        confcode,
-        province,
-        lgu,
-        regh!left(regnum, status, confcode)
-      `)
-      .eq('province', province)
-      .eq('lgu', lgu)
-      .eq('confcode', confcode); // Add conference filter
-
-    if (provinceLguError) {
-      console.error('Database error checking Province-LGU:', provinceLguError);
-      return NextResponse.json(
-        { error: 'Failed to check Province-LGU registration status' },
-        { status: 500 }
-      );
-    }
-
-    // Filter records where status is NULL, PENDING, or APPROVED and same conference
-    const validProvinceLguRecords = (provinceLguData || []).filter((record: any) => {
-      if (record.confcode !== confcode) {
-        return false;
-      }
-      const regh = Array.isArray(record.regh) ? record.regh[0] : record.regh;
-      if (!regh) {
-        return true;
-      }
-      if (regh.confcode && regh.confcode !== confcode) {
-        return false;
-      }
-      const status = (regh.status || '').toString().toUpperCase().trim();
-      return !status || status === 'PENDING' || status === 'APPROVED';
-    });
-
-    const provinceLguCount = validProvinceLguRecords.length;
-    const provinceLguLimit = await getProvinceLguLimit();
-    const participantsToAdd = parseInt(formData.DETAILCOUNT);
-
-    console.log('=== Province-LGU Count Check (Submit) ===');
-    console.log(`Conference: ${confcode}`);
-    console.log(`Province: ${province}, LGU: ${lgu}`);
-    console.log(`Current Province-LGU Count: ${provinceLguCount}`);
-    console.log(`Province-LGU Limit: ${provinceLguLimit}`);
-    console.log(`Participants to add: ${participantsToAdd}`);
-    console.log(`Total after submission: ${provinceLguCount + participantsToAdd}`);
-    console.log('==========================================');
-
-    // Check if adding these participants would exceed the Province-LGU limit
-    if (provinceLguCount + participantsToAdd > provinceLguLimit) {
-      console.log(
-        `Province-LGU registration closed: current count=${provinceLguCount}, limit=${provinceLguLimit}, trying to add=${participantsToAdd}`
-      );
-      return NextResponse.json(
-        { 
-          error: `Registration limit reached for ${province} - ${lgu}. Maximum ${provinceLguLimit} participants allowed per Province-LGU combination.`,
-          currentCount: provinceLguCount,
-          limit: provinceLguLimit,
-          province: province,
-          lgu: lgu
-        },
-        { status: 400 }
-      );
-    }
-
     const contactperson = formData.CONTACTPERSON.toUpperCase();
     const contactnum = formData.CONTACTNUMBER.toUpperCase();
     const email = formData.EMAILADDRESS.toLowerCase();
 
-    // Generate unique TRANSID
-    const transId = await generateUniqueTransId();
+    // Generate unique REGID with conference prefix
+    const prefix = conference.prefix || null;
+    const regId = await generateUniqueRegId(prefix);
+    
+    console.log(`Generated REGID with prefix: ${prefix || 'none'} -> ${regId}`);
 
     // Get current time in Manila timezone (UTC+8)
     const getManilaTime = (): string => {
@@ -243,7 +190,7 @@ export async function POST(request: Request) {
       return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
     };
 
-    // Insert header (REGNUM will be auto-generated by the database)
+    // Insert header - REGID is the only identifier needed (REGNUM has been removed)
     // REGDATE now includes date and time in Manila timezone (UTC+8)
     const regdate = getManilaTime();
     const { data: headerData, error: headerError } = await supabase
@@ -256,11 +203,11 @@ export async function POST(request: Request) {
         contactnum: contactnum,
         email: email,
         regdate: regdate,
-        transid: transId,
+        regid: regId,
         status: 'PENDING' // Set status to PENDING for new registrations
-        // Note: REGNUM is not included - it will be auto-generated by the database sequence
+        // Note: REGID is the only identifier needed (REGNUM has been removed)
       })
-      .select('regnum')
+      .select('regid')
       .single();
 
     if (headerError) {
@@ -271,8 +218,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const regnum = headerData.regnum;
-    const transNo = regnum; // REGNUM is the transaction number
+    const regidFromHeader = headerData.regid || regId; // Use regid from header or fallback to generated regId
     const detailcount = parseInt(formData.DETAILCOUNT);
 
     // Prepare detail records
@@ -298,9 +244,10 @@ export async function POST(request: Request) {
         }
       }
 
+      // Note: regd table now uses regid (not regnum) as foreign key to regh
       detailRecords.push({
         confcode: confcode,
-        regnum: regnum,
+        regid: regidFromHeader, // Use regid as foreign key (regnum column removed from regd)
         linenum: i + 1, // Line numbers start at 1
         lastname: lastname,
         firstname: firstname,
@@ -324,8 +271,8 @@ export async function POST(request: Request) {
 
     if (detailError) {
       console.error('Detail insert error:', detailError);
-      // Attempt to rollback header insert
-      await supabase.from('regh').delete().eq('regnum', regnum);
+      // Attempt to rollback header insert using regid
+      await supabase.from('regh').delete().eq('regid', regidFromHeader);
       return NextResponse.json(
         { error: 'Failed to submit registration details' },
         { status: 500 }
@@ -335,7 +282,7 @@ export async function POST(request: Request) {
     // Send confirmation email (non-blocking - registration succeeds even if email fails)
     try {
       const emailResult = await sendRegistrationConfirmation({
-        transId: transId,
+        transId: regId, // Use regId but keep parameter name as transId for backward compatibility
         email: email,
         contactPerson: contactperson,
         province: province,
@@ -344,7 +291,7 @@ export async function POST(request: Request) {
         regdate: regdate,
         participantCount: detailcount,
         viewUrl: process.env.NEXT_PUBLIC_APP_URL 
-          ? `${process.env.NEXT_PUBLIC_APP_URL}/view/${transId}`
+          ? `${process.env.NEXT_PUBLIC_APP_URL}/view/${regId}`
           : undefined
       });
 
@@ -361,10 +308,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: `Your registration was successful. Your transaction ID is ${transId}.`,
-      transId,
-      transNo,
-      regnum, // Keep for backward compatibility
+      message: `Your registration was successful. Your Registration ID is ${regId}.`,
+      transId: regId, // Keep as transId for backward compatibility with frontend
+      regId: regId, // Also include as regId for new code
       conference: {
         confcode: confcode,
         name: conference.name

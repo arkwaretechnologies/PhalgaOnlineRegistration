@@ -9,7 +9,7 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
-    const transId = formData.get('transId') as string;
+    const regId = formData.get('transId') || formData.get('regId') as string; // Support both for backward compatibility
 
     if (!file) {
       return NextResponse.json(
@@ -18,9 +18,9 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!transId) {
+    if (!regId) {
       return NextResponse.json(
-        { error: 'Transaction ID is required' },
+        { error: 'Registration ID is required' },
         { status: 400 }
       );
     }
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     // Generate unique filename
     const fileExtension = file.name.split('.').pop() || 'pdf';
     const timestamp = Date.now();
-    const filename = `payment-proof-${transId.toUpperCase()}-${timestamp}.${fileExtension}`;
+    const filename = `payment-proof-${regId.toUpperCase()}-${timestamp}.${fileExtension}`;
 
     // Upload to Supabase Storage
     // Use upsert: true to allow replacing existing files
@@ -117,7 +117,7 @@ export async function POST(request: Request) {
     const { error: updateError } = await supabase
       .from('regh')
       .update({ payment_proof_url: fileUrl })
-      .eq('transid', transId.toUpperCase());
+      .eq('regid', regId.toUpperCase());
 
     if (updateError) {
       console.error('Database update error:', updateError);
@@ -133,7 +133,7 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log('Payment proof uploaded successfully:', { transId, filename, fileUrl });
+    console.log('Payment proof uploaded successfully:', { regId, filename, fileUrl });
 
     return NextResponse.json({
       success: true,

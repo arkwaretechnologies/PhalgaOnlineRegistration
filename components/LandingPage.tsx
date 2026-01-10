@@ -26,7 +26,7 @@ export default function LandingPage() {
     const transIdParam = searchParams.get('transId');
     
     if (success === 'true' && transIdParam) {
-      setSuccessMessage(`Registration successful! Your Transaction ID is: ${transIdParam}`);
+      setSuccessMessage(`Registration successful! Your Registration ID is: ${transIdParam}`);
       setTransId(transIdParam.toUpperCase());
       // Clear URL parameters after displaying message
       router.replace('/', { scroll: false });
@@ -94,7 +94,7 @@ export default function LandingPage() {
     setError('');
     
     if (!transId.trim()) {
-      setError('Please enter a transaction ID');
+      setError('Please enter a registration ID');
       return;
     }
 
@@ -106,10 +106,10 @@ export default function LandingPage() {
       if (response.ok && data) {
         router.push(`/view/${transId.trim().toUpperCase()}`);
       } else {
-        setError(data.error || 'Transaction ID not found');
+        setError(data.error || 'Registration ID not found');
       }
     } catch (err) {
-      setError('Failed to lookup transaction. Please try again.');
+      setError('Failed to lookup registration. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -169,7 +169,7 @@ export default function LandingPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs sm:text-sm font-semibold text-green-800 break-words">{successMessage}</p>
-                  <p className="mt-1 text-xs text-green-700">You can use this Transaction ID to view your registration details.</p>
+                  <p className="mt-1 text-xs text-green-700">You can use this Registration ID to view your registration details.</p>
                 </div>
                 <button
                   onClick={() => setSuccessMessage('')}
@@ -184,7 +184,7 @@ export default function LandingPage() {
             </div>
           )}
 
-          {/* Transaction ID Lookup */}
+          {/* Registration ID Lookup */}
           <div>
             <h2 className="text-lg sm:text-xl font-semibold text-gray-700 mb-3 sm:mb-4">
               Lookup Registration
@@ -192,14 +192,14 @@ export default function LandingPage() {
             <form onSubmit={handleLookup} className="space-y-3 sm:space-y-4">
               <div>
                 <label htmlFor="transId" className="block text-sm font-medium text-gray-700 mb-2">
-                  Transaction ID
+                  Registration ID
                 </label>
                 <input
                   type="text"
                   id="transId"
                   value={transId}
                   onChange={(e) => setTransId(e.target.value.toUpperCase())}
-                  placeholder="Enter Transaction ID"
+                  placeholder="Enter Registration ID"
                   className="w-full px-3 sm:px-4 py-3 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-base sm:text-sm"
                   maxLength={6}
                   disabled={loading}

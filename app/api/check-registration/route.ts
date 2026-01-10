@@ -16,12 +16,13 @@ export async function GET(request: Request) {
     console.log(`=== Registration Check for Conference: ${confcode} ===`);
     
     // Step 1: Get all regd records for this conference with their regh data
+    // Note: regd table now uses regid (not regnum) as foreign key to regh
     const { data: regdData, error: regdError } = await supabase
       .from('regd')
       .select(`
-        regnum,
+        regid,
         confcode,
-        regh!left(regnum, status, confcode)
+        regh!left(regid, status, confcode)
       `)
       .eq('confcode', confcode); // Filter by conference code
     
@@ -70,7 +71,7 @@ export async function GET(request: Request) {
     console.log(`Total regd records: ${regdData?.length || 0}`);
     console.log(`Valid records (PENDING/APPROVED/NULL): ${registrationCount}`);
     console.log('Sample records:', regdData?.slice(0, 3).map((r: any) => ({
-      regnum: r.regnum,
+      regid: r.regid,
       confcode: r.confcode,
       regh_status: Array.isArray(r.regh) ? r.regh[0]?.status : r.regh?.status,
       regh_confcode: Array.isArray(r.regh) ? r.regh[0]?.confcode : r.regh?.confcode

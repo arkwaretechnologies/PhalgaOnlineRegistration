@@ -26,14 +26,15 @@ export async function GET(request: Request) {
 
     // Get all regd records with matching province, lgu, and conference, joined with regh to check status
     // Count only records where status is NULL, PENDING, or APPROVED and same conference
+    // Note: regd table now uses regid (not regnum) as foreign key to regh
     const { data: regdData, error: regdError } = await supabase
       .from('regd')
       .select(`
-        regnum,
+        regid,
         confcode,
         province,
         lgu,
-        regh!left(regnum, status, confcode)
+        regh!left(regid, status, confcode)
       `)
       .eq('province', province.toUpperCase())
       .eq('lgu', lgu.toUpperCase())

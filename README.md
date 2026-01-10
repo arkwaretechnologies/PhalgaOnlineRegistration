@@ -157,7 +157,7 @@ The migration includes basic RLS policies for public read/insert access. Adjust 
 2. Run the migration file: `supabase/migrations/20260113000001_setup_payment_proofs_storage.sql`
    - This creates the `payment-proofs` storage bucket
    - Sets up RLS policies to allow public uploads and reads
-   - Configures file size limit (5MB) and allowed file types
+   - Configures file size limit (10MB) and allowed file types
 
 Alternatively, you can manually create the bucket:
 1. Go to Supabase Dashboard → Storage

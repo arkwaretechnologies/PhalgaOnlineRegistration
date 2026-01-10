@@ -326,7 +326,11 @@ export default function RegistrationForm() {
         setShowErrorModal(true);
         return;
       }
-      // Position is optional - no validation needed
+      if (!p.position || p.position.trim() === '') {
+        setErrorModalMessage(`Participant ${i + 1}: Position is required.`);
+        setShowErrorModal(true);
+        return;
+      }
       // LGU validation: participant LGU can be empty if header LGU is set (it will default)
       const effectiveLgu = p.lgu && p.lgu.trim() !== '' ? p.lgu : lgu;
       if (!effectiveLgu || effectiveLgu.trim() === '') {
@@ -779,7 +783,7 @@ export default function RegistrationForm() {
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">Position</label>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Position *</label>
                       <input
                         type="text"
                         list={`position-list-mobile-${participant.id}`}
@@ -787,6 +791,7 @@ export default function RegistrationForm() {
                         onChange={(e) => updateParticipant(participant.id, 'position', e.target.value.toUpperCase())}
                         className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
                         placeholder="Enter or select position"
+                        required
                       />
                       <datalist id={`position-list-mobile-${participant.id}`}>
                         {positionOptions.map(position => <option key={position} value={position} />)}
@@ -904,6 +909,7 @@ export default function RegistrationForm() {
                         onChange={(e) => updateParticipant(participant.id, 'position', e.target.value.toUpperCase())}
                         className="w-full px-2 py-1.5 md:py-1 border-0 bg-transparent uppercase text-gray-900 text-sm"
                         placeholder="Enter position"
+                        required
                       />
                       <datalist id={`position-list-${participant.id}`}>
                         {positionOptions.map(position => <option key={position} value={position} />)}

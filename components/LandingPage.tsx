@@ -10,6 +10,13 @@ export default function LandingPage() {
   const [loading, setLoading] = useState(false);
   const [registrationStatus, setRegistrationStatus] = useState<{ count: number; isOpen: boolean } | null>(null);
   const [checkingStatus, setCheckingStatus] = useState(true);
+  const [conference, setConference] = useState<{
+    confcode: string;
+    name: string | null;
+    date_from: string | null;
+    date_to: string | null;
+    venue: string | null;
+  } | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -25,6 +32,36 @@ export default function LandingPage() {
       router.replace('/', { scroll: false });
     }
 
+    // Fetch conference information
+    const fetchConference = async () => {
+      try {
+        const response = await fetch('/api/get-conference');
+        const data = await response.json();
+        if (response.ok && data && !data.error) {
+          setConference(data);
+        } else {
+          console.warn('Conference not found, using defaults');
+          setConference({
+            confcode: '2026-GCMIN',
+            name: '18th Mindanao Geographic Conference',
+            date_from: null,
+            date_to: null,
+            venue: null
+          });
+        }
+      } catch (err) {
+        console.error('Failed to fetch conference:', err);
+        // Set default on error
+        setConference({
+          confcode: '2026-GCMIN',
+          name: '18th Mindanao Geographic Conference',
+          date_from: null,
+          date_to: null,
+          venue: null
+        });
+      }
+    };
+
     const checkRegistrationStatus = async () => {
       try {
         const response = await fetch('/api/check-registration');
@@ -32,6 +69,10 @@ export default function LandingPage() {
         if (response.ok) {
           console.log('Registration status:', data);
           setRegistrationStatus(data);
+          // Update conference from registration status if available
+          if (data.conference) {
+            setConference(prev => prev ? { ...prev, ...data.conference } : null);
+          }
         } else {
           console.error('Failed to check registration status:', data);
           setError(data.error || 'Failed to check registration status');
@@ -44,6 +85,7 @@ export default function LandingPage() {
       }
     };
 
+    fetchConference();
     checkRegistrationStatus();
   }, [searchParams, router]);
 
@@ -101,8 +143,18 @@ export default function LandingPage() {
             PhALGA Online Registration
           </h1>
           <p className="text-sm sm:text-base text-gray-600">
-            18th Mindanao Geographic Conference
+            {conference?.name || '18th Mindanao Geographic Conference'}
           </p>
+          {conference?.date_from && conference?.date_to && (
+            <p className="text-xs sm:text-sm text-gray-500 mt-1">
+              {new Date(conference.date_from).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} - {new Date(conference.date_to).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+            </p>
+          )}
+          {conference?.venue && (
+            <p className="text-xs sm:text-sm text-gray-500 mt-1">
+              {conference.venue}
+            </p>
+          )}
         </div>
 
         <div className="space-y-6">

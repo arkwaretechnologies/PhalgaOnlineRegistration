@@ -131,7 +131,7 @@ export async function sendRegistrationConfirmation(
                   </td>
                   <td style="width: 40%; vertical-align: middle; text-align: center; padding: 0 10px;">
                     <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: bold; line-height: 1.2;">
-                      18th Mindanao Geographic Conference
+                      18th Mindanao Geographical Conference
                     </h1>
                     <p style="margin: 10px 0 0 0; color: #ffffff; font-size: 16px;">
                       Registration Confirmation

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
-import { isProvinceLguRegistrationOpen, getProvinceLguLimit } from '@/lib/config';
+import { getProvinceLguLimit } from '@/lib/config';
+import { getConferenceCode } from '@/lib/conference';
 
 // Disable caching for this route to ensure fresh data
 export const dynamic = 'force-dynamic';
@@ -19,20 +20,27 @@ export async function GET(request: Request) {
       );
     }
 
-    // Get all regd records with matching province and lgu, joined with regh to check status
-    // Count only records where status is NULL, PENDING, or APPROVED
+    // Detect conference from domain
+    const hostname = request.headers.get('host') || request.headers.get('x-forwarded-host');
+    const confcode = await getConferenceCode(hostname || undefined);
+
+    // Get all regd records with matching province, lgu, and conference, joined with regh to check status
+    // Count only records where status is NULL, PENDING, or APPROVED and same conference
     const { data: regdData, error: regdError } = await supabase
       .from('regd')
       .select(`
         regnum,
+        confcode,
         province,
         lgu,
-        regh!left(regnum, status)
+        regh!left(regnum, status, confcode)
       `)
       .eq('province', province.toUpperCase())
-      .eq('lgu', lgu.toUpperCase());
+      .eq('lgu', lgu.toUpperCase())
+      .eq('confcode', confcode); // Add conference filter
 
     console.log('=== Province-LGU Count Check ===');
+    console.log(`Conference: ${confcode}`);
     console.log('Province:', province);
     console.log('LGU:', lgu);
     console.log('regdData length:', regdData?.length || 0);
@@ -49,12 +57,18 @@ export async function GET(request: Request) {
       );
     }
 
-    // Filter records where status is NULL, PENDING, or APPROVED (case-insensitive)
+    // Filter records where status is NULL, PENDING, or APPROVED (case-insensitive) and same conference
     const validRecords = (regdData || []).filter((record: any) => {
+      if (record.confcode !== confcode) {
+        return false;
+      }
       const regh = Array.isArray(record.regh) ? record.regh[0] : record.regh;
       if (!regh) {
         // If no regh record, include it (matches LEFT JOIN behavior with NULL status)
         return true;
+      }
+      if (regh.confcode && regh.confcode !== confcode) {
+        return false;
       }
       const status = (regh.status || '').toString().toUpperCase().trim();
       return !status || status === 'PENDING' || status === 'APPROVED';
@@ -62,7 +76,7 @@ export async function GET(request: Request) {
 
     const registrationCount = validRecords.length;
     const limit = await getProvinceLguLimit();
-    const isOpen = await isProvinceLguRegistrationOpen(registrationCount);
+    const isOpen = registrationCount < limit;
 
     console.log(`Province-LGU Registration Count: ${registrationCount}`);
     console.log(`Province-LGU Limit: ${limit}`);
@@ -75,7 +89,10 @@ export async function GET(request: Request) {
         limit: limit,
         isOpen: isOpen,
         province: province.toUpperCase(),
-        lgu: lgu.toUpperCase()
+        lgu: lgu.toUpperCase(),
+        conference: {
+          confcode: confcode
+        }
       },
       {
         headers: {

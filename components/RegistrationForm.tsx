@@ -70,8 +70,45 @@ export default function RegistrationForm() {
   const [pendingFormData, setPendingFormData] = useState<any>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorModalMessage, setErrorModalMessage] = useState('');
+  const [conference, setConference] = useState<{
+    confcode: string;
+    name: string | null;
+    date_from: string | null;
+    date_to: string | null;
+    venue: string | null;
+  } | null>(null);
 
   useEffect(() => {
+    // Fetch conference information
+    fetch('/api/get-conference')
+      .then(res => res.json())
+      .then(data => {
+        if (data && !data.error) {
+          setConference(data);
+        } else {
+          console.warn('Conference not found, using defaults');
+          // Set default conference info if not found
+          setConference({
+            confcode: '2026-GCMIN',
+            name: '18th Mindanao Geographic Conference',
+            date_from: null,
+            date_to: null,
+            venue: null
+          });
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching conference:', err);
+        // Set default on error
+        setConference({
+          confcode: '2026-GCMIN',
+          name: '18th Mindanao Geographic Conference',
+          date_from: null,
+          date_to: null,
+          venue: null
+        });
+      });
+
     // Check if registration is open
     fetch('/api/check-registration')
       .then(res => res.json())
@@ -283,7 +320,7 @@ export default function RegistrationForm() {
 
     // Build form data
     const formData: any = {
-      CONFERENCE: 'NL',
+      CONFERENCE: conference?.confcode || '2026-GCMIN', // Use conference code from database
       PROVINCE: province,
       LGU: lgu,
       CONTACTPERSON: contactPerson,
@@ -526,7 +563,7 @@ export default function RegistrationForm() {
             {/* Mobile Card Layout */}
             <div className="border border-gray-300 rounded-lg p-3 bg-gray-50">
               <div className="font-semibold text-sm text-gray-900 mb-1">CONFERENCE</div>
-              <div className="text-sm text-gray-900">18TH MINDANAO GEOGRAPHIC CONFERENCE</div>
+              <div className="text-sm text-gray-900">{conference?.name?.toUpperCase() || '18TH MINDANAO GEOGRAPHIC CONFERENCE'}</div>
             </div>
             <div className="border border-gray-300 rounded-lg p-3 bg-blue-50">
               <label className="block font-semibold text-sm text-gray-900 mb-2">PROVINCE *</label>
@@ -604,7 +641,7 @@ export default function RegistrationForm() {
             <tbody>
               <tr>
                 <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">CONFERENCE</td>
-                <td className="border border-gray-300 p-2 text-gray-900">18TH MINDANAO GEOGRAPHIC CONFERENCE</td>
+                <td className="border border-gray-300 p-2 text-gray-900">{conference?.name?.toUpperCase() || '18TH MINDANAO GEOGRAPHIC CONFERENCE'}</td>
               </tr>
               <tr>
                 <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">PROVINCE</td>
@@ -1136,7 +1173,7 @@ export default function RegistrationForm() {
                   <div className="block sm:hidden space-y-2">
                     <div className="border border-gray-300 rounded p-2 bg-gray-100">
                       <div className="text-xs font-semibold text-gray-900 mb-1">Conference</div>
-                      <div className="text-xs text-gray-900">18TH MINDANAO GEOGRAPHIC CONFERENCE</div>
+                      <div className="text-xs text-gray-900">{conference?.name?.toUpperCase() || '18TH MINDANAO GEOGRAPHIC CONFERENCE'}</div>
                     </div>
                     <div className="border border-gray-300 rounded p-2">
                       <div className="text-xs font-semibold text-gray-900 mb-1">Province</div>
@@ -1164,7 +1201,7 @@ export default function RegistrationForm() {
                     <tbody>
                       <tr>
                         <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900 w-1/3">Conference</td>
-                        <td className="border border-gray-300 p-2 text-gray-900">18TH MINDANAO GEOGRAPHIC CONFERENCE</td>
+                        <td className="border border-gray-300 p-2 text-gray-900">{conference?.name?.toUpperCase() || '18TH MINDANAO GEOGRAPHIC CONFERENCE'}</td>
                       </tr>
                       <tr>
                         <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">Province</td>

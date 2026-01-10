@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
-import { isRegistrationOpen, getRegistrationLimit, isProvinceLguRegistrationOpen, getProvinceLguLimit } from '@/lib/config';
+import { getRegistrationLimitByConference, isProvinceLguRegistrationOpen, getProvinceLguLimit } from '@/lib/config';
+import { getConferenceByDomain, getConferenceCode } from '@/lib/conference';
 import { sendRegistrationConfirmation } from '@/lib/email';
 
 // Disable caching for this route to ensure fresh data
@@ -65,20 +66,34 @@ async function generateUniqueTransId(): Promise<string> {
 
 export async function POST(request: Request) {
   try {
+    // Detect conference from domain at the start
+    const hostname = request.headers.get('host') || request.headers.get('x-forwarded-host');
+    const conference = await getConferenceByDomain(hostname || undefined);
+
+    if (!conference) {
+      return NextResponse.json(
+        { error: 'Conference not found for this domain. Please check your configuration.' },
+        { status: 400 }
+      );
+    }
+
+    const confcode = conference.confcode;
+    console.log(`=== Submitting Registration for Conference: ${confcode} (${conference.name}) ===`);
+
     const formData: RegistrationData = await request.json();
     
-    // Check registration count - use direct SELECT query matching the SQL:
-    // SELECT COUNT(*) FROM "regd" d LEFT JOIN "regh" h ON d."regnum" = h."regnum"
-    // WHERE h."status" IS NULL OR UPPER(TRIM(h."status")) = 'PENDING' OR UPPER(TRIM(h."status")) = 'APPROVED'
-    
+    // Check registration count - filter by conference
     const { data: regdData, error: regdError } = await supabase
       .from('regd')
       .select(`
         regnum,
-        regh!left(regnum, status)
-      `);
+        confcode,
+        regh!left(regnum, status, confcode)
+      `)
+      .eq('confcode', confcode); // Add conference filter
 
     console.log('=== Registration Count Check (Submit) ===');
+    console.log('Conference:', confcode);
     console.log('regdData length:', regdData?.length || 0);
     console.log('regdError:', regdError);
 
@@ -90,19 +105,24 @@ export async function POST(request: Request) {
       );
     }
 
-    // Filter records where status is NULL, PENDING, or APPROVED (case-insensitive)
+    // Filter records where status is NULL, PENDING, or APPROVED and same conference
     const validRecords = (regdData || []).filter((record: any) => {
+      if (record.confcode !== confcode) {
+        return false;
+      }
       const regh = Array.isArray(record.regh) ? record.regh[0] : record.regh;
       if (!regh) {
-        // If no regh record, include it (matches LEFT JOIN behavior with NULL status)
         return true;
+      }
+      if (regh.confcode && regh.confcode !== confcode) {
+        return false;
       }
       const status = (regh.status || '').toString().toUpperCase().trim();
       return !status || status === 'PENDING' || status === 'APPROVED';
     });
 
     const regcount = validRecords.length;
-    const limit = await getRegistrationLimit();
+    const limit = await getRegistrationLimitByConference(confcode);
 
     console.log(`Total regd records: ${regdData?.length || 0}`);
     console.log(`Valid records (PENDING/APPROVED/NULL): ${regcount}`);
@@ -111,7 +131,7 @@ export async function POST(request: Request) {
     console.log('==========================================');
 
     // Check if registration is open (registration closes when count >= limit)
-    if (!(await isRegistrationOpen(regcount))) {
+    if (regcount >= limit) {
       console.log(
         `Registration closed: current count=${regcount}, limit=${limit}`
       );
@@ -125,19 +145,22 @@ export async function POST(request: Request) {
       );
     }
 
-    const confcode = '2026-GCMIN';
     const province = formData.PROVINCE.toUpperCase();
     const lgu = formData.LGU.toUpperCase();
 
-    // Check Province-LGU specific limit
+    // Check Province-LGU specific limit - filter by conference
     const { data: provinceLguData, error: provinceLguError } = await supabase
       .from('regd')
       .select(`
         regnum,
-        regh!left(regnum, status)
+        confcode,
+        province,
+        lgu,
+        regh!left(regnum, status, confcode)
       `)
       .eq('province', province)
-      .eq('lgu', lgu);
+      .eq('lgu', lgu)
+      .eq('confcode', confcode); // Add conference filter
 
     if (provinceLguError) {
       console.error('Database error checking Province-LGU:', provinceLguError);
@@ -147,11 +170,17 @@ export async function POST(request: Request) {
       );
     }
 
-    // Filter records where status is NULL, PENDING, or APPROVED (case-insensitive)
+    // Filter records where status is NULL, PENDING, or APPROVED and same conference
     const validProvinceLguRecords = (provinceLguData || []).filter((record: any) => {
+      if (record.confcode !== confcode) {
+        return false;
+      }
       const regh = Array.isArray(record.regh) ? record.regh[0] : record.regh;
       if (!regh) {
         return true;
+      }
+      if (regh.confcode && regh.confcode !== confcode) {
+        return false;
       }
       const status = (regh.status || '').toString().toUpperCase().trim();
       return !status || status === 'PENDING' || status === 'APPROVED';
@@ -162,6 +191,7 @@ export async function POST(request: Request) {
     const participantsToAdd = parseInt(formData.DETAILCOUNT);
 
     console.log('=== Province-LGU Count Check (Submit) ===');
+    console.log(`Conference: ${confcode}`);
     console.log(`Province: ${province}, LGU: ${lgu}`);
     console.log(`Current Province-LGU Count: ${provinceLguCount}`);
     console.log(`Province-LGU Limit: ${provinceLguLimit}`);
@@ -170,7 +200,7 @@ export async function POST(request: Request) {
     console.log('==========================================');
 
     // Check if adding these participants would exceed the Province-LGU limit
-    if (!(await isProvinceLguRegistrationOpen(provinceLguCount + participantsToAdd))) {
+    if (provinceLguCount + participantsToAdd > provinceLguLimit) {
       console.log(
         `Province-LGU registration closed: current count=${provinceLguCount}, limit=${provinceLguLimit}, trying to add=${participantsToAdd}`
       );
@@ -271,7 +301,7 @@ export async function POST(request: Request) {
       detailRecords.push({
         confcode: confcode,
         regnum: regnum,
-        linenum: i,
+        linenum: i + 1, // Line numbers start at 1
         lastname: lastname,
         firstname: firstname,
         middleinit: middleinit,
@@ -334,7 +364,11 @@ export async function POST(request: Request) {
       message: `Your registration was successful. Your transaction ID is ${transId}.`,
       transId,
       transNo,
-      regnum // Keep for backward compatibility
+      regnum, // Keep for backward compatibility
+      conference: {
+        confcode: confcode,
+        name: conference.name
+      }
     });
   } catch (error) {
     console.error('Registration error:', error);

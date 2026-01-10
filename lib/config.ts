@@ -148,3 +148,47 @@ export async function isProvinceLguRegistrationOpen(currentCount: number): Promi
   const limit = await getProvinceLguLimit();
   return currentCount < limit;
 }
+
+/**
+ * Get registration limit from conference table for a specific conference
+ * Falls back to config table REGISTRATION_LIMIT if conference doesn't have reg_limit set
+ * @param confcode - Conference code
+ * @returns Registration limit number
+ */
+export async function getRegistrationLimitByConference(confcode: string): Promise<number> {
+  try {
+    const { data, error } = await supabase
+      .from('conference')
+      .select('reg_limit')
+      .eq('confcode', confcode)
+      .single();
+
+    if (error || !data?.reg_limit) {
+      console.warn(
+        `Failed to fetch reg_limit for conference ${confcode} from conference table. ` +
+        `Falling back to config table REGISTRATION_LIMIT.`
+      );
+      // Fallback to config table if conference table doesn't have reg_limit
+      return await getRegistrationLimit();
+    }
+
+    const limit = parseInt(String(data.reg_limit), 10);
+    
+    if (isNaN(limit) || limit < 0) {
+      console.warn(
+        `Invalid reg_limit value in conference table for ${confcode}: "${data.reg_limit}". ` +
+        `Falling back to config table REGISTRATION_LIMIT.`
+      );
+      return await getRegistrationLimit();
+    }
+    
+    console.log(`Using registration limit from conference table: ${limit} for ${confcode}`);
+    return limit;
+  } catch (error: any) {
+    console.error(
+      `Error fetching reg_limit for conference ${confcode}: ${error?.message || error}. ` +
+      `Falling back to config table REGISTRATION_LIMIT.`
+    );
+    return await getRegistrationLimit();
+  }
+}

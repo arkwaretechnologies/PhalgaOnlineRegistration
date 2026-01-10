@@ -24,7 +24,8 @@ export async function GET(request: Request) {
       .from('regdep')
       .select('*')
       .eq('regid', regIdString)
-      .order('uploaded_at', { ascending: true }); // Order by upload timestamp
+      .order('linenum', { ascending: true }) // Order by line number first
+      .order('uploaded_at', { ascending: true }); // Then by upload timestamp
 
     if (paymentProofsError) {
       console.error('Error fetching payment proofs:', paymentProofsError);

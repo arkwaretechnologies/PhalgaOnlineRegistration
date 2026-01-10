@@ -13,9 +13,16 @@ export async function POST(request: Request) {
     const file = formData.get('file') as File;
     const transIdValue = formData.get('transId');
     const regIdValue = formData.get('regId');
+    const linenumValue = formData.get('linenum');
     // Support both 'transId' and 'regId' for backward compatibility
     const regId = (typeof transIdValue === 'string' ? transIdValue : null) || 
                   (typeof regIdValue === 'string' ? regIdValue : null);
+    // Parse linenum if provided (optional - for associating payment proof with specific participant)
+    let linenum: number | null = null;
+    if (linenumValue) {
+      const parsed = parseInt(String(linenumValue), 10);
+      linenum = isNaN(parsed) ? null : parsed;
+    }
 
     if (!file) {
       return NextResponse.json(
@@ -67,6 +74,111 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: 'Registration not found' },
         { status: 404 }
+      );
+    }
+
+    // Ensure confcode is available (required for composite primary key)
+    if (!headerData.confcode) {
+      return NextResponse.json(
+        { error: 'Registration header is missing conference code. Cannot determine line number for payment proof.' },
+        { status: 400 }
+      );
+    }
+
+    // Get count of participants in regd for this regid and confcode
+    // This determines the maximum number of payment proofs that can be uploaded
+    const { count: participantCount, error: participantsError } = await supabase
+      .from('regd')
+      .select('*', { count: 'exact', head: true })
+      .eq('regid', regIdString)
+      .eq('confcode', headerData.confcode);
+
+    if (participantsError) {
+      console.error('Error fetching participant count:', participantsError);
+      return NextResponse.json(
+        { error: 'Failed to verify registration participants. Please try again.' },
+        { status: 500 }
+      );
+    }
+
+    const maxUploads = participantCount || 0;
+
+    if (maxUploads === 0) {
+      return NextResponse.json(
+        { error: 'No participants found for this registration. Please register participants first before uploading payment proofs.' },
+        { status: 400 }
+      );
+    }
+
+    console.log(`Registration has ${maxUploads} participant(s). Maximum ${maxUploads} payment proof(s) can be uploaded.`);
+
+    // Get existing payment proofs count for this registration and conference
+    const { count: existingProofsCount, error: existingProofsError } = await supabase
+      .from('regdep')
+      .select('*', { count: 'exact', head: true })
+      .eq('regid', regIdString)
+      .eq('confcode', headerData.confcode);
+
+    if (existingProofsError) {
+      console.error('Error fetching existing payment proofs count:', existingProofsError);
+      return NextResponse.json(
+        { error: 'Failed to check existing payment proofs. Please try again.' },
+        { status: 500 }
+      );
+    }
+
+    const currentUploadCount = existingProofsCount || 0;
+    console.log(`Current payment proof uploads: ${currentUploadCount}/${maxUploads}`);
+
+    // Check if max uploads limit has been reached
+    if (currentUploadCount >= maxUploads) {
+      return NextResponse.json(
+        { error: `Maximum upload limit reached. This registration has ${maxUploads} participant(s), and you have already uploaded ${currentUploadCount} payment proof(s).` },
+        { status: 400 }
+      );
+    }
+
+    // If linenum is not provided, determine it based on existing payment proofs
+    // linenum is sequential (1, 2, 3, ...) and represents the upload sequence, not tied to participant linenum
+    if (linenum === null || isNaN(linenum)) {
+      // Get the max linenum from existing payment proofs
+      const { data: existingProofsData, error: maxLinenumError } = await supabase
+        .from('regdep')
+        .select('linenum')
+        .eq('regid', regIdString)
+        .eq('confcode', headerData.confcode)
+        .order('linenum', { ascending: false })
+        .limit(1);
+
+      if (maxLinenumError) {
+        console.error('Error fetching max linenum:', maxLinenumError);
+        // Default to 1 if query fails
+        linenum = 1;
+      } else if (!existingProofsData || existingProofsData.length === 0) {
+        // No existing payment proofs, start with 1
+        linenum = 1;
+        console.log(`No existing payment proofs found for regid ${regIdString} and confcode ${headerData.confcode}, setting linenum to 1`);
+      } else {
+        // Get max linenum and add 1
+        const maxLinenum = existingProofsData[0].linenum;
+        linenum = maxLinenum + 1;
+        console.log(`Found existing payment proofs for regid ${regIdString} and confcode ${headerData.confcode}, max linenum is ${maxLinenum}, setting new linenum to ${linenum}`);
+      }
+    } else {
+      // If linenum is provided, validate it doesn't exceed max uploads
+      if (linenum > maxUploads) {
+        return NextResponse.json(
+          { error: `Line number ${linenum} exceeds the maximum allowed uploads (${maxUploads} participant(s) in this registration).` },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Validate that linenum is a valid positive integer
+    if (linenum === null || isNaN(linenum) || linenum < 1) {
+      return NextResponse.json(
+        { error: 'Invalid line number. Line number must be a positive integer.' },
+        { status: 400 }
       );
     }
 
@@ -209,24 +321,54 @@ export async function POST(request: Request) {
     console.log('Generated file URL:', fileUrl);
 
     // Insert payment proof into regdep table
+    // linenum is now guaranteed to be a valid number (either provided and validated, or auto-generated and validated)
+    // confcode and linenum are part of the composite primary key and must NOT be NULL
+    // Note: confcode check is already done above, and linenum is validated against regd above
+    if (linenum === null || isNaN(linenum)) {
+      return NextResponse.json(
+        { error: 'Invalid line number. Cannot save payment proof.' },
+        { status: 400 }
+      );
+    }
+
     const { error: insertError } = await supabase
       .from('regdep')
       .insert({
         regid: regIdString,
-        confcode: headerData.confcode || null,
-        payment_proof_url: fileUrl
+        confcode: headerData.confcode, // NOT NULL - part of composite primary key
+        payment_proof_url: fileUrl,
+        linenum: linenum // NOT NULL - part of composite primary key
       });
 
     if (insertError) {
       console.error('Database insert error:', insertError);
+      console.error('Insert error details:', {
+        regId: regIdString,
+        confcode: headerData.confcode,
+        linenum: linenum,
+        errorCode: insertError.code,
+        errorMessage: insertError.message,
+        errorDetails: insertError.details,
+        errorHint: insertError.hint
+      });
+      
       // Try to delete uploaded file if database insert fails
       try {
         await supabase.storage.from('payment-proofs').remove([filename]);
       } catch (deleteError) {
         console.error('Failed to delete uploaded file:', deleteError);
       }
+      
+      // Handle duplicate key violation (23505) - payment proof already exists for this participant
+      if (insertError.code === '23505') {
+        return NextResponse.json(
+          { error: `Payment proof already exists for participant line number ${linenum}. Please delete the existing payment proof first or choose a different participant.` },
+          { status: 409 } // 409 Conflict
+        );
+      }
+      
       return NextResponse.json(
-        { error: 'Failed to save payment proof to database' },
+        { error: 'Failed to save payment proof to database: ' + (insertError.message || 'Unknown error') },
         { status: 500 }
       );
     }

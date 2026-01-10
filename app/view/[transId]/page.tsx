@@ -37,9 +37,9 @@ interface RegistrationDetail {
 }
 
 interface PaymentProof {
-  id: string; // Unique ID from regdep table
   regid: string;
-  confcode: string | null;
+  confcode: string; // NOT NULL - part of composite primary key
+  linenum: number; // NOT NULL - part of composite primary key
   payment_proof_url: string;
   uploaded_at?: string; // Optional timestamp
 }
@@ -58,7 +58,7 @@ export default function ViewRegistration() {
   const [paymentProofs, setPaymentProofs] = useState<PaymentProof[]>([]);
   const [currentViewingProof, setCurrentViewingProof] = useState<string | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [deletingProofId, setDeletingProofId] = useState<string | null>(null);
+  const [deletingProof, setDeletingProof] = useState<{ regid: string; confcode: string; linenum: number } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -193,22 +193,15 @@ export default function ViewRegistration() {
     }
   };
 
-  const handleDeletePaymentProof = async (proofId: string) => {
-    if (!proofId || !transId || isDeleting) return;
-
-    // Find the proof to get its URL for closing modal if needed
-    const proofToDelete = paymentProofs.find(p => p.id === proofId);
-    if (!proofToDelete) {
-      setUploadError('Payment proof not found');
-      return;
-    }
+  const handleDeletePaymentProof = async (proof: { regid: string; confcode: string; linenum: number }) => {
+    if (!proof || !transId || isDeleting) return;
 
     setIsDeleting(true);
     setUploadError('');
     
     try {
       const response = await fetch(
-        `/api/delete-payment-proof?id=${encodeURIComponent(proofId)}&regId=${encodeURIComponent(transId)}`,
+        `/api/delete-payment-proof?regId=${encodeURIComponent(proof.regid)}&confcode=${encodeURIComponent(proof.confcode)}&linenum=${encodeURIComponent(proof.linenum)}`,
         {
           method: 'DELETE',
           cache: 'no-store'
@@ -232,22 +225,27 @@ export default function ViewRegistration() {
           setPaymentProofs(refreshData.paymentProofs || []);
         }
         // If we deleted the proof currently being viewed, close the modal
-        if (currentViewingProof === proofToDelete.payment_proof_url) {
+        const proofToDelete = paymentProofs.find(p => 
+          p.regid === proof.regid && 
+          p.confcode === proof.confcode && 
+          p.linenum === proof.linenum
+        );
+        if (proofToDelete && currentViewingProof === proofToDelete.payment_proof_url) {
           setShowPaymentModal(false);
           setCurrentViewingProof(null);
         }
         setShowDeleteConfirm(false);
-        setDeletingProofId(null);
+        setDeletingProof(null);
       } else {
         setUploadError(data.error || 'Failed to delete payment proof. Please try again.');
         setShowDeleteConfirm(false);
-        setDeletingProofId(null);
+        setDeletingProof(null);
       }
     } catch (error) {
       console.error('Delete error:', error);
       setUploadError('An error occurred while deleting. Please try again.');
       setShowDeleteConfirm(false);
-      setDeletingProofId(null);
+      setDeletingProof(null);
     } finally {
       setIsDeleting(false);
     }
@@ -406,8 +404,9 @@ export default function ViewRegistration() {
                                      !proof.payment_proof_url.includes('application/pdf');
                       const fileName = proof.payment_proof_url.split('/').pop() || `Payment Proof ${index + 1}`;
                       
+                      const proofKey = `${proof.regid}-${proof.confcode}-${proof.linenum}`;
                       return (
-                        <div key={proof.id} className="border border-gray-300 rounded-lg p-3 bg-gray-50 flex items-center justify-between gap-2 sm:gap-4">
+                        <div key={proofKey} className="border border-gray-300 rounded-lg p-3 bg-gray-50 flex items-center justify-between gap-2 sm:gap-4">
                           <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
                             {isImage ? (
                               <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded flex items-center justify-center">
@@ -445,7 +444,7 @@ export default function ViewRegistration() {
                             <button
                               type="button"
                               onClick={() => {
-                                setDeletingProofId(proof.id);
+                                setDeletingProof({ regid: proof.regid, confcode: proof.confcode, linenum: proof.linenum });
                                 setShowDeleteConfirm(true);
                               }}
                               disabled={isDeleting}
@@ -738,12 +737,12 @@ export default function ViewRegistration() {
       )}
 
       {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && deletingProofId && (
+      {showDeleteConfirm && deletingProof && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4"
           onClick={() => {
             setShowDeleteConfirm(false);
-            setDeletingProofId(null);
+            setDeletingProof(null);
           }}
         >
           <div 
@@ -768,7 +767,7 @@ export default function ViewRegistration() {
                 type="button"
                 onClick={() => {
                   setShowDeleteConfirm(false);
-                  setDeletingProofId(null);
+                  setDeletingProof(null);
                 }}
                 className="flex-1 px-4 py-2.5 sm:py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-lg transition-colors duration-200 touch-target text-sm sm:text-base"
               >
@@ -776,8 +775,8 @@ export default function ViewRegistration() {
               </button>
               <button
                 type="button"
-                onClick={() => deletingProofId && handleDeletePaymentProof(deletingProofId)}
-                disabled={isDeleting || !deletingProofId}
+                onClick={() => deletingProof && handleDeletePaymentProof(deletingProof)}
+                disabled={isDeleting || !deletingProof}
                 className="flex-1 px-4 py-2.5 sm:py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors duration-200 touch-target text-sm sm:text-base"
               >
                 {isDeleting ? 'Deleting...' : 'Delete'}

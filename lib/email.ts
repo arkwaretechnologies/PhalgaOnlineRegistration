@@ -232,7 +232,7 @@ export async function sendRegistrationConfirmation(
               </table>
               
               <p style="margin: 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
-                Please keep your Transaction ID safe. You can use it to view your registration details at any time.
+                Please keep your Registration ID safe. You can use it to view your registration details at any time.
               </p>
               
               <!-- View Registration Button -->

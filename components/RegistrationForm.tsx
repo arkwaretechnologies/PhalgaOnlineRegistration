@@ -47,6 +47,7 @@ export default function RegistrationForm() {
   const [emailAddress, setEmailAddress] = useState('');
   const [lguOptions, setLguOptions] = useState<string[]>([]);
   const [barangayOptions, setBarangayOptions] = useState<string[]>([]);
+  const [positionOptions, setPositionOptions] = useState<string[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([{
     id: 1,
     lastName: '',
@@ -127,6 +128,26 @@ export default function RegistrationForm() {
         console.error('✗ Error fetching provinces:', err);
         // Keep empty array - only show fetched provinces, no fallback
         setProvinces([]);
+      });
+
+    // Fetch positions from database
+    console.log('=== Fetching Positions from API ===');
+    fetch('/api/get-positions')
+      .then(res => res.json())
+      .then(data => {
+        console.log('Positions API Response:', data);
+        if (data && !data.error && Array.isArray(data)) {
+          console.log(`✓ Successfully fetched ${data.length} positions from API`);
+          console.log('Positions list:', data);
+          setPositionOptions(data);
+        } else {
+          console.warn('✗ Failed to fetch positions from API:', data);
+          setPositionOptions([]);
+        }
+      })
+      .catch(err => {
+        console.error('✗ Error fetching positions:', err);
+        setPositionOptions([]);
       });
 
     // Check if registration is open
@@ -223,6 +244,12 @@ export default function RegistrationForm() {
   };
 
   const insertParticipant = (id: number) => {
+    // Check if limit is reached
+    if (participants.length >= MAX_PARTICIPANTS) {
+      setErrorModalMessage(`Maximum ${MAX_PARTICIPANTS} participants allowed per registration.`);
+      setShowErrorModal(true);
+      return;
+    }
     // Insert new participant at the bottom of the list
     const newParticipant: Participant = {
       id: Math.max(...participants.map(p => p.id)) + 1,
@@ -299,11 +326,7 @@ export default function RegistrationForm() {
         setShowErrorModal(true);
         return;
       }
-      if (!p.position || p.position.trim() === '') {
-        setErrorModalMessage(`Participant ${i + 1}: Position is required.`);
-        setShowErrorModal(true);
-        return;
-      }
+      // Position is optional - no validation needed
       // LGU validation: participant LGU can be empty if header LGU is set (it will default)
       const effectiveLgu = p.lgu && p.lgu.trim() !== '' ? p.lgu : lgu;
       if (!effectiveLgu || effectiveLgu.trim() === '') {
@@ -311,11 +334,7 @@ export default function RegistrationForm() {
         setShowErrorModal(true);
         return;
       }
-      if (!p.barangay || p.barangay.trim() === '') {
-        setErrorModalMessage(`Participant ${i + 1}: Barangay is required.`);
-        setShowErrorModal(true);
-        return;
-      }
+      // Barangay is optional - no validation needed
       if (!p.tshirt || p.tshirt.trim() === '') {
         setErrorModalMessage(`Participant ${i + 1}: T-Shirt Size is required.`);
         setShowErrorModal(true);
@@ -419,10 +438,7 @@ export default function RegistrationForm() {
         setTimeout(() => {
           setErrorModalMessage(
             `Cannot submit registration. Not enough slots available.\n\n` +
-            `Current: ${currentCount}/${limit} participants\n` +
-            `Available slots: ${availableSlots}\n` +
-            `Participants to register: ${participantsToAdd}\n\n` +
-            `Please reduce the number of participants to ${availableSlots} or less.`
+            `Available slots: ${availableSlots}` 
           );
           setShowErrorModal(true);
         }, 100);
@@ -454,8 +470,7 @@ export default function RegistrationForm() {
           // Use setTimeout to ensure any modals close before error modal shows
           setTimeout(() => {
             setErrorModalMessage(
-              `Registration is closed. All slots are full.\n\n` +
-              `Current: ${errorCurrentCount}/${errorLimit} participants`
+              `Registration is closed. All slots are full.`
             );
             setShowErrorModal(true);
           }, 100);
@@ -721,7 +736,8 @@ export default function RegistrationForm() {
                       <button
                         type="button"
                         onClick={() => insertParticipant(participant.id)}
-                        className="px-3 py-1.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 touch-target"
+                        disabled={participants.length >= MAX_PARTICIPANTS}
+                        className="px-3 py-1.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed touch-target"
                       >
                         Insert
                       </button>
@@ -763,14 +779,18 @@ export default function RegistrationForm() {
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">Position *</label>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Position</label>
                       <input
                         type="text"
+                        list={`position-list-mobile-${participant.id}`}
                         value={participant.position}
                         onChange={(e) => updateParticipant(participant.id, 'position', e.target.value.toUpperCase())}
                         className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
-                        required
+                        placeholder="Enter or select position"
                       />
+                      <datalist id={`position-list-mobile-${participant.id}`}>
+                        {positionOptions.map(position => <option key={position} value={position} />)}
+                      </datalist>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
@@ -788,7 +808,7 @@ export default function RegistrationForm() {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-gray-700 mb-1">Barangay *</label>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">Barangay</label>
                         <input
                           type="text"
                           list={`barangay-list-mobile-${participant.id}`}
@@ -796,7 +816,6 @@ export default function RegistrationForm() {
                           onChange={(e) => updateParticipant(participant.id, 'barangay', e.target.value.toUpperCase())}
                           className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
                           disabled={!lgu}
-                          required
                         />
                         <datalist id={`barangay-list-mobile-${participant.id}`}>
                           {barangayOptions.map(b => <option key={b} value={b} />)}
@@ -880,11 +899,15 @@ export default function RegistrationForm() {
                     <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 w-48">
                       <input
                         type="text"
+                        list={`position-list-${participant.id}`}
                         value={participant.position}
                         onChange={(e) => updateParticipant(participant.id, 'position', e.target.value.toUpperCase())}
                         className="w-full px-2 py-1.5 md:py-1 border-0 bg-transparent uppercase text-gray-900 text-sm"
-                        required
+                        placeholder="Enter position"
                       />
+                      <datalist id={`position-list-${participant.id}`}>
+                        {positionOptions.map(position => <option key={position} value={position} />)}
+                      </datalist>
                     </td>
                     <td className="border border-gray-300 p-1 bg-blue-50">
                       <input
@@ -909,7 +932,6 @@ export default function RegistrationForm() {
                         className="w-full px-1 py-0.5 border-0 bg-transparent uppercase text-gray-900"
                         disabled={!lgu}
                         title={!lgu ? 'Please select an LGU first' : ''}
-                        required
                       />
                       <datalist id={`barangay-list-${participant.id}`}>
                         {barangayOptions.map(b => <option key={b} value={b} />)}
@@ -940,7 +962,8 @@ export default function RegistrationForm() {
                         <button
                           type="button"
                           onClick={() => insertParticipant(participant.id)}
-                          className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
+                          disabled={participants.length >= MAX_PARTICIPANTS}
+                          className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
                         >
                           Insert
                         </button>

@@ -19,14 +19,15 @@ interface RegistrationData {
   [key: string]: string; // For dynamic participant fields
 }
 
-// Function to generate random alphanumeric string
+// Function to generate random numeric string
 // If prefix is provided, it will be prepended to the generated string
 // Total length will be: prefix.length + randomLength
+// Returns: prefix + numeric_id (e.g., "MGC001234")
 function generateRegId(prefix: string | null = null, randomLength: number = 6): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const chars = '0123456789'; // Only numbers
   let result = '';
   
-  // Generate random part
+  // Generate random numeric part
   for (let i = 0; i < randomLength; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
@@ -40,7 +41,9 @@ function generateRegId(prefix: string | null = null, randomLength: number = 6): 
 }
 
 // Function to generate unique REGID that doesn't exist in database
+// Format: [PREFIX][NUMERIC_ID] (e.g., "MGC001234")
 // Prefix from conference table will be prepended if available
+// The numeric ID part uses only numbers (0-9)
 async function generateUniqueRegId(prefix: string | null = null): Promise<string> {
   let regId: string;
   let isUnique = false;
@@ -226,7 +229,7 @@ export async function POST(request: Request) {
         console.log(`Duplicate found: ${firstname} ${middleinit} ${lastname} in ${province} - ${participantLgu}`);
         return NextResponse.json(
           { 
-            error: `Participant "${firstname} ${middleinit} ${lastname}" already exists in ${province} - ${participantLgu}. Each participant can only register once per Province-LGU combination.`,
+            error: `Participant "${firstname} ${middleinit} ${lastname}" already exists in ${province} - ${participantLgu}. Each participant can only register once.`,
             duplicateParticipant: `${firstname} ${middleinit} ${lastname}`,
             province: province,
             lgu: participantLgu

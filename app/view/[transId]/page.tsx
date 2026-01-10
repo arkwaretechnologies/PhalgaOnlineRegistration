@@ -36,6 +36,14 @@ interface RegistrationDetail {
   email: string;
 }
 
+interface PaymentProof {
+  id: string; // Unique ID from regdep table
+  regid: string;
+  confcode: string | null;
+  payment_proof_url: string;
+  uploaded_at?: string; // Optional timestamp
+}
+
 export default function ViewRegistration() {
   const params = useParams();
   const router = useRouter();
@@ -47,8 +55,12 @@ export default function ViewRegistration() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [uploadSuccess, setUploadSuccess] = useState(false);
-  const [paymentProofUrl, setPaymentProofUrl] = useState<string | null>(null);
+  const [paymentProofs, setPaymentProofs] = useState<PaymentProof[]>([]);
+  const [currentViewingProof, setCurrentViewingProof] = useState<string | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [deletingProofId, setDeletingProofId] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -74,10 +86,6 @@ export default function ViewRegistration() {
         if (response.ok && data) {
           setHeader(data.header);
           setDetails(data.details);
-          // Set payment proof URL if available
-          if (data.header?.payment_proof_url) {
-            setPaymentProofUrl(data.header.payment_proof_url);
-          }
         } else {
           setError(data.error || 'Registration not found');
         }
@@ -89,8 +97,33 @@ export default function ViewRegistration() {
       }
     };
 
+    const fetchPaymentProofs = async () => {
+      try {
+        const timestamp = new Date().getTime();
+        const response = await fetch(
+          `/api/get-payment-proofs?transId=${encodeURIComponent(transId)}&_t=${timestamp}`,
+          {
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache'
+            }
+          }
+        );
+        const data = await response.json();
+
+        if (response.ok && data.paymentProofs) {
+          setPaymentProofs(data.paymentProofs || []);
+        } else {
+          console.error('Failed to fetch payment proofs:', data.error);
+        }
+      } catch (err) {
+        console.error('Error fetching payment proofs:', err);
+      }
+    };
+
     if (transId) {
       fetchRegistration();
+      fetchPaymentProofs();
     }
   }, [transId]);
 
@@ -130,20 +163,18 @@ export default function ViewRegistration() {
 
       if (response.ok && data.success) {
         setUploadSuccess(true);
-        setPaymentProofUrl(data.url);
-        // Refresh registration data to get updated payment proof URL
+        // Refresh payment proofs list
         const timestamp = new Date().getTime();
         const refreshResponse = await fetch(
-          `/api/get-registration?transId=${encodeURIComponent(transId)}&_t=${timestamp}`,
+          `/api/get-payment-proofs?transId=${encodeURIComponent(transId)}&_t=${timestamp}`,
           {
             cache: 'no-store',
             headers: { 'Cache-Control': 'no-cache' }
           }
         );
         const refreshData = await refreshResponse.json();
-        if (refreshData.header) {
-          setHeader(refreshData.header);
-          setPaymentProofUrl(refreshData.header.payment_proof_url || null);
+        if (refreshResponse.ok && refreshData.paymentProofs) {
+          setPaymentProofs(refreshData.paymentProofs || []);
         }
         // Clear success message after 3 seconds
         setTimeout(() => setUploadSuccess(false), 3000);
@@ -159,6 +190,66 @@ export default function ViewRegistration() {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+    }
+  };
+
+  const handleDeletePaymentProof = async (proofId: string) => {
+    if (!proofId || !transId || isDeleting) return;
+
+    // Find the proof to get its URL for closing modal if needed
+    const proofToDelete = paymentProofs.find(p => p.id === proofId);
+    if (!proofToDelete) {
+      setUploadError('Payment proof not found');
+      return;
+    }
+
+    setIsDeleting(true);
+    setUploadError('');
+    
+    try {
+      const response = await fetch(
+        `/api/delete-payment-proof?id=${encodeURIComponent(proofId)}&regId=${encodeURIComponent(transId)}`,
+        {
+          method: 'DELETE',
+          cache: 'no-store'
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        // Refresh payment proofs list
+        const timestamp = new Date().getTime();
+        const refreshResponse = await fetch(
+          `/api/get-payment-proofs?transId=${encodeURIComponent(transId)}&_t=${timestamp}`,
+          {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache' }
+          }
+        );
+        const refreshData = await refreshResponse.json();
+        if (refreshResponse.ok && refreshData.paymentProofs) {
+          setPaymentProofs(refreshData.paymentProofs || []);
+        }
+        // If we deleted the proof currently being viewed, close the modal
+        if (currentViewingProof === proofToDelete.payment_proof_url) {
+          setShowPaymentModal(false);
+          setCurrentViewingProof(null);
+        }
+        setShowDeleteConfirm(false);
+        setDeletingProofId(null);
+      } else {
+        setUploadError(data.error || 'Failed to delete payment proof. Please try again.');
+        setShowDeleteConfirm(false);
+        setDeletingProofId(null);
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+      setUploadError('An error occurred while deleting. Please try again.');
+      setShowDeleteConfirm(false);
+      setDeletingProofId(null);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -303,29 +394,69 @@ export default function ViewRegistration() {
           <div className="col-span-1 md:col-span-2 mt-4 pt-4 border-t border-gray-200">
             <div className="flex flex-col gap-3 sm:gap-4">
               <div className="flex-1">
-                <span className="text-xs sm:text-sm font-medium text-gray-500 block mb-2">
-                  Proof of Payment
-                </span>
-                {paymentProofUrl ? (
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs sm:text-sm font-medium text-gray-500">
+                    Proof of Payment ({paymentProofs.length} {paymentProofs.length === 1 ? 'file' : 'files'})
+                  </span>
+                </div>
+                {paymentProofs.length > 0 ? (
                   <div className="space-y-2 mb-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!paymentProofUrl || paymentProofUrl.includes('undefined')) {
-                          setUploadError('Invalid file URL. Please re-upload the file.');
-                        } else {
-                          setShowPaymentModal(true);
-                        }
-                      }}
-                      className="text-blue-600 hover:text-blue-700 underline text-xs sm:text-sm inline-flex items-center gap-1 touch-target no-touch-target py-2"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                      View Uploaded File
-                    </button>
-                    <p className="text-xs text-gray-500">Payment proof has been uploaded</p>
+                    {paymentProofs.map((proof, index) => {
+                      const isImage = !proof.payment_proof_url.toLowerCase().endsWith('.pdf') && 
+                                     !proof.payment_proof_url.includes('application/pdf');
+                      const fileName = proof.payment_proof_url.split('/').pop() || `Payment Proof ${index + 1}`;
+                      
+                      return (
+                        <div key={proof.id} className="border border-gray-300 rounded-lg p-3 bg-gray-50 flex items-center justify-between gap-2 sm:gap-4">
+                          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                            {isImage ? (
+                              <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded flex items-center justify-center">
+                                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                              </div>
+                            ) : (
+                              <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 bg-red-100 rounded flex items-center justify-center">
+                                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                </svg>
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs sm:text-sm font-medium text-gray-800 truncate">{fileName}</p>
+                              <p className="text-xs text-gray-500">{isImage ? 'Image' : 'PDF'}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!proof.payment_proof_url || proof.payment_proof_url.includes('undefined')) {
+                                  setUploadError('Invalid file URL. Please re-upload the file.');
+                                } else {
+                                  setCurrentViewingProof(proof.payment_proof_url);
+                                  setShowPaymentModal(true);
+                                }
+                              }}
+                              className="text-blue-600 hover:text-blue-700 text-xs sm:text-sm font-medium px-2 sm:px-3 py-1.5 sm:py-2 rounded hover:bg-blue-50 transition-colors touch-target"
+                            >
+                              View
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDeletingProofId(proof.id);
+                                setShowDeleteConfirm(true);
+                              }}
+                              disabled={isDeleting}
+                              className="text-red-600 hover:text-red-700 disabled:text-gray-400 disabled:cursor-not-allowed text-xs sm:text-sm font-medium px-2 sm:px-3 py-1.5 sm:py-2 rounded hover:bg-red-50 transition-colors touch-target"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="text-xs sm:text-sm text-gray-600 mb-3">
@@ -359,19 +490,12 @@ export default function ViewRegistration() {
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                       Uploading...
                     </>
-                  ) : paymentProofUrl ? (
-                    <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                      </svg>
-                      Replace File
-                    </>
                   ) : (
                     <>
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                       </svg>
-                      Upload Proof of Payment
+                      Add Payment Proof
                     </>
                   )}
                 </button>
@@ -526,10 +650,13 @@ export default function ViewRegistration() {
       </div>
 
       {/* Payment Proof Modal */}
-      {showPaymentModal && paymentProofUrl && (
+      {showPaymentModal && currentViewingProof && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-0 sm:p-4"
-          onClick={() => setShowPaymentModal(false)}
+          onClick={() => {
+            setShowPaymentModal(false);
+            setCurrentViewingProof(null);
+          }}
         >
           <div 
             className="bg-white rounded-none sm:rounded-lg shadow-xl w-full h-full sm:max-w-4xl sm:w-full sm:max-h-[90vh] overflow-hidden flex flex-col"
@@ -540,7 +667,10 @@ export default function ViewRegistration() {
               <h3 className="text-base sm:text-lg font-semibold text-gray-800">Proof of Payment</h3>
               <button
                 type="button"
-                onClick={() => setShowPaymentModal(false)}
+                onClick={() => {
+                  setShowPaymentModal(false);
+                  setCurrentViewingProof(null);
+                }}
                 className="text-gray-500 hover:text-gray-700 transition-colors touch-target no-touch-target p-1"
                 aria-label="Close modal"
               >
@@ -552,11 +682,11 @@ export default function ViewRegistration() {
 
             {/* Modal Content */}
             <div className="flex-1 overflow-auto p-2 sm:p-4 bg-gray-100">
-              {paymentProofUrl.toLowerCase().endsWith('.pdf') || paymentProofUrl.includes('application/pdf') ? (
+              {currentViewingProof.toLowerCase().endsWith('.pdf') || currentViewingProof.includes('application/pdf') ? (
                 // PDF Viewer
                 <div className="w-full h-full min-h-[400px] sm:min-h-[500px]">
                   <iframe
-                    src={paymentProofUrl}
+                    src={currentViewingProof}
                     className="w-full h-full border-0 rounded"
                     title="Proof of Payment PDF"
                   />
@@ -565,13 +695,14 @@ export default function ViewRegistration() {
                 // Image Viewer
                 <div className="flex items-center justify-center min-h-[400px] sm:min-h-[500px]">
                   <img
-                    src={paymentProofUrl}
+                    src={currentViewingProof}
                     alt="Proof of Payment"
                     className="max-w-full max-h-[75vh] sm:max-h-[70vh] object-contain rounded"
                     onError={(e) => {
-                      console.error('Failed to load image:', paymentProofUrl);
+                      console.error('Failed to load image:', currentViewingProof);
                       setUploadError('Failed to load payment proof image. The file may have been deleted or the URL is invalid.');
                       setShowPaymentModal(false);
+                      setCurrentViewingProof(null);
                     }}
                   />
                 </div>
@@ -581,7 +712,7 @@ export default function ViewRegistration() {
             {/* Modal Footer */}
             <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 p-3 sm:p-4 border-t border-gray-200 bg-gray-50">
               <a
-                href={paymentProofUrl}
+                href={currentViewingProof}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-600 hover:text-blue-700 text-xs sm:text-sm font-medium inline-flex items-center justify-center gap-1 touch-target no-touch-target py-2"
@@ -593,10 +724,63 @@ export default function ViewRegistration() {
               </a>
               <button
                 type="button"
-                onClick={() => setShowPaymentModal(false)}
+                onClick={() => {
+                  setShowPaymentModal(false);
+                  setCurrentViewingProof(null);
+                }}
                 className="w-full sm:w-auto bg-gray-600 hover:bg-gray-700 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors text-sm sm:text-base touch-target"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && deletingProofId && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4"
+          onClick={() => {
+            setShowDeleteConfirm(false);
+            setDeletingProofId(null);
+          }}
+        >
+          <div 
+            className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 sm:p-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center mb-4">
+              <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-gray-900 ml-3">Confirm Delete</h2>
+            </div>
+            <div className="mb-6">
+              <p className="text-gray-700">
+                Are you sure you want to delete this payment proof? This action cannot be undone.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setDeletingProofId(null);
+                }}
+                className="flex-1 px-4 py-2.5 sm:py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-lg transition-colors duration-200 touch-target text-sm sm:text-base"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => deletingProofId && handleDeletePaymentProof(deletingProofId)}
+                disabled={isDeleting || !deletingProofId}
+                className="flex-1 px-4 py-2.5 sm:py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors duration-200 touch-target text-sm sm:text-base"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
               </button>
             </div>
           </div>

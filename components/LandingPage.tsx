@@ -297,7 +297,7 @@ export default function LandingPage() {
                 Only <span className="font-bold text-red-600 text-xl sm:text-2xl">{remainingSlots}</span> {remainingSlots === 1 ? 'slot' : 'slots'} remaining
               </p>
               <p className="text-sm sm:text-base text-gray-600">
-                Register now to secure your spot for the conference.
+                Register now to secure your slot for the conference.
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">

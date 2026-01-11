@@ -158,7 +158,7 @@ export default function LandingPage() {
           </p>
           {conference?.date_from && conference?.date_to && (
             <p className="text-xs sm:text-sm text-gray-500 mt-1">
-              {new Date(conference.date_from).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} - {new Date(conference.date_to).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+              {new Date(conference.date_from).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} - {new Date(conference.date_to).toLocaleDateString('en-US', { day: 'numeric' })}, {new Date(conference.date_to).toLocaleDateString('en-US', { year: 'numeric' })}
             </p>
           )}
           {conference?.venue && (
@@ -178,7 +178,7 @@ export default function LandingPage() {
             ) : registrationStatus && !registrationStatus.isOpen ? (
               <div className="space-y-2 sm:space-y-3">
                 <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg text-xs sm:text-sm text-center break-words">
-                  Thank you for your interest in joining the conference. We regret to inform you that all available slots are already filled.
+                  Thank you for your interest in joining the conference. We regret to inform you that all slots are fully taken.
                 </div>
                 <button
                   disabled
@@ -273,9 +273,9 @@ export default function LandingPage() {
 
         </div>
 
-        <div className="mt-6 sm:mt-8 text-center text-xs sm:text-sm text-gray-500">
-          <p>Need help? Contact the registration team.</p>
-        </div>
+        {/* <div className="mt-6 sm:mt-8 text-center text-xs sm:text-sm text-gray-500">
+          <p>Need help? Contact mobile number 09695041485.</p>
+        </div> */}
       </div>
 
       {/* Remaining Slots Modal */}

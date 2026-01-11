@@ -575,15 +575,15 @@ export default function ViewRegistration() {
         <div className="mt-4 sm:mt-6 md:mt-8 bg-white rounded-lg shadow-lg p-4 sm:p-6 md:p-8 mb-4 sm:mb-6">
           <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-gray-900">NOTES</h2>
           <div className="space-y-2 sm:space-y-3 text-xs sm:text-sm text-gray-900">
-            <p><strong>REGISTRATION PROCEDURES:</strong></p>
+            <p><strong>REGISTRATION PROCEDURE:</strong></p>
             
-            <p><strong>B.</strong> Deposit your Registration Fees to either of the following:</p>
+            <p><strong>1.</strong> Deposit your Registration Fee/s to either of the following bank account:</p>
             {/* Mobile Stacked Layout */}
             <div className="block sm:hidden space-y-3 my-3">
               <div className="border border-gray-300 rounded p-3">
                 <div className="font-bold text-xs mb-1">PAYEE:</div>
                 <div className="text-xs mb-2">Philippine Association of Local Government Accountants, Inc.</div>
-                <div className="font-semibold text-xs">(1) BDO - CDO</div>
+                <div className="font-semibold text-xs">(1) BDO - Cagayan de Oro</div>
                 <div className="text-xs">Account No. 0119 4800 6438</div>
               </div>
               <div className="border border-gray-300 rounded p-3">
@@ -606,7 +606,7 @@ export default function ViewRegistration() {
                 </tr>
                 <tr>
                   <td className="border border-gray-300 p-2 text-gray-900 text-xs sm:text-sm">
-                    <strong>(1) BDO - CDO</strong><br />
+                    <strong>(1) BDO - Cagayan de Oro</strong><br />
                     Account No. 0119 4800 6438
                   </td>
                   <td className="border border-gray-300 p-2 text-gray-900 text-xs sm:text-sm">
@@ -618,15 +618,15 @@ export default function ViewRegistration() {
             </table>
 
             <p>
-              Upload the scanned/photographed Validated Bank Deposit Slip to the system.
+            <strong>2.</strong> Upload the scanned/photographed Validated Bank Deposit Slip to the system.
             </p>
             
             <p>
-              An e-mail reply-confirmation would be received for successful registration. Print a copy of the confirmation and attach the validated deposit slip for reference during the conference.
+            <strong>3.</strong> An e-mail reply-confirmation would be received for successful registration.
             </p>
             
             <p>
-              For other issues and concerns, please contact the VP for MINDANAO, Ritchleen Grace Jasebelle A. Buray, CPA at her mobile number <strong>09177-7189-615</strong>.
+              For concerns, please contact registration team at mobile number <strong>09695041485</strong>.
             </p>
           </div>
         </div>

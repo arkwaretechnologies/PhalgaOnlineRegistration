@@ -166,7 +166,7 @@ export async function sendRegistrationConfirmation(
               </p>
               
               <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
-                Thank you for registering for the <strong>${conferenceName}</strong>. Your registration has been successfully submitted and is currently under review.
+                Your registration has been successfully submitted. Please upload your proof of payment within 24 hours.
               </p>
               
               <!-- Transaction ID Highlight -->
@@ -232,7 +232,7 @@ export async function sendRegistrationConfirmation(
               </table>
               
               <p style="margin: 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
-                Please keep your Registration ID safe. You can use it to view your registration details at any time.
+                Use your Registration ID to view your registration details.
               </p>
               
               <!-- View Registration Button -->
@@ -243,7 +243,7 @@ export async function sendRegistrationConfirmation(
               </div>
               
               <p style="margin: 20px 0 0 0; color: #666666; font-size: 14px; line-height: 1.6;">
-                If you have any questions or need to make changes to your registration, please contact us using the information provided in your registration.
+                If you have any questions or need to make changes to your registration, please contact registration team using this number 09695041485.
               </p>
             </td>
           </tr>

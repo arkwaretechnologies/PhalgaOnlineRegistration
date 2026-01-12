@@ -75,7 +75,7 @@ export async function sendRegistrationConfirmation(
     const formattedDate = formatDate(data.regdate);
     
     // Get conference name from data or use default
-    const conferenceName = data.conferenceName || '18th Mindanao Geographic Conference';
+    const conferenceName = data.conferenceName || 'Philippine Association of Local Government Accountants, Inc.';
     
     // Fetch conference data and contacts from database if confcode is provided
     let dateFrom: string | null = null;

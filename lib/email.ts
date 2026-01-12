@@ -77,10 +77,27 @@ export async function sendRegistrationConfirmation(
     // Get conference name from data or use default
     const conferenceName = data.conferenceName || '18th Mindanao Geographic Conference';
     
-    // Fetch contacts from database if confcode is provided
+    // Fetch conference data and contacts from database if confcode is provided
+    let dateFrom: string | null = null;
+    let dateTo: string | null = null;
+    let venue: string | null = null;
     let contactNumbers: string[] = [];
     if (data.confcode) {
       try {
+        // Fetch conference data for date_from, date_to, and venue
+        const { data: conferenceData, error: conferenceError } = await supabase
+          .from('conference')
+          .select('date_from, date_to, venue')
+          .eq('confcode', data.confcode)
+          .single();
+        
+        if (!conferenceError && conferenceData) {
+          dateFrom = conferenceData.date_from;
+          dateTo = conferenceData.date_to;
+          venue = conferenceData.venue;
+        }
+        
+        // Fetch contacts
         const { data: contactData, error: contactError } = await supabase
           .from('contacts')
           .select('contact_no')
@@ -91,10 +108,27 @@ export async function sendRegistrationConfirmation(
           contactNumbers = contactData.map(contact => contact.contact_no || '').filter(Boolean);
         }
       } catch (error) {
-        console.error('Error fetching contacts for email:', error);
-        // Continue with empty contact numbers - will fallback to default
+        console.error('Error fetching conference data or contacts for email:', error);
+        // Continue with empty values - will not display dates/venue if not available
       }
     }
+    
+    // Format date range for display (similar to landing page)
+    const formatDateRange = (dateFrom: string | null, dateTo: string | null): string => {
+      if (!dateFrom || !dateTo) return '';
+      try {
+        const fromDate = new Date(dateFrom);
+        const toDate = new Date(dateTo);
+        const fromFormatted = fromDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+        const toDay = toDate.toLocaleDateString('en-US', { day: 'numeric' });
+        const toYear = toDate.toLocaleDateString('en-US', { year: 'numeric' });
+        return `${fromFormatted} - ${toDay}, ${toYear}`;
+      } catch (error) {
+        return '';
+      }
+    };
+    
+    const formattedDateRange = formatDateRange(dateFrom, dateTo);
     
     // Format contact numbers for display
     const formatContactNumbers = (contacts: string[]): string => {
@@ -176,7 +210,9 @@ export async function sendRegistrationConfirmation(
                     <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: bold; line-height: 1.2;">
                       ${conferenceName}
                     </h1>
-                    <p style="margin: 10px 0 0 0; color: #ffffff; font-size: 16px;">
+                    ${formattedDateRange ? `<p style="margin: 8px 0 0 0; color: #ffffff; font-size: 14px; opacity: 0.9;">${formattedDateRange}</p>` : ''}
+                    ${venue ? `<p style="margin: ${formattedDateRange ? '4px' : '8px'} 0 0 0; color: #ffffff; font-size: 14px; opacity: 0.9;">${venue}</p>` : ''}
+                    <p style="margin: ${venue ? '10px' : formattedDateRange ? '8px' : '10px'} 0 0 0; color: #ffffff; font-size: 16px;">
                       Registration Confirmation
                     </p>
                   </td>

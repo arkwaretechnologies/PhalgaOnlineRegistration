@@ -44,6 +44,16 @@ interface PaymentProof {
   uploaded_at?: string; // Optional timestamp
 }
 
+interface Bank {
+  bank_name: string;
+  acct_no: string;
+  payee: string;
+}
+
+interface Contact {
+  contact_no: string;
+}
+
 export default function ViewRegistration() {
   const params = useParams();
   const router = useRouter();
@@ -61,6 +71,8 @@ export default function ViewRegistration() {
   const [deletingProof, setDeletingProof] = useState<{ regid: string; confcode: string; linenum: number } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [banks, setBanks] = useState<Bank[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -126,6 +138,68 @@ export default function ViewRegistration() {
       fetchPaymentProofs();
     }
   }, [transId]);
+
+  // Fetch banks when header (and confcode) is available
+  useEffect(() => {
+    const fetchBanks = async () => {
+      if (!header?.confcode) return;
+
+      try {
+        const timestamp = new Date().getTime();
+        const response = await fetch(
+          `/api/get-banks?confcode=${encodeURIComponent(header.confcode)}&_t=${timestamp}`,
+          {
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache'
+            }
+          }
+        );
+        const data = await response.json();
+
+        if (response.ok && Array.isArray(data)) {
+          setBanks(data);
+        } else {
+          console.error('Failed to fetch banks:', data.error);
+        }
+      } catch (err) {
+        console.error('Error fetching banks:', err);
+      }
+    };
+
+    fetchBanks();
+  }, [header?.confcode]);
+
+  // Fetch contacts when header (and confcode) is available
+  useEffect(() => {
+    const fetchContacts = async () => {
+      if (!header?.confcode) return;
+
+      try {
+        const timestamp = new Date().getTime();
+        const response = await fetch(
+          `/api/get-contacts?confcode=${encodeURIComponent(header.confcode)}&_t=${timestamp}`,
+          {
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache'
+            }
+          }
+        );
+        const data = await response.json();
+
+        if (response.ok && Array.isArray(data)) {
+          setContacts(data);
+        } else {
+          console.error('Failed to fetch contacts:', data.error);
+        }
+      } catch (err) {
+        console.error('Error fetching contacts:', err);
+      }
+    };
+
+    fetchContacts();
+  }, [header?.confcode]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -530,10 +604,6 @@ export default function ViewRegistration() {
                   <div><span className="font-semibold text-gray-700">Designation:</span> <span className="text-gray-900">{detail.designation || '-'}</span></div>
                   <div><span className="font-semibold text-gray-700">Barangay:</span> <span className="text-gray-900">{detail.brgy || '-'}</span></div>
                   <div><span className="font-semibold text-gray-700">T-Shirt Size:</span> <span className="text-gray-900">{detail.tshirtsize || '-'}</span></div>
-                  <div><span className="font-semibold text-gray-700">Contact:</span> <span className="text-gray-900">{detail.contactnum || '-'}</span></div>
-                  {detail.prcnum && (
-                    <div><span className="font-semibold text-gray-700">PRC Number:</span> <span className="text-gray-900">{detail.prcnum}</span></div>
-                  )}
                 </div>
               </div>
             ))}
@@ -548,8 +618,6 @@ export default function ViewRegistration() {
                   <th className="border border-gray-300 px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-semibold text-gray-700">Designation</th>
                   <th className="border border-gray-300 px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-semibold text-gray-700">Barangay</th>
                   <th className="border border-gray-300 px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-semibold text-gray-700">T-Shirt Size</th>
-                  <th className="border border-gray-300 px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-semibold text-gray-700">Contact</th>
-                  <th className="border border-gray-300 px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-semibold text-gray-700">PRC Number</th>
                 </tr>
               </thead>
               <tbody>
@@ -562,8 +630,6 @@ export default function ViewRegistration() {
                     <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700">{detail.designation || '-'}</td>
                     <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700">{detail.brgy || '-'}</td>
                     <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700">{detail.tshirtsize || '-'}</td>
-                    <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700">{detail.contactnum || '-'}</td>
-                    <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700">{detail.prcnum || '-'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -579,43 +645,44 @@ export default function ViewRegistration() {
             
             <p><strong>1.</strong> Deposit your Registration Fee/s to either of the following bank account:</p>
             {/* Mobile Stacked Layout */}
-            <div className="block sm:hidden space-y-3 my-3">
-              <div className="border border-gray-300 rounded p-3">
-                <div className="font-bold text-xs mb-1">PAYEE:</div>
-                <div className="text-xs mb-2">Philippine Association of Local Government Accountants, Inc.</div>
-                <div className="font-semibold text-xs">(1) BDO - Cagayan de Oro</div>
-                <div className="text-xs">Account No. 0119 4800 6438</div>
-              </div>
-              <div className="border border-gray-300 rounded p-3">
-                <div className="font-bold text-xs mb-1">PAYEE:</div>
-                <div className="text-xs mb-2">Philippine Association of Local Government Accountants, Inc.</div>
-                <div className="font-semibold text-xs">(2) Landbank - Imus, Cavite</div>
-                <div className="text-xs">Account No. 1422-1089-19</div>
-              </div>
-            </div>
-            {/* Desktop Table Layout */}
-            <table className="hidden sm:table w-full sm:w-3/4 border-collapse border border-gray-300 my-4">
-              <tbody>
-                <tr>
-                  <td className="border border-gray-300 p-2 text-gray-900 text-xs sm:text-sm">
-                    <strong>PAYEE:</strong> Philippine Association of Local Government Accountants, Inc.
-                  </td>
-                  <td className="border border-gray-300 p-2 text-gray-900 text-xs sm:text-sm">
-                    <strong>PAYEE:</strong> Philippine Association of Local Government Accountants, Inc.
-                  </td>
-                </tr>
-                <tr>
-                  <td className="border border-gray-300 p-2 text-gray-900 text-xs sm:text-sm">
-                    <strong>(1) BDO - Cagayan de Oro</strong><br />
-                    Account No. 0119 4800 6438
-                  </td>
-                  <td className="border border-gray-300 p-2 text-gray-900 text-xs sm:text-sm">
-                    <strong>(2) Landbank - Imus, Cavite</strong><br />
-                    Account No. 1422-1089-19
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            {banks.length > 0 ? (
+              <>
+                <div className="block sm:hidden space-y-3 my-3">
+                  {banks.map((bank, index) => (
+                    <div key={index} className="border border-gray-300 rounded p-3">
+                      <div className="font-bold text-xs mb-1">PAYEE:</div>
+                      <div className="text-xs mb-2">{bank.payee || '-'}</div>
+                      <div className="font-semibold text-xs">({index + 1}) {bank.bank_name || '-'}</div>
+                      <div className="text-xs">Account No. {bank.acct_no || '-'}</div>
+                    </div>
+                  ))}
+                </div>
+                {/* Desktop Table Layout */}
+                <table className="hidden sm:table w-full sm:w-3/4 border-collapse border border-gray-300 my-4">
+                  <tbody>
+                    {/* First row: Payees */}
+                    <tr>
+                      {banks.map((bank, index) => (
+                        <td key={`payee-${index}`} className="border border-gray-300 p-2 text-gray-900 text-xs sm:text-sm">
+                          <strong>PAYEE:</strong> {bank.payee || '-'}
+                        </td>
+                      ))}
+                    </tr>
+                    {/* Second row: Bank names and account numbers */}
+                    <tr>
+                      {banks.map((bank, index) => (
+                        <td key={`bank-${index}`} className="border border-gray-300 p-2 text-gray-900 text-xs sm:text-sm">
+                          <strong>({index + 1}) {bank.bank_name || '-'}</strong><br />
+                          Account No. {bank.acct_no || '-'}
+                        </td>
+                      ))}
+                    </tr>
+                  </tbody>
+                </table>
+              </>
+            ) : (
+              <p className="text-xs sm:text-sm text-gray-600 my-3 italic">Bank information is being loaded...</p>
+            )}
 
             <p>
             <strong>2.</strong> Upload the scanned/photographed Validated Bank Deposit Slip to the system.
@@ -626,7 +693,22 @@ export default function ViewRegistration() {
             </p>
             
             <p>
-              For concerns, please contact registration team at mobile number <strong>09695041485</strong>.
+              For concerns, please contact registration team at mobile number{contacts.length > 1 ? 's' : ''}{' '}
+              {contacts.length > 0 ? (
+                <strong>
+                  {contacts.map((contact, index) => (
+                    <span key={index}>
+                      {contact.contact_no || '-'}
+                      {index < contacts.length - 1 && (
+                        index === contacts.length - 2 ? ' and ' : ', '
+                      )}
+                    </span>
+                  ))}
+                </strong>
+              ) : (
+                <strong>Loading...</strong>
+              )}
+              .
             </p>
           </div>
         </div>

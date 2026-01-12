@@ -372,7 +372,8 @@ export async function POST(request: Request) {
         viewUrl: process.env.NEXT_PUBLIC_APP_URL 
           ? `${process.env.NEXT_PUBLIC_APP_URL}/view/${regId}`
           : undefined,
-        conferenceName: conference.name || undefined
+        conferenceName: conference.name || undefined,
+        confcode: confcode
       });
 
       if (emailResult.success) {

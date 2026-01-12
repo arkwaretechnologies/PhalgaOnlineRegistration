@@ -504,10 +504,16 @@ export default function RegistrationForm() {
 
   if (!isRegistrationOpen) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="bg-white p-8 rounded-lg shadow-lg">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">Registration Closed</h1>
-          <p className="text-gray-700">Registration is already closed.</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="bg-white p-8 sm:p-10 rounded-lg shadow-lg max-w-2xl w-full text-center">
+          <div className="mb-6">
+            <svg className="mx-auto h-16 w-16 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <p className="text-lg sm:text-xl text-gray-700 leading-relaxed">
+            Thank you for your interest in joining the conference. We regret to inform you that all slots are fully taken.
+          </p>
         </div>
       </div>
     );

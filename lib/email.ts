@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { supabase } from '@/lib/db';
 
 // Initialize Resend client
 const resendApiKey = process.env.RESEND_API_KEY;
@@ -23,6 +24,7 @@ interface RegistrationEmailData {
   participantCount: number;
   viewUrl?: string;
   conferenceName?: string;
+  confcode?: string;
 }
 
 /**
@@ -74,6 +76,42 @@ export async function sendRegistrationConfirmation(
     
     // Get conference name from data or use default
     const conferenceName = data.conferenceName || '18th Mindanao Geographic Conference';
+    
+    // Fetch contacts from database if confcode is provided
+    let contactNumbers: string[] = [];
+    if (data.confcode) {
+      try {
+        const { data: contactData, error: contactError } = await supabase
+          .from('contacts')
+          .select('contact_no')
+          .eq('confcode', data.confcode)
+          .order('id', { ascending: true });
+        
+        if (!contactError && contactData) {
+          contactNumbers = contactData.map(contact => contact.contact_no || '').filter(Boolean);
+        }
+      } catch (error) {
+        console.error('Error fetching contacts for email:', error);
+        // Continue with empty contact numbers - will fallback to default
+      }
+    }
+    
+    // Format contact numbers for display
+    const formatContactNumbers = (contacts: string[]): string => {
+      if (contacts.length === 0) {
+        return 'Loading...'; // Fallback if no contacts found
+      } else if (contacts.length === 1) {
+        return contacts[0];
+      } else if (contacts.length === 2) {
+        return `${contacts[0]} and ${contacts[1]}`;
+      } else {
+        const last = contacts[contacts.length - 1];
+        const rest = contacts.slice(0, -1);
+        return `${rest.join(', ')}, and ${last}`;
+      }
+    };
+    
+    const formattedContactNumbers = formatContactNumbers(contactNumbers);
     
     // Get base URL for images - must be absolute URL for email clients
     // In Next.js, files in public folder are served from root
@@ -243,7 +281,7 @@ export async function sendRegistrationConfirmation(
               </div>
               
               <p style="margin: 20px 0 0 0; color: #666666; font-size: 14px; line-height: 1.6;">
-                If you have any questions or need to make changes to your registration, please contact registration team using this number 09695041485.
+                If you have any questions or need to make changes to your registration, please contact registration team using this number${contactNumbers.length > 1 ? 's' : ''} <strong>${formattedContactNumbers}</strong>.
               </p>
             </td>
           </tr>

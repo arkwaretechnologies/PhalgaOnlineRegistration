@@ -41,7 +41,6 @@ interface PaymentProof {
   confcode: string; // NOT NULL - part of composite primary key
   linenum: number; // NOT NULL - part of composite primary key
   payment_proof_url: string;
-  uploaded_at?: string; // Optional timestamp
 }
 
 interface Bank {

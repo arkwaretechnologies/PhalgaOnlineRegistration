@@ -8,42 +8,50 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const lgu = searchParams.get('lgu');
+    const psgc = searchParams.get('psgc'); // Accept PSGC code directly
 
     console.log('=== Fetching Barangays ===');
     console.log('LGU selected:', lgu);
+    console.log('PSGC code:', psgc);
 
-    if (!lgu) {
+    let lguPsgc: string | null = null;
+
+    // If PSGC is provided, use it directly
+    if (psgc && psgc.trim() !== '') {
+      lguPsgc = psgc.trim();
+      console.log('Using provided PSGC code:', lguPsgc);
+    } else if (lgu) {
+      // Fallback: Get PSGC for the LGU (must have geolevel = 'MUN' or 'CITY')
+      // Using ilike for case-insensitive matching of LGU name
+      const { data: lguPsgcData, error: lguPsgcError } = await supabase
+        .from('lgus')
+        .select('psgc, lguname, geolevel')
+        .ilike('lguname', lgu.trim())
+        .in('geolevel', ['MUN', 'CITY'])
+        .limit(1);
+
+      if (lguPsgcError) {
+        console.error('Database error fetching LGU PSGC:', lguPsgcError);
+        return NextResponse.json(
+          { error: 'Failed to fetch barangays' },
+          { status: 500 }
+        );
+      }
+
+      if (!lguPsgcData || lguPsgcData.length === 0) {
+        console.log(`No LGU found with name: ${lgu} and geolevel=MUN or CITY`);
+        return NextResponse.json([]);
+      }
+
+      lguPsgc = lguPsgcData[0].psgc;
+    } else {
       return NextResponse.json(
-        { error: 'LGU parameter is required' },
+        { error: 'LGU or PSGC parameter is required' },
         { status: 400 }
       );
     }
 
-    // Get PSGC for the LGU (must have geolevel = 'MUN' or 'CITY')
-    // Using ilike for case-insensitive matching of LGU name
-    const { data: lguPsgcData, error: lguPsgcError } = await supabase
-      .from('lgus')
-      .select('psgc, lguname, geolevel')
-      .ilike('lguname', lgu.trim())
-      .in('geolevel', ['MUN', 'CITY'])
-      .limit(1);
-
-    if (lguPsgcError) {
-      console.error('Database error fetching LGU PSGC:', lguPsgcError);
-      return NextResponse.json(
-        { error: 'Failed to fetch barangays' },
-        { status: 500 }
-      );
-    }
-
-    if (!lguPsgcData || lguPsgcData.length === 0) {
-      console.log(`No LGU found with name: ${lgu} and geolevel=MUN or CITY`);
-      return NextResponse.json([]);
-    }
-
-    const lguPsgc = lguPsgcData[0].psgc;
-    console.log('LGU PSGC found:', lguPsgc);
-    console.log('LGU geolevel:', lguPsgcData[0].geolevel);
+    console.log('LGU PSGC to use:', lguPsgc);
 
     if (!lguPsgc || lguPsgc.length < 7) {
       console.error('Invalid PSGC - must be at least 7 characters:', lguPsgc);

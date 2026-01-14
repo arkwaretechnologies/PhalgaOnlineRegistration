@@ -49,7 +49,7 @@ export async function GET(request: Request) {
       console.log(`Fetching LGUs by city_class: ${cityClass}`);
       console.log('Conference PSGC filter:', conference.psgc || 'none');
 
-      let allLGUs: string[] = [];
+      let allLGUs: Array<{ name: string; psgc: string }> = [];
       const seenLGUs = new Set<string>();
 
       // If no PSGC filter is set, return all LGUs with the city class
@@ -70,7 +70,7 @@ export async function GET(request: Request) {
           );
         }
 
-        allLGUs = lguData?.map((row) => row.lguname) || [];
+        allLGUs = lguData?.map((row) => ({ name: row.lguname, psgc: row.psgc })) || [];
       } else {
         // Parse comma-separated PSGC prefixes
         const psgcPrefixes = conference.psgc
@@ -100,9 +100,10 @@ export async function GET(request: Request) {
             for (const row of lguData) {
               // Check if PSGC starts with the prefix and has matching city_class
               if (row.psgc && row.psgc.startsWith(prefix) && row.lguname) {
-                if (!seenLGUs.has(row.lguname)) {
-                  seenLGUs.add(row.lguname);
-                  allLGUs.push(row.lguname);
+                const lguKey = `${row.lguname}|${row.psgc}`;
+                if (!seenLGUs.has(lguKey)) {
+                  seenLGUs.add(lguKey);
+                  allLGUs.push({ name: row.lguname, psgc: row.psgc });
                   console.log(`  ✓ Added LGU: "${row.lguname}" (PSGC: ${row.psgc}, city_class: ${row.city_class})`);
                 }
               }
@@ -110,8 +111,8 @@ export async function GET(request: Request) {
           }
         }
 
-        // Sort LGUs alphabetically
-        allLGUs.sort((a, b) => a.localeCompare(b));
+        // Sort LGUs alphabetically by name
+        allLGUs.sort((a, b) => a.name.localeCompare(b.name));
       }
 
       console.log(`Found ${allLGUs.length} LGUs with city_class=${cityClass}`);
@@ -194,7 +195,7 @@ export async function GET(request: Request) {
       console.log('LGUs found:', lguData.map(l => ({ name: l.lguname, psgc: l.psgc, geolevel: l.geolevel })));
     }
 
-    const data = lguData?.map((row) => row.lguname) || [];
+    const data = lguData?.map((row) => ({ name: row.lguname, psgc: row.psgc })) || [];
     
     console.log('=== Final LGUs List ===');
     console.log('Total LGUs:', data.length);

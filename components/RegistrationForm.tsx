@@ -45,7 +45,8 @@ export default function RegistrationForm() {
   const [contactPerson, setContactPerson] = useState('');
   const [contactNo, setContactNo] = useState('');
   const [emailAddress, setEmailAddress] = useState('');
-  const [lguOptions, setLguOptions] = useState<string[]>([]);
+  const [lguOptions, setLguOptions] = useState<Array<{ name: string; psgc: string }>>([]);
+  const [selectedLguPsgc, setSelectedLguPsgc] = useState<string>('');
   const [barangayOptions, setBarangayOptions] = useState<string[]>([]);
   const [positionOptions, setPositionOptions] = useState<string[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([{
@@ -164,8 +165,23 @@ export default function RegistrationForm() {
       fetch(`/api/get-lgus?province=${encodeURIComponent(province)}`)
         .then(res => res.json())
         .then(data => {
-          setLguOptions(Array.isArray(data) ? data : []);
+          // Handle both old format (array of strings) and new format (array of objects)
+          if (Array.isArray(data)) {
+            const formattedData = data.map(item => {
+              if (typeof item === 'string') {
+                // Old format: just return the string as name, PSGC will be looked up
+                return { name: item, psgc: '' };
+              } else {
+                // New format: object with name and psgc
+                return { name: item.name || item.lguname || '', psgc: item.psgc || '' };
+              }
+            });
+            setLguOptions(formattedData);
+          } else {
+            setLguOptions([]);
+          }
           setLgu(''); // Reset LGU when province changes
+          setSelectedLguPsgc(''); // Reset PSGC
         })
         .catch(err => {
           console.error('Error fetching LGUs:', err);
@@ -174,13 +190,37 @@ export default function RegistrationForm() {
     } else {
       setLguOptions([]);
       setLgu('');
+      setSelectedLguPsgc('');
     }
   }, [province]);
 
   // Fetch barangays when LGU changes
   useEffect(() => {
-    if (lgu) {
+    if (lgu && selectedLguPsgc) {
       console.log('=== Fetching Barangays for LGU ===');
+      console.log('LGU selected:', lgu);
+      console.log('PSGC code:', selectedLguPsgc);
+      // Use PSGC code for accurate lookup
+      fetch(`/api/get-barangays?lgu=${encodeURIComponent(lgu)}&psgc=${encodeURIComponent(selectedLguPsgc)}`)
+        .then(res => res.json())
+        .then(data => {
+          console.log('Barangays API Response:', data);
+          if (data && !data.error && Array.isArray(data)) {
+            console.log(`✓ Successfully fetched ${data.length} barangays for LGU: ${lgu} (PSGC: ${selectedLguPsgc})`);
+            console.log('Barangays list:', data);
+            setBarangayOptions(data);
+          } else {
+            console.warn('✗ Failed to fetch barangays from API:', data);
+            setBarangayOptions([]);
+          }
+        })
+        .catch(err => {
+          console.error('✗ Error fetching barangays:', err);
+          setBarangayOptions([]);
+        });
+    } else if (lgu) {
+      // Fallback: try without PSGC if it's not available
+      console.log('=== Fetching Barangays for LGU (fallback) ===');
       console.log('LGU selected:', lgu);
       fetch(`/api/get-barangays?lgu=${encodeURIComponent(lgu)}`)
         .then(res => res.json())
@@ -202,7 +242,7 @@ export default function RegistrationForm() {
     } else {
       setBarangayOptions([]);
     }
-  }, [lgu]);
+  }, [lgu, selectedLguPsgc]);
 
   // Update all participant LGUs when header LGU changes
   useEffect(() => {
@@ -577,12 +617,18 @@ export default function RegistrationForm() {
                 type="text"
                 list="lgu-list-mobile"
                 value={lgu}
-                onChange={(e) => setLgu(e.target.value)}
+                onChange={(e) => {
+                  const selectedName = e.target.value;
+                  setLgu(selectedName);
+                  // Find matching LGU object and set PSGC
+                  const matchedLgu = lguOptions.find(l => l.name.toUpperCase() === selectedName.toUpperCase());
+                  setSelectedLguPsgc(matchedLgu?.psgc || '');
+                }}
                 className="w-full px-3 py-2.5 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
                 required
               />
               <datalist id="lgu-list-mobile">
-                {lguOptions.map(l => <option key={l} value={l} />)}
+                {lguOptions.map((l, idx) => <option key={l.psgc || idx} value={l.name} />)}
               </datalist>
             </div>
             <div className="border border-gray-300 rounded-lg p-3 bg-blue-50">
@@ -658,12 +704,18 @@ export default function RegistrationForm() {
                     type="text"
                     list="lgu-list"
                     value={lgu}
-                    onChange={(e) => setLgu(e.target.value)}
+                    onChange={(e) => {
+                      const selectedName = e.target.value;
+                      setLgu(selectedName);
+                      // Find matching LGU object and set PSGC
+                      const matchedLgu = lguOptions.find(l => l.name.toUpperCase() === selectedName.toUpperCase());
+                      setSelectedLguPsgc(matchedLgu?.psgc || '');
+                    }}
                     className="w-full px-2 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white"
                     required
                   />
                   <datalist id="lgu-list">
-                    {lguOptions.map(l => <option key={l} value={l} />)}
+                    {lguOptions.map((l, idx) => <option key={l.psgc || idx} value={l.name} />)}
                   </datalist>
                 </td>
               </tr>

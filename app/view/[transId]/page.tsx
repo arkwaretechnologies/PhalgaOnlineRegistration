@@ -688,7 +688,7 @@ export default function ViewRegistration() {
             </p>
             
             <p>
-            <strong>3.</strong> An e-mail reply-confirmation would be received for successful registration.
+            <strong>3.</strong> An e-mail reply-confirmation will be received for successful registration.
             </p>
             
             <p>

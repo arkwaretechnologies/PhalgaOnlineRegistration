@@ -48,7 +48,7 @@ export default function RegistrationForm() {
   const [lguOptions, setLguOptions] = useState<Array<{ name: string; psgc: string }>>([]);
   const [selectedLguPsgc, setSelectedLguPsgc] = useState<string>('');
   const [barangayOptions, setBarangayOptions] = useState<string[]>([]);
-  const [positionOptions, setPositionOptions] = useState<string[]>([]);
+  const [positionOptions, setPositionOptions] = useState<Array<{ name: string; lvl: string | null }>>([]);
   const [participants, setParticipants] = useState<Participant[]>([{
     id: 1,
     lastName: '',
@@ -329,6 +329,38 @@ export default function RegistrationForm() {
     ));
   };
 
+  // Helper function to get the lvl for a position name
+  const getPositionLvl = (positionName: string): string | null => {
+    const position = positionOptions.find(p => p.name.toUpperCase() === positionName.toUpperCase());
+    return position?.lvl || null;
+  };
+
+  // Helper function to check if Barangay should be enabled for a participant
+  const isBarangayEnabled = (participant: Participant): boolean => {
+    if (!participant.position) return false;
+    const lvl = getPositionLvl(participant.position);
+    return lvl === 'BGY';
+  };
+
+  // Helper function to handle position change and clear barangay if needed
+  const handlePositionChange = (participantId: number, newPosition: string) => {
+    const newPositionUpper = newPosition.toUpperCase();
+    const lvl = getPositionLvl(newPositionUpper);
+    
+    setParticipants(participants.map(p => {
+      if (p.id === participantId) {
+        // If the new position doesn't have lvl === 'BGY', clear the barangay field
+        const shouldClearBarangay = lvl !== 'BGY';
+        return {
+          ...p,
+          position: newPositionUpper,
+          barangay: shouldClearBarangay ? '' : p.barangay
+        };
+      }
+      return p;
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitMessage(null);
@@ -604,6 +636,14 @@ export default function RegistrationForm() {
                 list="provinces-list-mobile"
                 value={province}
                 onChange={(e) => setProvince(e.target.value)}
+                onBlur={(e) => {
+                  // Validate that the value exists in the provinces list
+                  const enteredValue = e.target.value.trim().toUpperCase();
+                  const isValid = provinces.some(p => p.toUpperCase() === enteredValue);
+                  if (!isValid && enteredValue !== '') {
+                    setProvince('');
+                  }
+                }}
                 className="w-full px-3 py-2.5 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
                 required
               />
@@ -623,6 +663,15 @@ export default function RegistrationForm() {
                   // Find matching LGU object and set PSGC
                   const matchedLgu = lguOptions.find(l => l.name.toUpperCase() === selectedName.toUpperCase());
                   setSelectedLguPsgc(matchedLgu?.psgc || '');
+                }}
+                onBlur={(e) => {
+                  // Validate that the value exists in the LGU options list
+                  const enteredValue = e.target.value.trim().toUpperCase();
+                  const isValid = lguOptions.some(l => l.name.toUpperCase() === enteredValue);
+                  if (!isValid && enteredValue !== '') {
+                    setLgu('');
+                    setSelectedLguPsgc('');
+                  }
                 }}
                 className="w-full px-3 py-2.5 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
                 required
@@ -689,6 +738,14 @@ export default function RegistrationForm() {
                     list="provinces-list"
                     value={province}
                     onChange={(e) => setProvince(e.target.value)}
+                    onBlur={(e) => {
+                      // Validate that the value exists in the provinces list
+                      const enteredValue = e.target.value.trim().toUpperCase();
+                      const isValid = provinces.some(p => p.toUpperCase() === enteredValue);
+                      if (!isValid && enteredValue !== '') {
+                        setProvince('');
+                      }
+                    }}
                     className="w-full px-2 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white"
                     required
                   />
@@ -710,6 +767,15 @@ export default function RegistrationForm() {
                       // Find matching LGU object and set PSGC
                       const matchedLgu = lguOptions.find(l => l.name.toUpperCase() === selectedName.toUpperCase());
                       setSelectedLguPsgc(matchedLgu?.psgc || '');
+                    }}
+                    onBlur={(e) => {
+                      // Validate that the value exists in the LGU options list
+                      const enteredValue = e.target.value.trim().toUpperCase();
+                      const isValid = lguOptions.some(l => l.name.toUpperCase() === enteredValue);
+                      if (!isValid && enteredValue !== '') {
+                        setLgu('');
+                        setSelectedLguPsgc('');
+                      }
                     }}
                     className="w-full px-2 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white"
                     required
@@ -846,13 +912,13 @@ export default function RegistrationForm() {
                         type="text"
                         list={`position-list-mobile-${participant.id}`}
                         value={participant.position}
-                        onChange={(e) => updateParticipant(participant.id, 'position', e.target.value.toUpperCase())}
+                        onChange={(e) => handlePositionChange(participant.id, e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
                         placeholder="Enter or select position"
                         required
                       />
                       <datalist id={`position-list-mobile-${participant.id}`}>
-                        {positionOptions.map(position => <option key={position} value={position} />)}
+                        {positionOptions.map(position => <option key={position.name} value={position.name} />)}
                       </datalist>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -878,7 +944,7 @@ export default function RegistrationForm() {
                           value={participant.barangay}
                           onChange={(e) => updateParticipant(participant.id, 'barangay', e.target.value.toUpperCase())}
                           className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
-                          disabled={!lgu}
+                          disabled={!lgu || !isBarangayEnabled(participant)}
                         />
                         <datalist id={`barangay-list-mobile-${participant.id}`}>
                           {barangayOptions.map(b => <option key={b} value={b} />)}
@@ -964,13 +1030,13 @@ export default function RegistrationForm() {
                         type="text"
                         list={`position-list-${participant.id}`}
                         value={participant.position}
-                        onChange={(e) => updateParticipant(participant.id, 'position', e.target.value.toUpperCase())}
+                        onChange={(e) => handlePositionChange(participant.id, e.target.value)}
                         className="w-full px-2 py-1.5 md:py-1 border-0 bg-transparent uppercase text-gray-900 text-sm"
                         placeholder="Enter position"
                         required
                       />
                       <datalist id={`position-list-${participant.id}`}>
-                        {positionOptions.map(position => <option key={position} value={position} />)}
+                        {positionOptions.map(position => <option key={position.name} value={position.name} />)}
                       </datalist>
                     </td>
                     <td className="border border-gray-300 p-1 bg-blue-50">
@@ -994,8 +1060,8 @@ export default function RegistrationForm() {
                         value={participant.barangay}
                         onChange={(e) => updateParticipant(participant.id, 'barangay', e.target.value.toUpperCase())}
                         className="w-full px-1 py-0.5 border-0 bg-transparent uppercase text-gray-900"
-                        disabled={!lgu}
-                        title={!lgu ? 'Please select an LGU first' : ''}
+                        disabled={!lgu || !isBarangayEnabled(participant)}
+                        title={!lgu ? 'Please select an LGU first' : (!isBarangayEnabled(participant) ? 'Barangay is only enabled for positions with level BGY' : '')}
                       />
                       <datalist id={`barangay-list-${participant.id}`}>
                         {barangayOptions.map(b => <option key={b} value={b} />)}

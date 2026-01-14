@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     // Fetch positions from the positions table, ordered by name
     const { data: positionData, error: positionError } = await supabase
       .from('positions')
-      .select('name')
+      .select('name, lvl')
       .order('name', { ascending: true });
 
     if (positionError) {
@@ -25,10 +25,10 @@ export async function GET(request: Request) {
     console.log(`Found ${positionData?.length || 0} positions`);
     
     if (positionData && positionData.length > 0) {
-      console.log('Positions found (first 10):', positionData.slice(0, 10).map(p => p.name));
+      console.log('Positions found (first 10):', positionData.slice(0, 10).map(p => ({ name: p.name, lvl: p.lvl })));
     }
 
-    const data = positionData?.map((row) => row.name) || [];
+    const data = positionData?.map((row) => ({ name: row.name, lvl: row.lvl || null })) || [];
     
     console.log('=== Final Positions List ===');
     console.log('Total positions:', data.length);

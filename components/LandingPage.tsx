@@ -8,7 +8,7 @@ export default function LandingPage() {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
-  const [registrationStatus, setRegistrationStatus] = useState<{ count: number; limit: number; isOpen: boolean } | null>(null);
+  const [registrationStatus, setRegistrationStatus] = useState<{ count: number; limit: number; isOpen: boolean; regAlertCount?: number } | null>(null);
   const [checkingStatus, setCheckingStatus] = useState(true);
   const [showRemainingSlotsModal, setShowRemainingSlotsModal] = useState(false);
   const [remainingSlots, setRemainingSlots] = useState<number | null>(null);
@@ -76,11 +76,12 @@ export default function LandingPage() {
             setConference(prev => prev ? { ...prev, ...data.conference } : null);
           }
           
-          // Check if remaining slots are 100 or less (only if registration is open)
+          // Check if remaining slots are at or below the alert threshold (only if registration is open)
           if (data.count !== undefined && data.limit !== undefined && data.isOpen) {
             const remaining = data.limit - data.count;
+            const alertThreshold = data.regAlertCount || 100; // Use dynamic value or default to 100
             setRemainingSlots(remaining);
-            if (remaining > 0 && remaining <= 100) {
+            if (remaining > 0 && remaining <= alertThreshold) {
               setShowRemainingSlotsModal(true);
             }
           }

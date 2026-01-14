@@ -95,6 +95,7 @@ export async function GET(request: Request) {
         count: registrationCount,
         limit: limit,
         isOpen: isOpen,
+        regAlertCount: conference?.reg_alert_count || 100, // Default to 100 if not set
         conference: {
           confcode: conference?.confcode || confcode,
           name: conference?.name || null

@@ -120,27 +120,28 @@ export async function POST(request: Request) {
       );
     }
 
-    // Filter records where status is NULL, PENDING, or APPROVED and same conference
+    // Filter records where status is PENDING or APPROVED and same conference
     const validRecords = (regdData || []).filter((record: any) => {
       if (record.confcode !== confcode) {
         return false;
       }
       const regh = Array.isArray(record.regh) ? record.regh[0] : record.regh;
+      // Only count records that have a regh record with status
       if (!regh) {
-        return true;
+        return false;
       }
       if (regh.confcode && regh.confcode !== confcode) {
         return false;
       }
       const status = (regh.status || '').toString().toUpperCase().trim();
-      return !status || status === 'PENDING' || status === 'APPROVED';
+      return status === 'PENDING' || status === 'APPROVED';
     });
 
     const regcount = validRecords.length;
     const limit = await getRegistrationLimitByConference(confcode);
 
     console.log(`Total regd records: ${regdData?.length || 0}`);
-    console.log(`Valid records (PENDING/APPROVED/NULL): ${regcount}`);
+    console.log(`Valid records (PENDING/APPROVED only): ${regcount}`);
     console.log(`Registration Count: ${regcount}`);
     console.log(`Registration Limit: ${limit}`);
     console.log('==========================================');

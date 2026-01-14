@@ -41,7 +41,7 @@ export async function GET(request: Request) {
       );
     }
     
-    // Step 2: Filter records where status is NULL, PENDING, or APPROVED (case-insensitive)
+    // Step 2: Filter records where status is PENDING or APPROVED (case-insensitive)
     // AND ensure the regh record belongs to the same conference
     const validRecords = (regdData || []).filter((record: any) => {
       // First check if regd belongs to this conference
@@ -50,9 +50,9 @@ export async function GET(request: Request) {
       }
       
       const regh = Array.isArray(record.regh) ? record.regh[0] : record.regh;
+      // Only count records that have a regh record with status
       if (!regh) {
-        // If no regh record, include it (matches LEFT JOIN behavior with NULL status)
-        return true;
+        return false;
       }
       
       // Double-check regh belongs to same conference (if confcode exists in regh)
@@ -61,7 +61,7 @@ export async function GET(request: Request) {
       }
       
       const status = (regh.status || '').toString().toUpperCase().trim();
-      return !status || status === 'PENDING' || status === 'APPROVED';
+      return status === 'PENDING' || status === 'APPROVED';
     });
     
     const registrationCount = validRecords.length;
@@ -69,7 +69,7 @@ export async function GET(request: Request) {
     console.log('=== Registration Count Check ===');
     console.log(`Conference: ${confcode}`);
     console.log(`Total regd records: ${regdData?.length || 0}`);
-    console.log(`Valid records (PENDING/APPROVED/NULL): ${registrationCount}`);
+    console.log(`Valid records (PENDING/APPROVED only): ${registrationCount}`);
     console.log('Sample records:', regdData?.slice(0, 3).map((r: any) => ({
       regid: r.regid,
       confcode: r.confcode,

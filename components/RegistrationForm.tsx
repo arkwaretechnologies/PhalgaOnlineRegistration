@@ -75,6 +75,7 @@ export default function RegistrationForm() {
     psgc: string | null;
   } | null>(null);
   const [provinces, setProvinces] = useState<string[]>([]); // Start with empty array - only show fetched provinces
+  const [isProvinceLgu, setIsProvinceLgu] = useState(false);
 
   useEffect(() => {
     // Fetch conference information
@@ -256,6 +257,18 @@ export default function RegistrationForm() {
       );
     }
   }, [lgu]);
+
+  // Handle province LGU checkbox change
+  useEffect(() => {
+    if (isProvinceLgu) {
+      setLgu('PROVINCE');
+      setSelectedLguPsgc('');
+    } else if (lgu === 'PROVINCE') {
+      // If checkbox is unchecked and LGU is still "PROVINCE", clear it
+      setLgu('');
+      setSelectedLguPsgc('');
+    }
+  }, [isProvinceLgu]);
 
   const MAX_PARTICIPANTS = 20;
 
@@ -653,29 +666,50 @@ export default function RegistrationForm() {
             </div>
             <div className="border border-gray-300 rounded-lg p-3 bg-blue-50">
               <label className="block font-semibold text-sm text-gray-900 mb-2">LGU *</label>
-              <input
-                type="text"
-                list="lgu-list-mobile"
-                value={lgu}
-                onChange={(e) => {
-                  const selectedName = e.target.value;
-                  setLgu(selectedName);
-                  // Find matching LGU object and set PSGC
-                  const matchedLgu = lguOptions.find(l => l.name.toUpperCase() === selectedName.toUpperCase());
-                  setSelectedLguPsgc(matchedLgu?.psgc || '');
-                }}
-                onBlur={(e) => {
-                  // Validate that the value exists in the LGU options list
-                  const enteredValue = e.target.value.trim().toUpperCase();
-                  const isValid = lguOptions.some(l => l.name.toUpperCase() === enteredValue);
-                  if (!isValid && enteredValue !== '') {
-                    setLgu('');
-                    setSelectedLguPsgc('');
-                  }
-                }}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
-                required
-              />
+              <div className="flex items-center gap-2 sm:gap-3">
+                <input
+                  type="text"
+                  list="lgu-list-mobile"
+                  value={lgu}
+                  onChange={(e) => {
+                    if (!isProvinceLgu) {
+                      const selectedName = e.target.value;
+                      setLgu(selectedName);
+                      // Find matching LGU object and set PSGC
+                      const matchedLgu = lguOptions.find(l => l.name.toUpperCase() === selectedName.toUpperCase());
+                      setSelectedLguPsgc(matchedLgu?.psgc || '');
+                    }
+                  }}
+                  onBlur={(e) => {
+                    if (!isProvinceLgu) {
+                      // Validate that the value exists in the LGU options list
+                      const enteredValue = e.target.value.trim().toUpperCase();
+                      const isValid = lguOptions.some(l => l.name.toUpperCase() === enteredValue);
+                      if (!isValid && enteredValue !== '') {
+                        setLgu('');
+                        setSelectedLguPsgc('');
+                      }
+                    }
+                  }}
+                  className="flex-1 px-3 py-2.5 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  disabled={isProvinceLgu}
+                  required
+                />
+                <label htmlFor="province-lgu-checkbox-mobile" className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    id="province-lgu-checkbox-mobile"
+                    checked={isProvinceLgu}
+                    onChange={(e) => {
+                      setIsProvinceLgu(e.target.checked);
+                    }}
+                    className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer m-0"
+                  />
+                  <span className="text-xs sm:text-sm font-medium text-gray-900 select-none whitespace-nowrap">
+                    PROVINCE
+                  </span>
+                </label>
+              </div>
               <datalist id="lgu-list-mobile">
                 {lguOptions.map((l, idx) => <option key={l.psgc || idx} value={l.name} />)}
               </datalist>
@@ -757,29 +791,50 @@ export default function RegistrationForm() {
               <tr>
                 <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">LGU</td>
                 <td className="border border-gray-300 p-2 bg-blue-50">
-                  <input
-                    type="text"
-                    list="lgu-list"
-                    value={lgu}
-                    onChange={(e) => {
-                      const selectedName = e.target.value;
-                      setLgu(selectedName);
-                      // Find matching LGU object and set PSGC
-                      const matchedLgu = lguOptions.find(l => l.name.toUpperCase() === selectedName.toUpperCase());
-                      setSelectedLguPsgc(matchedLgu?.psgc || '');
-                    }}
-                    onBlur={(e) => {
-                      // Validate that the value exists in the LGU options list
-                      const enteredValue = e.target.value.trim().toUpperCase();
-                      const isValid = lguOptions.some(l => l.name.toUpperCase() === enteredValue);
-                      if (!isValid && enteredValue !== '') {
-                        setLgu('');
-                        setSelectedLguPsgc('');
-                      }
-                    }}
-                    className="w-full px-2 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white"
-                    required
-                  />
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <input
+                      type="text"
+                      list="lgu-list"
+                      value={lgu}
+                      onChange={(e) => {
+                        if (!isProvinceLgu) {
+                          const selectedName = e.target.value;
+                          setLgu(selectedName);
+                          // Find matching LGU object and set PSGC
+                          const matchedLgu = lguOptions.find(l => l.name.toUpperCase() === selectedName.toUpperCase());
+                          setSelectedLguPsgc(matchedLgu?.psgc || '');
+                        }
+                      }}
+                      onBlur={(e) => {
+                        if (!isProvinceLgu) {
+                          // Validate that the value exists in the LGU options list
+                          const enteredValue = e.target.value.trim().toUpperCase();
+                          const isValid = lguOptions.some(l => l.name.toUpperCase() === enteredValue);
+                          if (!isValid && enteredValue !== '') {
+                            setLgu('');
+                            setSelectedLguPsgc('');
+                          }
+                        }
+                      }}
+                      className="flex-1 px-2 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      disabled={isProvinceLgu}
+                      required
+                    />
+                    <label htmlFor="province-lgu-checkbox" className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        id="province-lgu-checkbox"
+                        checked={isProvinceLgu}
+                        onChange={(e) => {
+                          setIsProvinceLgu(e.target.checked);
+                        }}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer m-0"
+                      />
+                      <span className="text-sm font-medium text-gray-900 select-none whitespace-nowrap">
+                        PROVINCE
+                      </span>
+                    </label>
+                  </div>
                   <datalist id="lgu-list">
                     {lguOptions.map((l, idx) => <option key={l.psgc || idx} value={l.name} />)}
                   </datalist>

@@ -92,7 +92,7 @@ export async function POST(request: Request) {
     }
 
     const confcode = conference.confcode;
-    console.log(`=== Submitting Registration for Conference: ${confcode} (${conference.name}) ===`);
+    // console.log(`=== Submitting Registration for Conference: ${confcode} (${conference.name}) ===`);
 
     const formData: RegistrationData = await request.json();
     
@@ -107,10 +107,10 @@ export async function POST(request: Request) {
       `)
       .eq('confcode', confcode); // Add conference filter
 
-    console.log('=== Registration Count Check (Submit) ===');
-    console.log('Conference:', confcode);
-    console.log('regdData length:', regdData?.length || 0);
-    console.log('regdError:', regdError);
+    // console.log('=== Registration Count Check (Submit) ===');
+    // console.log('Conference:', confcode);
+    // console.log('regdData length:', regdData?.length || 0);
+    // console.log('regdError:', regdError);
 
     if (regdError) {
       console.error('Database error:', regdError);
@@ -140,17 +140,17 @@ export async function POST(request: Request) {
     const regcount = validRecords.length;
     const limit = await getRegistrationLimitByConference(confcode);
 
-    console.log(`Total regd records: ${regdData?.length || 0}`);
-    console.log(`Valid records (PENDING/APPROVED only): ${regcount}`);
-    console.log(`Registration Count: ${regcount}`);
-    console.log(`Registration Limit: ${limit}`);
-    console.log('==========================================');
+    // console.log(`Total regd records: ${regdData?.length || 0}`);
+    // console.log(`Valid records (PENDING/APPROVED only): ${regcount}`);
+    // console.log(`Registration Count: ${regcount}`);
+    // console.log(`Registration Limit: ${limit}`);
+    // console.log('==========================================');
 
     // Check if registration is open (registration closes when count >= limit)
     if (regcount >= limit) {
-      console.log(
-        `Registration closed: current count=${regcount}, limit=${limit}`
-      );
+      // console.log(
+      //   `Registration closed: current count=${regcount}, limit=${limit}`
+      // );
       return NextResponse.json(
         { 
           error: 'Registration is already closed',
@@ -170,8 +170,8 @@ export async function POST(request: Request) {
     const detailcount = parseInt(formData.DETAILCOUNT);
 
     // Check for duplicate participants (same last name, first name, middle initial in same province and LGU)
-    console.log('=== Checking for Duplicate Participants ===');
-    console.log(`Province: ${province}, LGU: ${lgu}, Conference: ${confcode}, Participant Count: ${detailcount}`);
+    // console.log('=== Checking for Duplicate Participants ===');
+    // console.log(`Province: ${province}, LGU: ${lgu}, Conference: ${confcode}, Participant Count: ${detailcount}`);
     
     for (let i = 0; i < detailcount; i++) {
       const lastname = (formData[`LASTNAME|${i}`] || '').toUpperCase().trim();
@@ -227,7 +227,7 @@ export async function POST(request: Request) {
       });
       
       if (validDuplicates.length > 0) {
-        console.log(`Duplicate found: ${firstname} ${middleinit} ${lastname} in ${province} - ${participantLgu}`);
+        // console.log(`Duplicate found: ${firstname} ${middleinit} ${lastname} in ${province} - ${participantLgu}`);
         return NextResponse.json(
           { 
             error: `Participant "${firstname} ${middleinit} ${lastname}" already exists in ${province} - ${participantLgu}. Each participant can only register once.`,
@@ -240,13 +240,13 @@ export async function POST(request: Request) {
       }
     }
     
-    console.log('✓ No duplicate participants found');
+    // console.log('✓ No duplicate participants found');
 
     // Generate unique REGID with conference prefix
     const prefix = conference.prefix || null;
     const regId = await generateUniqueRegId(prefix);
     
-    console.log(`Generated REGID with prefix: ${prefix || 'none'} -> ${regId}`);
+    // console.log(`Generated REGID with prefix: ${prefix || 'none'} -> ${regId}`);
 
     // Get current time in Manila timezone (UTC+8)
     const getManilaTime = (): string => {
@@ -378,7 +378,7 @@ export async function POST(request: Request) {
       });
 
       if (emailResult.success) {
-        console.log('Confirmation email sent successfully to:', email);
+        // console.log('Confirmation email sent successfully to:', email);
       } else {
         console.warn('Failed to send confirmation email:', emailResult.error);
         // Don't fail registration if email fails

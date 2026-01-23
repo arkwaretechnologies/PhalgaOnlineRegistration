@@ -90,9 +90,9 @@ export default function ViewRegistration() {
         );
         const data = await response.json();
 
-        console.log('=== View Registration Fetch ===');
-        console.log('Response data:', JSON.stringify(data, null, 2));
-        console.log('Header status:', data.header?.status);
+        // console.log('=== View Registration Fetch ===');
+        // console.log('Response data:', JSON.stringify(data, null, 2));
+        // console.log('Header status:', data.header?.status);
 
         if (response.ok && data) {
           setHeader(data.header);

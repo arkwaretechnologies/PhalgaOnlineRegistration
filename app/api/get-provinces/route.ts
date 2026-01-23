@@ -19,14 +19,14 @@ export async function GET(request: Request) {
       );
     }
 
-    console.log('=== Fetching Provinces ===');
-    console.log('Conference:', conference.confcode);
-    console.log('Conference Name:', conference.name);
-    console.log('Conference PSGC filter:', conference.psgc || 'none');
+    // console.log('=== Fetching Provinces ===');
+    // console.log('Conference:', conference.confcode);
+    // console.log('Conference Name:', conference.name);
+    // console.log('Conference PSGC filter:', conference.psgc || 'none');
 
     // If no PSGC filter is set, return all provinces
     if (!conference.psgc || conference.psgc.trim() === '') {
-      console.log('No PSGC filter set - fetching all provinces with geolevel=PROV');
+      // console.log('No PSGC filter set - fetching all provinces with geolevel=PROV');
       // Return all provinces (geolevel = 'PROV')
       const { data: allProvinces, error: allError } = await supabase
         .from('lgus')
@@ -57,11 +57,11 @@ export async function GET(request: Request) {
       // Combine fixed provinces at the top with fetched provinces
       const finalProvinces = [...fixedCityClasses, ...provinces];
       
-      console.log(`Fetched ${provinces.length} provinces (all provinces):`);
-      console.log(`Fixed city class provinces: ${fixedCityClasses.length}`);
-      console.log(`Total provinces: ${finalProvinces.length}`);
-      console.log('Provinces list:', finalProvinces);
-      console.log('========================');
+      // console.log(`Fetched ${provinces.length} provinces (all provinces):`);
+      // console.log(`Fixed city class provinces: ${fixedCityClasses.length}`);
+      // console.log(`Total provinces: ${finalProvinces.length}`);
+      // console.log('Provinces list:', finalProvinces);
+      // console.log('========================');
       
       return NextResponse.json(finalProvinces, {
         headers: {
@@ -78,10 +78,10 @@ export async function GET(request: Request) {
       .map(p => p.trim())
       .filter(p => p !== '');
 
-    console.log('PSGC Prefixes parsed:', psgcPrefixes);
+    // console.log('PSGC Prefixes parsed:', psgcPrefixes);
 
     if (psgcPrefixes.length === 0) {
-      console.log('No valid PSGC prefixes found - returning empty array');
+      // console.log('No valid PSGC prefixes found - returning empty array');
       return NextResponse.json([], {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
@@ -98,7 +98,7 @@ export async function GET(request: Request) {
 
     // Query for each PSGC prefix
     for (const prefix of psgcPrefixes) {
-      console.log(`Querying provinces for PSGC prefix: "${prefix}"`);
+      // console.log(`Querying provinces for PSGC prefix: "${prefix}"`);
       const { data, error } = await supabase
         .from('lgus')
         .select('lguname, psgc')
@@ -111,11 +111,11 @@ export async function GET(request: Request) {
         continue; // Skip this prefix if there's an error
       }
 
-      console.log(`  Found ${data?.length || 0} raw records for prefix "${prefix}"`);
+      // console.log(`  Found ${data?.length || 0} raw records for prefix "${prefix}"`);
 
-      if (data && data.length > 0) {
-        console.log(`  Raw data for prefix "${prefix}":`, JSON.stringify(data, null, 2));
-      }
+      // if (data && data.length > 0) {
+      //   console.log(`  Raw data for prefix "${prefix}":`, JSON.stringify(data, null, 2));
+      // }
 
       if (data) {
         for (const row of data) {
@@ -124,12 +124,12 @@ export async function GET(request: Request) {
             if (!seenProvinces.has(row.lguname)) {
               seenProvinces.add(row.lguname);
               allProvinces.push(row.lguname);
-              console.log(`  ✓ Added province: "${row.lguname}" (PSGC: ${row.psgc})`);
+              // console.log(`  ✓ Added province: "${row.lguname}" (PSGC: ${row.psgc})`);
             } else {
-              console.log(`  ⊗ Skipped duplicate province: "${row.lguname}"`);
+              // console.log(`  ⊗ Skipped duplicate province: "${row.lguname}"`);
             }
           } else {
-            console.log(`  ⊗ Filtered out: "${row.lguname || 'NO NAME'}" (PSGC: ${row.psgc || 'NO PSGC'}) - doesn't match criteria`);
+            // console.log(`  ⊗ Filtered out: "${row.lguname || 'NO NAME'}" (PSGC: ${row.psgc || 'NO PSGC'}) - doesn't match criteria`);
           }
         }
       }
@@ -148,12 +148,12 @@ export async function GET(request: Request) {
     // Combine fixed provinces at the top with fetched provinces
     const finalProvinces = [...fixedCityClasses, ...allProvinces];
 
-    console.log(`=== Final Result ===`);
-    console.log(`Fixed city class provinces: ${fixedCityClasses.length}`);
-    console.log(`Regular provinces fetched: ${allProvinces.length}`);
-    console.log(`Total provinces: ${finalProvinces.length}`);
-    console.log('Provinces list:', finalProvinces);
-    console.log('===================');
+    // console.log(`=== Final Result ===`);
+    // console.log(`Fixed city class provinces: ${fixedCityClasses.length}`);
+    // console.log(`Regular provinces fetched: ${allProvinces.length}`);
+    // console.log(`Total provinces: ${finalProvinces.length}`);
+    // console.log('Provinces list:', finalProvinces);
+    // console.log('===================');
 
     return NextResponse.json(finalProvinces, {
       headers: {

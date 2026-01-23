@@ -39,12 +39,12 @@ export async function GET(request: Request) {
       .eq('lgu', lgu.toUpperCase())
       .eq('confcode', confcode); // Add conference filter
 
-    console.log('=== Province-LGU Count Check ===');
-    console.log(`Conference: ${confcode}`);
-    console.log('Province:', province);
-    console.log('LGU:', lgu);
-    console.log('regdData length:', regdData?.length || 0);
-    console.log('regdError:', regdError);
+    // console.log('=== Province-LGU Count Check ===');
+    // console.log(`Conference: ${confcode}`);
+    // console.log('Province:', province);
+    // console.log('LGU:', lgu);
+    // console.log('regdData length:', regdData?.length || 0);
+    // console.log('regdError:', regdError);
 
     if (regdError) {
       console.error('Database error:', regdError);
@@ -76,9 +76,9 @@ export async function GET(request: Request) {
 
     const registrationCount = validRecords.length;
 
-    console.log(`Province-LGU Registration Count: ${registrationCount}`);
-    console.log('Note: Province-LGU limit checking has been removed');
-    console.log('================================');
+    // console.log(`Province-LGU Registration Count: ${registrationCount}`);
+    // console.log('Note: Province-LGU limit checking has been removed');
+    // console.log('================================');
 
     // Return count only (limit checking removed)
     return NextResponse.json(

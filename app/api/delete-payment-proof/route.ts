@@ -44,7 +44,7 @@ export async function DELETE(request: Request) {
       );
     }
 
-    console.log(`Deleting payment proof for regid: ${regIdString}, confcode: ${confcodeString}, linenum: ${linenum}`);
+    // console.log(`Deleting payment proof for regid: ${regIdString}, confcode: ${confcodeString}, linenum: ${linenum}`);
 
     // Verify the payment proof exists before deleting (using composite primary key)
     const { data: existingProof, error: verifyError } = await supabase
@@ -106,7 +106,7 @@ export async function DELETE(request: Request) {
           // (file might already be deleted or not exist)
           console.warn(`Failed to delete file from storage: ${filename}. Continuing with database deletion.`);
         } else {
-          console.log('File deleted from storage:', filename, storageData);
+          // console.log('File deleted from storage:', filename, storageData);
         }
       } catch (storageDeleteException) {
         console.error('Exception during storage delete:', storageDeleteException);
@@ -146,7 +146,7 @@ export async function DELETE(request: Request) {
       );
     }
 
-    console.log('Payment proof deleted successfully:', { regId: regIdString, confcode: confcodeString, linenum: linenum, filename });
+    // console.log('Payment proof deleted successfully:', { regId: regIdString, confcode: confcodeString, linenum: linenum, filename });
 
     return NextResponse.json({
       success: true,

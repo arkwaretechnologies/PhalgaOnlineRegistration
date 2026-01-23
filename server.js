@@ -34,6 +34,6 @@ app.prepare().then(() => {
       console.error('Failed to start server:', err);
       process.exit(1);
     }
-    console.log(`> Ready on http://${hostname}:${port}`);
+    // console.log(`> Ready on http://${hostname}:${port}`);
   });
 });

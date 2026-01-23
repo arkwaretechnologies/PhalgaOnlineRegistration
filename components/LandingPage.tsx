@@ -69,7 +69,7 @@ export default function LandingPage() {
         const response = await fetch('/api/check-registration');
         const data = await response.json();
         if (response.ok) {
-          console.log('Registration status:', data);
+          // console.log('Registration status:', data);
           setRegistrationStatus(data);
           // Update conference from registration status if available
           if (data.conference) {

@@ -16,8 +16,8 @@ export async function GET(request: Request) {
       );
     }
 
-    console.log('=== Fetching Banks ===');
-    console.log('Conference code:', confcode);
+    // console.log('=== Fetching Banks ===');
+    // console.log('Conference code:', confcode);
 
     // Fetch banks from the banks table, filtered by confcode
     const { data: bankData, error: bankError } = await supabase
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
       );
     }
 
-    console.log(`Found ${bankData?.length || 0} banks for conference ${confcode}`);
+    // console.log(`Found ${bankData?.length || 0} banks for conference ${confcode}`);
 
     return NextResponse.json(bankData || [], {
       headers: {

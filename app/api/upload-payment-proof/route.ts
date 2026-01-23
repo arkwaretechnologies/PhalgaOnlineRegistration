@@ -110,7 +110,7 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log(`Registration has ${maxUploads} participant(s). Maximum ${maxUploads} payment proof(s) can be uploaded.`);
+    // console.log(`Registration has ${maxUploads} participant(s). Maximum ${maxUploads} payment proof(s) can be uploaded.`);
 
     // Get existing payment proofs count for this registration and conference
     const { count: existingProofsCount, error: existingProofsError } = await supabase
@@ -128,7 +128,7 @@ export async function POST(request: Request) {
     }
 
     const currentUploadCount = existingProofsCount || 0;
-    console.log(`Current payment proof uploads: ${currentUploadCount}/${maxUploads}`);
+    // console.log(`Current payment proof uploads: ${currentUploadCount}/${maxUploads}`);
 
     // Check if max uploads limit has been reached
     if (currentUploadCount >= maxUploads) {
@@ -157,12 +157,12 @@ export async function POST(request: Request) {
       } else if (!existingProofsData || existingProofsData.length === 0) {
         // No existing payment proofs, start with 1
         linenum = 1;
-        console.log(`No existing payment proofs found for regid ${regIdString} and confcode ${headerData.confcode}, setting linenum to 1`);
+        // console.log(`No existing payment proofs found for regid ${regIdString} and confcode ${headerData.confcode}, setting linenum to 1`);
       } else {
         // Get max linenum and add 1
         const maxLinenum = existingProofsData[0].linenum;
         linenum = maxLinenum + 1;
-        console.log(`Found existing payment proofs for regid ${regIdString} and confcode ${headerData.confcode}, max linenum is ${maxLinenum}, setting new linenum to ${linenum}`);
+        // console.log(`Found existing payment proofs for regid ${regIdString} and confcode ${headerData.confcode}, max linenum is ${maxLinenum}, setting new linenum to ${linenum}`);
       }
     } else {
       // If linenum is provided, validate it doesn't exceed max uploads
@@ -242,7 +242,7 @@ export async function POST(request: Request) {
           // If animated, keep as GIF (but could be optimized further with gifsicle if needed)
         }
         
-        console.log(`Image optimized: Original size: ${file.size} bytes, Optimized size: ${buffer.length} bytes, Reduction: ${((1 - buffer.length / file.size) * 100).toFixed(1)}%`);
+        // console.log(`Image optimized: Original size: ${file.size} bytes, Optimized size: ${buffer.length} bytes, Reduction: ${((1 - buffer.length / file.size) * 100).toFixed(1)}%`);
       } catch (optimizationError) {
         console.error('Image optimization error:', optimizationError);
         // If optimization fails, use original buffer and preserve original file extension/mime type
@@ -318,7 +318,7 @@ export async function POST(request: Request) {
       );
     }
     
-    console.log('Generated file URL:', fileUrl);
+    // console.log('Generated file URL:', fileUrl);
 
     // Insert payment proof into regdep table
     // linenum is now guaranteed to be a valid number (either provided and validated, or auto-generated and validated)
@@ -373,7 +373,7 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log('Payment proof uploaded successfully:', { regId, confcode: headerData.confcode, filename, fileUrl });
+    // console.log('Payment proof uploaded successfully:', { regId, confcode: headerData.confcode, filename, fileUrl });
 
     return NextResponse.json({
       success: true,

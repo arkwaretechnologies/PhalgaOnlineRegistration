@@ -110,7 +110,7 @@ export async function getRegistrationLimitByConference(confcode: string): Promis
       return await getRegistrationLimit();
     }
     
-    console.log(`Using registration limit from conference table: ${limit} for ${confcode}`);
+    // console.log(`Using registration limit from conference table: ${limit} for ${confcode}`);
     return limit;
   } catch (error: any) {
     console.error(

@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     }
 
     const confcode = conference.confcode;
-    console.log(`=== Getting Registration for Conference: ${confcode} (${conference.name}) ===`);
+    // console.log(`=== Getting Registration for Conference: ${confcode} (${conference.name}) ===`);
 
     const { searchParams } = new URL(request.url);
     const regId = searchParams.get('transId') || searchParams.get('regId'); // Support both for backward compatibility
@@ -40,11 +40,11 @@ export async function GET(request: Request) {
       .eq('confcode', confcode)
       .single();
 
-    console.log('=== Get Registration Debug ===');
-    console.log('Conference:', confcode);
-    console.log('regId:', regId);
-    console.log('headerData:', JSON.stringify(headerData, null, 2));
-    console.log('headerError:', headerError);
+    // console.log('=== Get Registration Debug ===');
+    // console.log('Conference:', confcode);
+    // console.log('regId:', regId);
+    // console.log('headerData:', JSON.stringify(headerData, null, 2));
+    // console.log('headerError:', headerError);
 
     if (headerError || !headerData) {
       // Check if it's a "not found" error or if confcode doesn't match

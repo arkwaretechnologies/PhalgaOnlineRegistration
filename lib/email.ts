@@ -166,15 +166,15 @@ export async function sendRegistrationConfirmation(
     const rightImageUrl = `${baseUrl}/right.png`;
     const viewUrl = data.viewUrl || `${baseUrl}/view/${data.transId}`;
     
-    console.log('Email image URLs:', { 
-      leftImageUrl, 
-      rightImageUrl, 
-      baseUrl,
-      viewUrl,
-      nextPublicAppUrl: process.env.NEXT_PUBLIC_APP_URL,
-      nodeEnv: process.env.NODE_ENV,
-      conferenceName
-    });
+    // // console.log('Email image URLs:', { 
+    // //   leftImageUrl, 
+    // //   rightImageUrl, 
+    // //   baseUrl,
+    // //   viewUrl,
+    // //   nextPublicAppUrl: process.env.NEXT_PUBLIC_APP_URL,
+    //   nodeEnv: process.env.NODE_ENV,
+    //   conferenceName
+    // });
 
     // Create HTML email template
     const htmlContent = `
@@ -354,7 +354,7 @@ export async function sendRegistrationConfirmation(
       return { success: false, error: result.error.message || 'Failed to send email' };
     }
 
-    console.log('Registration confirmation email sent successfully to:', data.email);
+    // console.log('Registration confirmation email sent successfully to:', data.email);
     return { success: true };
   } catch (error: any) {
     console.error('Error sending registration confirmation email:', error);

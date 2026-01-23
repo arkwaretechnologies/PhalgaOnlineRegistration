@@ -33,7 +33,7 @@ export async function getConferenceByDomain(hostname?: string): Promise<Conferen
     // Extract domain without port
     const domain = hostname.split(':')[0].toLowerCase();
     
-    console.log(`Detecting conference for domain: ${domain}`);
+    // console.log(`Detecting conference for domain: ${domain}`);
 
     // Query conference table by domain
     const { data, error } = await supabase
@@ -55,7 +55,7 @@ export async function getConferenceByDomain(hostname?: string): Promise<Conferen
             .single();
           
           if (defaultConf) {
-            console.log(`Using default conference: ${defaultConf.confcode}`);
+            // console.log(`Using default conference: ${defaultConf.confcode}`);
             return defaultConf;
           }
         } else {
@@ -72,7 +72,7 @@ export async function getConferenceByDomain(hostname?: string): Promise<Conferen
       return null;
     }
 
-    console.log(`Conference detected: ${data.confcode} - ${data.name}`);
+    // console.log(`Conference detected: ${data.confcode} - ${data.name}`);
     return data;
   } catch (error: any) {
     console.error(`Error detecting conference: ${error?.message || error}`);

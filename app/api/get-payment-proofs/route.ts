@@ -34,7 +34,7 @@ export async function GET(request: Request) {
       );
     }
 
-    console.log(`Fetched ${paymentProofs?.length || 0} payment proofs for regid: ${regIdString}`);
+    // console.log(`Fetched ${paymentProofs?.length || 0} payment proofs for regid: ${regIdString}`);
 
     // Return response with no-cache headers to ensure fresh data
     return NextResponse.json(

@@ -16,8 +16,8 @@ export async function GET(request: Request) {
       );
     }
 
-    console.log('=== Fetching Contacts ===');
-    console.log('Conference code:', confcode);
+    // console.log('=== Fetching Contacts ===');
+    // console.log('Conference code:', confcode);
 
     // Fetch contacts from the contacts table, filtered by confcode
     const { data: contactData, error: contactError } = await supabase
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
       );
     }
 
-    console.log(`Found ${contactData?.length || 0} contacts for conference ${confcode}`);
+    // console.log(`Found ${contactData?.length || 0} contacts for conference ${confcode}`);
 
     return NextResponse.json(contactData || [], {
       headers: {

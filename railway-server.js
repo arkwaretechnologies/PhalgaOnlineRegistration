@@ -22,8 +22,8 @@ if (!process.env.NODE_ENV) {
 }
 
 // Log the configuration (after setting HOSTNAME)
-console.log(`Starting Next.js standalone server on ${process.env.HOSTNAME}:${port}`);
-console.log(`Environment: NODE_ENV=${process.env.NODE_ENV}, HOSTNAME=${process.env.HOSTNAME}, PORT=${port}`);
+// console.log(`Starting Next.js standalone server on ${process.env.HOSTNAME}:${port}`);
+// console.log(`Environment: NODE_ENV=${process.env.NODE_ENV}, HOSTNAME=${process.env.HOSTNAME}, PORT=${port}`);
 
 // Change to the standalone directory and run the server
 const path = require('path');

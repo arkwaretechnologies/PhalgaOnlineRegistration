@@ -59,7 +59,7 @@ function copyDirectory(src, dest, name) {
     // Copy directory recursively
     fs.cpSync(src, dest, { recursive: true, force: true });
     
-    console.log(`✓ Copied ${name} -> ${path.relative(projectRoot, dest)}`);
+    // console.log(`✓ Copied ${name} -> ${path.relative(projectRoot, dest)}`);
     return true;
   } catch (error) {
     console.error(`✗ Error copying ${name}:`, error.message);
@@ -68,7 +68,7 @@ function copyDirectory(src, dest, name) {
 }
 
 // Main execution
-console.log('Copying static assets to standalone output...\n');
+// console.log('Copying static assets to standalone output...\n');
 
 let allSuccess = true;
 
@@ -81,10 +81,10 @@ for (const { from, to, name } of sources) {
   }
 }
 
-console.log(''); // Empty line for readability
+// console.log(''); // Empty line for readability
 
 if (allSuccess) {
-  console.log('✓ All static assets copied successfully!');
+  // console.log('✓ All static assets copied successfully!');
   process.exit(0);
 } else {
   console.warn('⚠ Some assets could not be copied. Check the warnings above.');

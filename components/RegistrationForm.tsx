@@ -111,14 +111,14 @@ export default function RegistrationForm() {
       });
 
     // Fetch provinces filtered by conference PSGC
-    console.log('=== Fetching Provinces from API ===');
+    // console.log('=== Fetching Provinces from API ===');
     fetch('/api/get-provinces')
       .then(res => res.json())
       .then(data => {
-        console.log('API Response:', data);
+        // console.log('API Response:', data);
         if (data && !data.error && Array.isArray(data)) {
-          console.log(`✓ Successfully fetched ${data.length} provinces from API`);
-          console.log('Provinces list:', data);
+          // console.log(`✓ Successfully fetched ${data.length} provinces from API`);
+          // console.log('Provinces list:', data);
           setProvinces(data);
         } else {
           console.warn('✗ Failed to fetch provinces from API:', data);
@@ -133,14 +133,14 @@ export default function RegistrationForm() {
       });
 
     // Fetch positions from database
-    console.log('=== Fetching Positions from API ===');
+    // console.log('=== Fetching Positions from API ===');
     fetch('/api/get-positions')
       .then(res => res.json())
       .then(data => {
-        console.log('Positions API Response:', data);
+        // console.log('Positions API Response:', data);
         if (data && !data.error && Array.isArray(data)) {
-          console.log(`✓ Successfully fetched ${data.length} positions from API`);
-          console.log('Positions list:', data);
+          // console.log(`✓ Successfully fetched ${data.length} positions from API`);
+          // console.log('Positions list:', data);
           setPositionOptions(data);
         } else {
           console.warn('✗ Failed to fetch positions from API:', data);
@@ -198,17 +198,17 @@ export default function RegistrationForm() {
   // Fetch barangays when LGU changes
   useEffect(() => {
     if (lgu && selectedLguPsgc) {
-      console.log('=== Fetching Barangays for LGU ===');
-      console.log('LGU selected:', lgu);
-      console.log('PSGC code:', selectedLguPsgc);
+      // console.log('=== Fetching Barangays for LGU ===');
+      // console.log('LGU selected:', lgu);
+      // console.log('PSGC code:', selectedLguPsgc);
       // Use PSGC code for accurate lookup
       fetch(`/api/get-barangays?lgu=${encodeURIComponent(lgu)}&psgc=${encodeURIComponent(selectedLguPsgc)}`)
         .then(res => res.json())
         .then(data => {
-          console.log('Barangays API Response:', data);
+          // console.log('Barangays API Response:', data);
           if (data && !data.error && Array.isArray(data)) {
-            console.log(`✓ Successfully fetched ${data.length} barangays for LGU: ${lgu} (PSGC: ${selectedLguPsgc})`);
-            console.log('Barangays list:', data);
+            // console.log(`✓ Successfully fetched ${data.length} barangays for LGU: ${lgu} (PSGC: ${selectedLguPsgc})`);
+            // console.log('Barangays list:', data);
             setBarangayOptions(data);
           } else {
             console.warn('✗ Failed to fetch barangays from API:', data);
@@ -221,15 +221,15 @@ export default function RegistrationForm() {
         });
     } else if (lgu) {
       // Fallback: try without PSGC if it's not available
-      console.log('=== Fetching Barangays for LGU (fallback) ===');
-      console.log('LGU selected:', lgu);
+      // console.log('=== Fetching Barangays for LGU (fallback) ===');
+      // console.log('LGU selected:', lgu);
       fetch(`/api/get-barangays?lgu=${encodeURIComponent(lgu)}`)
         .then(res => res.json())
         .then(data => {
-          console.log('Barangays API Response:', data);
+          // console.log('Barangays API Response:', data);
           if (data && !data.error && Array.isArray(data)) {
-            console.log(`✓ Successfully fetched ${data.length} barangays for LGU: ${lgu}`);
-            console.log('Barangays list:', data);
+            // console.log(`✓ Successfully fetched ${data.length} barangays for LGU: ${lgu}`);
+            // console.log('Barangays list:', data);
             setBarangayOptions(data);
           } else {
             console.warn('✗ Failed to fetch barangays from API:', data);

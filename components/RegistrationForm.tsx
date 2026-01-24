@@ -43,6 +43,7 @@ export default function RegistrationForm() {
   const [province, setProvince] = useState('');
   const [lgu, setLgu] = useState('');
   const [contactPerson, setContactPerson] = useState('');
+  const [contactPersonError, setContactPersonError] = useState<string>('');
   const [contactNo, setContactNo] = useState('');
   const [emailAddress, setEmailAddress] = useState('');
   const [lguOptions, setLguOptions] = useState<Array<{ name: string; psgc: string }>>([]);
@@ -324,6 +325,12 @@ export default function RegistrationForm() {
     return emailRegex.test(email);
   };
 
+  const validateContactPerson = (value: string): boolean => {
+    if (!value || value.trim() === '') return true; // Allow empty (will be caught by required validation)
+    // Check if the value contains only digits
+    return !/^\d+$/.test(value.trim());
+  };
+
   const formatContactNumber = (value: string): string => {
     // Remove all non-numeric characters
     const numbersOnly = value.replace(/\D/g, '');
@@ -448,6 +455,12 @@ export default function RegistrationForm() {
       return;
     }
 
+    // Validate that Contact Person does not contain only numbers
+    if (!validateContactPerson(contactPerson)) {
+      setErrorModalMessage('Contact Person cannot contain only numbers. Please enter a name.');
+      setShowErrorModal(true);
+      return;
+    }
 
     // Build form data
     const formData: any = {
@@ -719,10 +732,29 @@ export default function RegistrationForm() {
               <input
                 type="text"
                 value={contactPerson}
-                onChange={(e) => setContactPerson(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
+                onChange={(e) => {
+                  setContactPerson(e.target.value);
+                  // Clear error message when user types
+                  if (contactPersonError) {
+                    setContactPersonError('');
+                  }
+                }}
+                onBlur={(e) => {
+                  const value = e.target.value.trim();
+                  if (value && !validateContactPerson(value)) {
+                    setContactPersonError('Contact Person cannot contain only numbers.');
+                  } else {
+                    setContactPersonError('');
+                  }
+                }}
+                className={`w-full px-3 py-2.5 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base ${
+                  contactPersonError ? 'border-red-500' : ''
+                }`}
                 required
               />
+              {contactPersonError && (
+                <p className="text-xs text-red-600 mt-1">{contactPersonError}</p>
+              )}
             </div>
             <div className="border border-gray-300 rounded-lg p-3 bg-blue-50">
               <label className="block font-semibold text-sm text-gray-900 mb-2">CONTACT NO. *</label>
@@ -846,10 +878,29 @@ export default function RegistrationForm() {
                   <input
                     type="text"
                     value={contactPerson}
-                    onChange={(e) => setContactPerson(e.target.value)}
-                    className="w-full px-2 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white"
+                    onChange={(e) => {
+                      setContactPerson(e.target.value);
+                      // Clear error message when user types
+                      if (contactPersonError) {
+                        setContactPersonError('');
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const value = e.target.value.trim();
+                      if (value && !validateContactPerson(value)) {
+                        setContactPersonError('Contact Person cannot contain only numbers.');
+                      } else {
+                        setContactPersonError('');
+                      }
+                    }}
+                    className={`w-full px-2 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white ${
+                      contactPersonError ? 'border-red-500' : ''
+                    }`}
                     required
                   />
+                  {contactPersonError && (
+                    <p className="text-xs text-red-600 mt-1">{contactPersonError}</p>
+                  )}
                 </td>
               </tr>
               <tr>

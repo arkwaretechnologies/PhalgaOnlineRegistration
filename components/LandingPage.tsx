@@ -157,11 +157,25 @@ export default function LandingPage() {
           <p className="text-sm sm:text-base text-gray-600">
             {conference?.name || '18th Mindanao Geographic Conference'}
           </p>
-          {conference?.date_from && conference?.date_to && (
-            <p className="text-xs sm:text-sm text-gray-500 mt-1">
-              {new Date(conference.date_from).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} - {new Date(conference.date_to).toLocaleDateString('en-US', { day: 'numeric' })}, {new Date(conference.date_to).toLocaleDateString('en-US', { year: 'numeric' })}
-            </p>
-          )}
+          {conference?.date_from && conference?.date_to && (() => {
+            const dateFrom = new Date(conference.date_from);
+            const dateTo = new Date(conference.date_to);
+            const sameMonth = dateFrom.getMonth() === dateTo.getMonth() && dateFrom.getFullYear() === dateTo.getFullYear();
+            
+            const dateFromStr = dateFrom.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+            const dateToDay = dateTo.toLocaleDateString('en-US', { day: 'numeric' });
+            const dateToMonth = dateTo.toLocaleDateString('en-US', { month: 'long' });
+            const dateToYear = dateTo.toLocaleDateString('en-US', { year: 'numeric' });
+            
+            return (
+              <p className="text-xs sm:text-sm text-gray-500 mt-1">
+                {sameMonth 
+                  ? `${dateFromStr} - ${dateToDay}, ${dateToYear}`
+                  : `${dateFromStr} - ${dateToMonth} ${dateToDay}, ${dateToYear}`
+                }
+              </p>
+            );
+          })()}
           {conference?.venue && (
             <p className="text-xs sm:text-sm text-gray-500 mt-1">
               {conference.venue}

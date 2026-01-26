@@ -2,12 +2,16 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
 import { getConferenceCode, getConferenceByDomain } from '@/lib/conference';
 import { getRegistrationLimitByConference } from '@/lib/config';
+import { createTimeout, withTimeout } from '@/lib/security';
 
 // Disable caching for this route to ensure fresh data
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function GET(request: Request) {
+  // Create timeout for request (10 seconds for read operations)
+  const { abortController, timeoutId, timeoutPromise } = createTimeout(10000);
+
   try {
     // Detect conference from domain
     const hostname = request.headers.get('host') || request.headers.get('x-forwarded-host');
@@ -17,14 +21,17 @@ export async function GET(request: Request) {
     
     // Step 1: Get all regd records for this conference with their regh data
     // Note: regd table now uses regid (not regnum) as foreign key to regh
-    const { data: regdData, error: regdError } = await supabase
-      .from('regd')
-      .select(`
-        regid,
-        confcode,
-        regh!left(regid, status, confcode)
-      `)
-      .eq('confcode', confcode); // Filter by conference code
+    const { data: regdData, error: regdError } = await withTimeout(
+      supabase
+        .from('regd')
+        .select(`
+          regid,
+          confcode,
+          regh!left(regid, status, confcode)
+        `)
+        .eq('confcode', confcode),
+      timeoutPromise
+    ) as { data: any[] | null; error: any };
     
     // console.log('=== Direct Query Result ===');
     // console.log('regdData length:', regdData?.length || 0);
@@ -32,6 +39,7 @@ export async function GET(request: Request) {
     
     if (regdError) {
       console.error('Database error with direct query:', regdError);
+      clearTimeout(timeoutId);
       return NextResponse.json(
         { 
           error: 'Failed to check registration status', 
@@ -89,7 +97,9 @@ export async function GET(request: Request) {
     // console.log(`Is Open: ${isOpen}`);
     // console.log('================================');
     
-    // Return response with no-cache headers to ensure fresh data
+    clearTimeout(timeoutId);
+    
+    // Return response with short cache (5 seconds) to reduce load while keeping data relatively fresh
     return NextResponse.json(
       { 
         count: registrationCount,
@@ -103,13 +113,22 @@ export async function GET(request: Request) {
       },
       {
         headers: {
-          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
+          'Cache-Control': 'public, s-maxage=5, stale-while-revalidate=10',
         }
       }
     );
   } catch (error: any) {
+    clearTimeout(timeoutId);
+    
+    // Handle timeout/abort errors
+    if (error.name === 'AbortError' || abortController.signal.aborted) {
+      console.error('Request timeout:', error);
+      return NextResponse.json(
+        { error: 'Request timeout. Please try again.' },
+        { status: 408 }
+      );
+    }
+
     console.error('API error checking registration:', error);
     return NextResponse.json(
       { error: 'Failed to check registration status', details: error?.message },

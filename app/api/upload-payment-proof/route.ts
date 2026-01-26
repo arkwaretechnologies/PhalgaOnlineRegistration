@@ -2,13 +2,44 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
 // @ts-ignore - sharp has built-in types but TypeScript may not recognize them in some environments
 import sharp from 'sharp';
+import {
+  validateRequestSize,
+  validateContentType,
+  createTimeout,
+  withTimeout,
+} from '@/lib/security';
 
 // Disable caching for this route
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function POST(request: Request) {
+  // Create timeout for request (30 seconds)
+  const { abortController, timeoutId, timeoutPromise } = createTimeout(30000);
+
   try {
+    // Validate Content-Type (multipart/form-data)
+    const contentTypeCheck = validateContentType(request, ['multipart/form-data']);
+    if (!contentTypeCheck.isValid) {
+      clearTimeout(timeoutId);
+      return NextResponse.json(
+        { error: contentTypeCheck.error },
+        { status: 400 }
+      );
+    }
+
+    // Validate request size (max 11MB to account for form fields + file)
+    // File itself is limited to 10MB, but multipart encoding adds overhead
+    const sizeCheck = validateRequestSize(request, 11 * 1024 * 1024); // 11MB
+    if (!sizeCheck.isValid) {
+      clearTimeout(timeoutId);
+      return NextResponse.json(
+        { error: sizeCheck.error },
+        { status: 413 }
+      );
+    }
+
+    // @ts-ignore - formData now takes no arguments as of standard fetch
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const transIdValue = formData.get('transId');
@@ -25,6 +56,7 @@ export async function POST(request: Request) {
     }
 
     if (!file) {
+      clearTimeout(timeoutId);
       return NextResponse.json(
         { error: 'No file provided' },
         { status: 400 }
@@ -32,6 +64,7 @@ export async function POST(request: Request) {
     }
 
     if (!regId) {
+      clearTimeout(timeoutId);
       return NextResponse.json(
         { error: 'Registration ID is required' },
         { status: 400 }
@@ -41,6 +74,7 @@ export async function POST(request: Request) {
     // Validate file type
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf'];
     if (!allowedTypes.includes(file.type)) {
+      clearTimeout(timeoutId);
       return NextResponse.json(
         { error: 'Invalid file type. Please upload an image (JPEG, PNG, GIF) or PDF file.' },
         { status: 400 }
@@ -50,6 +84,7 @@ export async function POST(request: Request) {
     // Validate file size (max 10MB)
     const maxSize = 10 * 1024 * 1024; // 10MB
     if (file.size > maxSize) {
+      clearTimeout(timeoutId);
       return NextResponse.json(
         { error: 'File size must be less than 10MB.' },
         { status: 400 }
@@ -64,13 +99,17 @@ export async function POST(request: Request) {
 
     // Get registration header to get confcode
     const regIdString = regId.toUpperCase().trim();
-    const { data: headerData, error: headerError } = await supabase
-      .from('regh')
-      .select('confcode')
-      .eq('regid', regIdString)
-      .single();
+    const { data: headerData, error: headerError } = await withTimeout(
+      supabase
+        .from('regh')
+        .select('confcode')
+        .eq('regid', regIdString)
+        .single(),
+      timeoutPromise
+    ) as { data: { confcode: string } | null; error: any };
 
     if (headerError || !headerData) {
+      clearTimeout(timeoutId);
       return NextResponse.json(
         { error: 'Registration not found' },
         { status: 404 }
@@ -79,6 +118,7 @@ export async function POST(request: Request) {
 
     // Ensure confcode is available (required for composite primary key)
     if (!headerData.confcode) {
+      clearTimeout(timeoutId);
       return NextResponse.json(
         { error: 'Registration header is missing conference code. Cannot determine line number for payment proof.' },
         { status: 400 }
@@ -87,14 +127,18 @@ export async function POST(request: Request) {
 
     // Get count of participants in regd for this regid and confcode
     // This determines the maximum number of payment proofs that can be uploaded
-    const { count: participantCount, error: participantsError } = await supabase
-      .from('regd')
-      .select('*', { count: 'exact', head: true })
-      .eq('regid', regIdString)
-      .eq('confcode', headerData.confcode);
+    const { count: participantCount, error: participantsError } = await withTimeout(
+      supabase
+        .from('regd')
+        .select('*', { count: 'exact', head: true })
+        .eq('regid', regIdString)
+        .eq('confcode', headerData.confcode),
+      timeoutPromise
+    ) as { count: number | null; error: any };
 
     if (participantsError) {
       console.error('Error fetching participant count:', participantsError);
+      clearTimeout(timeoutId);
       return NextResponse.json(
         { error: 'Failed to verify registration participants. Please try again.' },
         { status: 500 }
@@ -104,6 +148,7 @@ export async function POST(request: Request) {
     const maxUploads = participantCount || 0;
 
     if (maxUploads === 0) {
+      clearTimeout(timeoutId);
       return NextResponse.json(
         { error: 'No participants found for this registration. Please register participants first before uploading payment proofs.' },
         { status: 400 }
@@ -113,14 +158,18 @@ export async function POST(request: Request) {
     // console.log(`Registration has ${maxUploads} participant(s). Maximum ${maxUploads} payment proof(s) can be uploaded.`);
 
     // Get existing payment proofs count for this registration and conference
-    const { count: existingProofsCount, error: existingProofsError } = await supabase
-      .from('regdep')
-      .select('*', { count: 'exact', head: true })
-      .eq('regid', regIdString)
-      .eq('confcode', headerData.confcode);
+    const { count: existingProofsCount, error: existingProofsError } = await withTimeout(
+      supabase
+        .from('regdep')
+        .select('*', { count: 'exact', head: true })
+        .eq('regid', regIdString)
+        .eq('confcode', headerData.confcode),
+      timeoutPromise
+    ) as { count: number | null; error: any };
 
     if (existingProofsError) {
       console.error('Error fetching existing payment proofs count:', existingProofsError);
+      clearTimeout(timeoutId);
       return NextResponse.json(
         { error: 'Failed to check existing payment proofs. Please try again.' },
         { status: 500 }
@@ -132,6 +181,7 @@ export async function POST(request: Request) {
 
     // Check if max uploads limit has been reached
     if (currentUploadCount >= maxUploads) {
+      clearTimeout(timeoutId);
       return NextResponse.json(
         { error: `Maximum upload limit reached. This registration has ${maxUploads} participant(s), and you have already uploaded ${currentUploadCount} payment proof(s).` },
         { status: 400 }
@@ -142,13 +192,16 @@ export async function POST(request: Request) {
     // linenum is sequential (1, 2, 3, ...) and represents the upload sequence, not tied to participant linenum
     if (linenum === null || isNaN(linenum)) {
       // Get the max linenum from existing payment proofs
-      const { data: existingProofsData, error: maxLinenumError } = await supabase
-        .from('regdep')
-        .select('linenum')
-        .eq('regid', regIdString)
-        .eq('confcode', headerData.confcode)
-        .order('linenum', { ascending: false })
-        .limit(1);
+      const { data: existingProofsData, error: maxLinenumError } = await withTimeout(
+        supabase
+          .from('regdep')
+          .select('linenum')
+          .eq('regid', regIdString)
+          .eq('confcode', headerData.confcode)
+          .order('linenum', { ascending: false })
+          .limit(1),
+        timeoutPromise
+      ) as { data: { linenum: number }[] | null; error: any };
 
       if (maxLinenumError) {
         console.error('Error fetching max linenum:', maxLinenumError);
@@ -167,6 +220,7 @@ export async function POST(request: Request) {
     } else {
       // If linenum is provided, validate it doesn't exceed max uploads
       if (linenum > maxUploads) {
+        clearTimeout(timeoutId);
         return NextResponse.json(
           { error: `Line number ${linenum} exceeds the maximum allowed uploads (${maxUploads} participant(s) in this registration).` },
           { status: 400 }
@@ -176,6 +230,7 @@ export async function POST(request: Request) {
 
     // Validate that linenum is a valid positive integer
     if (linenum === null || isNaN(linenum) || linenum < 1) {
+      clearTimeout(timeoutId);
       return NextResponse.json(
         { error: 'Invalid line number. Line number must be a positive integer.' },
         { status: 400 }
@@ -262,15 +317,19 @@ export async function POST(request: Request) {
     // Upload to Supabase Storage
     // Each file should be unique - no upsert
     // Use optimized mime type
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('payment-proofs')
-      .upload(filename, buffer, {
-        contentType: optimizedMimeType,
-        cacheControl: '3600'
-      });
+    const { data: uploadData, error: uploadError } = await withTimeout(
+      supabase.storage
+        .from('payment-proofs')
+        .upload(filename, buffer, {
+          contentType: optimizedMimeType,
+          cacheControl: '3600'
+        }),
+      timeoutPromise
+    ) as { data: { path: string } | null; error: any };
 
     if (uploadError) {
       console.error('Supabase storage error:', uploadError);
+      clearTimeout(timeoutId);
       
       // If bucket doesn't exist, provide helpful error message
       if (uploadError.message.includes('Bucket not found') || uploadError.message.includes('not found')) {
@@ -306,6 +365,7 @@ export async function POST(request: Request) {
     // Verify the URL is valid
     if (!fileUrl || fileUrl.includes('undefined')) {
       console.error('Failed to generate public URL:', urlData);
+      clearTimeout(timeoutId);
       // Try to delete uploaded file
       try {
         await supabase.storage.from('payment-proofs').remove([filename]);
@@ -325,20 +385,25 @@ export async function POST(request: Request) {
     // confcode and linenum are part of the composite primary key and must NOT be NULL
     // Note: confcode check is already done above, and linenum is validated against regd above
     if (linenum === null || isNaN(linenum)) {
+      clearTimeout(timeoutId);
       return NextResponse.json(
         { error: 'Invalid line number. Cannot save payment proof.' },
         { status: 400 }
       );
     }
 
-    const { error: insertError } = await supabase
-      .from('regdep')
-      .insert({
-        regid: regIdString,
-        confcode: headerData.confcode, // NOT NULL - part of composite primary key
-        payment_proof_url: fileUrl,
-        linenum: linenum // NOT NULL - part of composite primary key
-      });
+    const result = await withTimeout(
+      supabase
+        .from('regdep')
+        .insert({
+          regid: regIdString,
+          confcode: headerData.confcode, // NOT NULL - part of composite primary key
+          payment_proof_url: fileUrl,
+          linenum: linenum // NOT NULL - part of composite primary key
+        }),
+      timeoutPromise
+    ) as { error: any };
+    const { error: insertError } = result;
 
     if (insertError) {
       console.error('Database insert error:', insertError);
@@ -359,6 +424,8 @@ export async function POST(request: Request) {
         console.error('Failed to delete uploaded file:', deleteError);
       }
       
+      clearTimeout(timeoutId);
+      
       // Handle duplicate key violation (23505) - payment proof already exists for this participant
       if (insertError.code === '23505') {
         return NextResponse.json(
@@ -375,12 +442,24 @@ export async function POST(request: Request) {
 
     // console.log('Payment proof uploaded successfully:', { regId, confcode: headerData.confcode, filename, fileUrl });
 
+    clearTimeout(timeoutId);
     return NextResponse.json({
       success: true,
       url: fileUrl,
       message: 'Payment proof uploaded successfully'
     });
   } catch (error: any) {
+    clearTimeout(timeoutId);
+    
+    // Handle timeout/abort errors
+    if (error.name === 'AbortError' || abortController.signal.aborted) {
+      console.error('Request timeout:', error);
+      return NextResponse.json(
+        { error: 'Request timeout. Please try again.' },
+        { status: 408 }
+      );
+    }
+
     console.error('Upload error:', error);
     return NextResponse.json(
       { error: 'Failed to upload payment proof: ' + (error?.message || 'Unknown error') },

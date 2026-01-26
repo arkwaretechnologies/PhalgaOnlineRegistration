@@ -3,6 +3,12 @@ import { supabase } from '@/lib/db';
 import { getRegistrationLimitByConference } from '@/lib/config';
 import { getConferenceByDomain, getConferenceCode } from '@/lib/conference';
 import { sendRegistrationConfirmation } from '@/lib/email';
+import {
+  validateRequestSize,
+  validateContentType,
+  createTimeout,
+  withTimeout,
+} from '@/lib/security';
 
 // Disable caching for this route to ensure fresh data
 export const dynamic = 'force-dynamic';
@@ -79,12 +85,36 @@ async function generateUniqueRegId(prefix: string | null = null): Promise<string
 }
 
 export async function POST(request: Request) {
+  // Create timeout for request (30 seconds)
+  const { abortController, timeoutId, timeoutPromise } = createTimeout(30000);
+
   try {
+    // Validate Content-Type
+    const contentTypeCheck = validateContentType(request, ['application/json']);
+    if (!contentTypeCheck.isValid) {
+      clearTimeout(timeoutId);
+      return NextResponse.json(
+        { error: contentTypeCheck.error },
+        { status: 400 }
+      );
+    }
+
+    // Validate request size (max 100KB for JSON payload)
+    const sizeCheck = validateRequestSize(request, 100 * 1024); // 100KB
+    if (!sizeCheck.isValid) {
+      clearTimeout(timeoutId);
+      return NextResponse.json(
+        { error: sizeCheck.error },
+        { status: 413 }
+      );
+    }
+
     // Detect conference from domain at the start
     const hostname = request.headers.get('host') || request.headers.get('x-forwarded-host');
     const conference = await getConferenceByDomain(hostname || undefined);
 
     if (!conference) {
+      clearTimeout(timeoutId);
       return NextResponse.json(
         { error: 'Conference not found for this domain. Please check your configuration.' },
         { status: 400 }
@@ -94,18 +124,22 @@ export async function POST(request: Request) {
     const confcode = conference.confcode;
     // console.log(`=== Submitting Registration for Conference: ${confcode} (${conference.name}) ===`);
 
+    // Parse request body
     const formData: RegistrationData = await request.json();
     
     // Check registration count - filter by conference
     // Note: regd table now uses regid (not regnum) as foreign key to regh
-    const { data: regdData, error: regdError } = await supabase
-      .from('regd')
-      .select(`
-        regid,
-        confcode,
-        regh!left(regid, status, confcode)
-      `)
-      .eq('confcode', confcode); // Add conference filter
+    const { data: regdData, error: regdError } = await withTimeout(
+      supabase
+        .from('regd')
+        .select(`
+          regid,
+          confcode,
+          regh!left(regid, status, confcode)
+        `)
+        .eq('confcode', confcode),
+      timeoutPromise
+    ) as { data: any[] | null; error: any };
 
     // console.log('=== Registration Count Check (Submit) ===');
     // console.log('Conference:', confcode);
@@ -114,6 +148,7 @@ export async function POST(request: Request) {
 
     if (regdError) {
       console.error('Database error:', regdError);
+      clearTimeout(timeoutId);
       return NextResponse.json(
         { error: 'Failed to check registration status' },
         { status: 500 }
@@ -151,6 +186,7 @@ export async function POST(request: Request) {
       // console.log(
       //   `Registration closed: current count=${regcount}, limit=${limit}`
       // );
+      clearTimeout(timeoutId);
       return NextResponse.json(
         { 
           error: 'Registration is already closed',
@@ -186,27 +222,31 @@ export async function POST(request: Request) {
       const participantLgu = (formData[`LGU|${i}`] || lgu).toUpperCase().trim();
       
       // Query existing participants in the same province and LGU with matching name
-      const { data: existingParticipants, error: duplicateError } = await supabase
-        .from('regd')
-        .select(`
-          regid,
-          confcode,
-          province,
-          lgu,
-          lastname,
-          firstname,
-          middleinit,
-          regh!left(regid, status, confcode)
-        `)
-        .eq('confcode', confcode)
-        .eq('province', province)
-        .eq('lgu', participantLgu)
-        .eq('lastname', lastname)
-        .eq('firstname', firstname)
-        .eq('middleinit', middleinit);
+      const { data: existingParticipants, error: duplicateError } = await withTimeout(
+        supabase
+          .from('regd')
+          .select(`
+            regid,
+            confcode,
+            province,
+            lgu,
+            lastname,
+            firstname,
+            middleinit,
+            regh!left(regid, status, confcode)
+          `)
+          .eq('confcode', confcode)
+          .eq('province', province)
+          .eq('lgu', participantLgu)
+          .eq('lastname', lastname)
+          .eq('firstname', firstname)
+          .eq('middleinit', middleinit),
+        timeoutPromise
+      ) as { data: any[] | null; error: any };
       
       if (duplicateError) {
         console.error('Error checking for duplicates:', duplicateError);
+        clearTimeout(timeoutId);
         return NextResponse.json(
           { error: 'Failed to validate registration data' },
           { status: 500 }
@@ -228,6 +268,7 @@ export async function POST(request: Request) {
       
       if (validDuplicates.length > 0) {
         // console.log(`Duplicate found: ${firstname} ${middleinit} ${lastname} in ${province} - ${participantLgu}`);
+        clearTimeout(timeoutId);
         return NextResponse.json(
           { 
             error: `Participant "${firstname} ${middleinit} ${lastname}" already exists in ${province} - ${participantLgu}. Each participant can only register once.`,
@@ -244,7 +285,11 @@ export async function POST(request: Request) {
 
     // Generate unique REGID with conference prefix
     const prefix = conference.prefix || null;
-    const regId = await generateUniqueRegId(prefix);
+    // Wrap generateUniqueRegId with timeout
+    const regId = await Promise.race([
+      generateUniqueRegId(prefix),
+      timeoutPromise
+    ]) as string;
     
     // console.log(`Generated REGID with prefix: ${prefix || 'none'} -> ${regId}`);
 
@@ -271,25 +316,29 @@ export async function POST(request: Request) {
     // Insert header - REGID is the only identifier needed (REGNUM has been removed)
     // REGDATE now includes date and time in Manila timezone (UTC+8)
     const regdate = getManilaTime();
-    const { data: headerData, error: headerError } = await supabase
-      .from('regh')
-      .insert({
-        confcode: confcode,
-        province: province,
-        lgu: lgu,
-        contactperson: contactperson,
-        contactnum: contactnum,
-        email: email,
-        regdate: regdate,
-        regid: regId,
-        status: 'PENDING' // Set status to PENDING for new registrations
-        // Note: REGID is the only identifier needed (REGNUM has been removed)
-      })
-      .select('regid')
-      .single();
+    const { data: headerData, error: headerError } = await withTimeout(
+      supabase
+        .from('regh')
+        .insert({
+          confcode: confcode,
+          province: province,
+          lgu: lgu,
+          contactperson: contactperson,
+          contactnum: contactnum,
+          email: email,
+          regdate: regdate,
+          regid: regId,
+          status: 'PENDING' // Set status to PENDING for new registrations
+          // Note: REGID is the only identifier needed (REGNUM has been removed)
+        })
+        .select('regid')
+        .single(),
+      timeoutPromise
+    ) as { data: { regid: string } | null; error: any };
 
-    if (headerError) {
+    if (headerError || !headerData) {
       console.error('Header insert error:', headerError);
+      clearTimeout(timeoutId);
       return NextResponse.json(
         { error: 'Failed to create registration header' },
         { status: 500 }
@@ -304,6 +353,7 @@ export async function POST(request: Request) {
       const lastname = (formData[`LASTNAME|${i}`] || '').toUpperCase();
       const firstname = (formData[`FIRSTNAME|${i}`] || '').toUpperCase();
       const middleinit = (formData[`MI|${i}`] || '').toUpperCase();
+      const suffix = (formData[`SUFFIX|${i}`] || '').toUpperCase();
       const designation = (formData[`DESIGNATION|${i}`] || '').toUpperCase();
       const brgy = (formData[`BRGY|${i}`] || '').toUpperCase();
       const tshirtsize = (formData[`TSHIRTSIZE|${i}`] || '').toUpperCase();
@@ -332,6 +382,7 @@ export async function POST(request: Request) {
         lastname: lastname,
         firstname: firstname,
         middleinit: middleinit,
+        suffix: suffix || null, // Save suffix, use null if empty
         designation: designation,
         brgy: brgy,
         lgu: participantLguForRecord, // Use participant's LGU if different from header
@@ -345,12 +396,17 @@ export async function POST(request: Request) {
     }
 
     // Insert all detail records
-    const { error: detailError } = await supabase
-      .from('regd')
-      .insert(detailRecords);
+    const result = await withTimeout(
+      supabase
+        .from('regd')
+        .insert(detailRecords),
+      timeoutPromise
+    ) as { error: any };
+    const { error: detailError } = result;
 
     if (detailError) {
       console.error('Detail insert error:', detailError);
+      clearTimeout(timeoutId);
       // Attempt to rollback header insert using regid
       await supabase.from('regh').delete().eq('regid', regidFromHeader);
       return NextResponse.json(
@@ -388,6 +444,7 @@ export async function POST(request: Request) {
       // Don't fail registration if email fails
     }
 
+    clearTimeout(timeoutId);
     return NextResponse.json({
       success: true,
       message: `Your registration was successful. Your Registration ID is ${regId}.`,
@@ -398,7 +455,18 @@ export async function POST(request: Request) {
         name: conference.name
       }
     });
-  } catch (error) {
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    
+    // Handle timeout/abort errors
+    if (error.name === 'AbortError' || abortController.signal.aborted) {
+      console.error('Request timeout:', error);
+      return NextResponse.json(
+        { error: 'Request timeout. Please try again.' },
+        { status: 408 }
+      );
+    }
+
     console.error('Registration error:', error);
     return NextResponse.json(
       { error: 'Failed to submit registration' },

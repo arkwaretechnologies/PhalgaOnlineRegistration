@@ -9,6 +9,7 @@ interface Participant {
   lastName: string;
   firstName: string;
   middleInit: string;
+  suffix: string;
   position: string;
   lgu: string;
   barangay: string;
@@ -55,6 +56,7 @@ export default function RegistrationForm() {
     lastName: '',
     firstName: '',
     middleInit: '',
+    suffix: '',
     position: '',
     lgu: '',
     barangay: '',
@@ -284,6 +286,7 @@ export default function RegistrationForm() {
       lastName: '',
       firstName: '',
       middleInit: '',
+      suffix: '',
       position: '',
       lgu: lgu, // Default to header LGU
       barangay: '',
@@ -310,6 +313,7 @@ export default function RegistrationForm() {
       lastName: '',
       firstName: '',
       middleInit: '',
+      suffix: '',
       position: '',
       lgu: lgu, // Default to header LGU
       barangay: '',
@@ -477,6 +481,7 @@ export default function RegistrationForm() {
       formData[`LASTNAME|${index}`] = p.lastName;
       formData[`FIRSTNAME|${index}`] = p.firstName;
       formData[`MI|${index}`] = p.middleInit;
+      formData[`SUFFIX|${index}`] = p.suffix;
       formData[`DESIGNATION|${index}`] = p.position;
       formData[`LGU|${index}`] = p.lgu || lgu; // Use header LGU if participant LGU is empty
       formData[`BRGY|${index}`] = p.barangay;
@@ -989,7 +994,7 @@ export default function RegistrationForm() {
                         required
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       <div>
                         <label className="block text-xs font-semibold text-gray-700 mb-1">First Name *</label>
                         <input
@@ -1007,8 +1012,19 @@ export default function RegistrationForm() {
                           value={participant.middleInit}
                           onChange={(e) => updateParticipant(participant.id, 'middleInit', e.target.value.toUpperCase())}
                           className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
-                          maxLength={1}
+                          maxLength={4}
                           required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">Suffix</label>
+                        <input
+                          type="text"
+                          value={participant.suffix}
+                          onChange={(e) => updateParticipant(participant.id, 'suffix', e.target.value.toUpperCase())}
+                          className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
+                          maxLength={12}
+                          placeholder="JR, SR, II"
                         />
                       </div>
                     </div>
@@ -1082,7 +1098,7 @@ export default function RegistrationForm() {
             <table className="w-full border-collapse border border-gray-300">
               <thead>
                 <tr>
-                  <th colSpan={8} className="border border-gray-300 p-2 bg-gray-200 text-center">
+                  <th colSpan={9} className="border border-gray-300 p-2 bg-gray-200 text-center">
                     <span className="text-lg font-bold text-gray-900">LIST OF PARTICIPANTS</span>
                     <span className="ml-4 text-base font-normal text-gray-700">
                       (Total: {participants.length} {participants.length === 1 ? 'participant' : 'participants'})
@@ -1092,7 +1108,8 @@ export default function RegistrationForm() {
                 <tr>
                   <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">LAST NAME</th>
                   <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">FIRST NAME</th>
-                  <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-12">M.I.</th>
+                  <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-16">M.I.</th>
+                  <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-16">SUFFIX</th>
                   <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-48">POSITION</th>
                   <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">LGU</th>
                   <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">BARANGAY</th>
@@ -1121,14 +1138,24 @@ export default function RegistrationForm() {
                         required
                       />
                     </td>
-                    <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 w-12">
+                    <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 w-16">
                       <input
                         type="text"
                         value={participant.middleInit}
                         onChange={(e) => updateParticipant(participant.id, 'middleInit', e.target.value.toUpperCase())}
                         className="w-full px-2 py-1.5 md:py-1 border-0 bg-transparent uppercase text-gray-900 text-sm"
-                        maxLength={1}
+                        maxLength={4}
                         required
+                      />
+                    </td>
+                    <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 w-16">
+                      <input
+                        type="text"
+                        value={participant.suffix}
+                        onChange={(e) => updateParticipant(participant.id, 'suffix', e.target.value.toUpperCase())}
+                        className="w-full px-2 py-1.5 md:py-1 border-0 bg-transparent uppercase text-gray-900 text-sm"
+                        maxLength={12}
+                        placeholder="JR, SR, II"
                       />
                     </td>
                     <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 w-48">
@@ -1378,7 +1405,7 @@ export default function RegistrationForm() {
                         <div key={index} className="border border-gray-300 rounded-lg p-3 bg-gray-50">
                           <div className="font-bold text-xs text-gray-900 mb-2">Participant #{index + 1}</div>
                           <div className="space-y-1.5 text-xs">
-                            <div><span className="font-semibold text-gray-700">Name:</span> <span className="text-gray-900">{pendingFormData[`LASTNAME|${index}`] || '-'}, {pendingFormData[`FIRSTNAME|${index}`] || '-'} {pendingFormData[`MI|${index}`] || ''}</span></div>
+                            <div><span className="font-semibold text-gray-700">Name:</span> <span className="text-gray-900">{pendingFormData[`LASTNAME|${index}`] || '-'}, {pendingFormData[`FIRSTNAME|${index}`] || '-'} {pendingFormData[`MI|${index}`] || ''} {pendingFormData[`SUFFIX|${index}`] || ''}</span></div>
                             <div><span className="font-semibold text-gray-700">Position:</span> <span className="text-gray-900">{pendingFormData[`DESIGNATION|${index}`] || '-'}</span></div>
                             <div><span className="font-semibold text-gray-700">LGU:</span> <span className="text-gray-900">{pendingFormData[`LGU|${index}`] || '-'}</span></div>
                             <div><span className="font-semibold text-gray-700">Barangay:</span> <span className="text-gray-900">{pendingFormData[`BRGY|${index}`] || '-'}</span></div>
@@ -1396,7 +1423,8 @@ export default function RegistrationForm() {
                           <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">#</th>
                           <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">Last Name</th>
                           <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">First Name</th>
-                          <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-12">M.I.</th>
+                          <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-16">M.I.</th>
+                          <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-16">Suffix</th>
                           <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-48">Position</th>
                           <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">LGU</th>
                           <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">Barangay</th>
@@ -1415,7 +1443,8 @@ export default function RegistrationForm() {
                               <td className="border border-gray-300 p-2 text-gray-900">{index + 1}</td>
                               <td className="border border-gray-300 p-2 text-gray-900">{pendingFormData[`LASTNAME|${index}`] || '-'}</td>
                               <td className="border border-gray-300 p-2 text-gray-900">{pendingFormData[`FIRSTNAME|${index}`] || '-'}</td>
-                              <td className="border border-gray-300 p-2 text-gray-900 w-12">{pendingFormData[`MI|${index}`] || '-'}</td>
+                              <td className="border border-gray-300 p-2 text-gray-900 w-16">{pendingFormData[`MI|${index}`] || '-'}</td>
+                              <td className="border border-gray-300 p-2 text-gray-900 w-16">{pendingFormData[`SUFFIX|${index}`] || '-'}</td>
                               <td className="border border-gray-300 p-2 text-gray-900 w-48">{pendingFormData[`DESIGNATION|${index}`] || '-'}</td>
                               <td className="border border-gray-300 p-2 text-gray-900">{pendingFormData[`LGU|${index}`] || '-'}</td>
                               <td className="border border-gray-300 p-2 text-gray-900">{pendingFormData[`BRGY|${index}`] || '-'}</td>

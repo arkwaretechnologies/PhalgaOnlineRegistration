@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
+import { createTimeout, withTimeout } from '@/lib/security';
 
 // Disable caching for this route
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function DELETE(request: Request) {
+  // Create timeout for request (30 seconds)
+  const { abortController, timeoutId, timeoutPromise } = createTimeout(30000);
+
   try {
     const { searchParams } = new URL(request.url);
     const regId = searchParams.get('regId') || searchParams.get('transId');
@@ -13,6 +17,7 @@ export async function DELETE(request: Request) {
     const linenumParam = searchParams.get('linenum');
 
     if (!regId) {
+      clearTimeout(timeoutId);
       return NextResponse.json(
         { error: 'Registration ID is required' },
         { status: 400 }
@@ -20,6 +25,7 @@ export async function DELETE(request: Request) {
     }
 
     if (!confcode) {
+      clearTimeout(timeoutId);
       return NextResponse.json(
         { error: 'Conference code is required' },
         { status: 400 }
@@ -27,6 +33,7 @@ export async function DELETE(request: Request) {
     }
 
     if (!linenumParam) {
+      clearTimeout(timeoutId);
       return NextResponse.json(
         { error: 'Line number is required' },
         { status: 400 }
@@ -38,6 +45,7 @@ export async function DELETE(request: Request) {
     const linenum = parseInt(linenumParam, 10);
 
     if (isNaN(linenum)) {
+      clearTimeout(timeoutId);
       return NextResponse.json(
         { error: 'Invalid line number' },
         { status: 400 }
@@ -47,16 +55,20 @@ export async function DELETE(request: Request) {
     // console.log(`Deleting payment proof for regid: ${regIdString}, confcode: ${confcodeString}, linenum: ${linenum}`);
 
     // Verify the payment proof exists before deleting (using composite primary key)
-    const { data: existingProof, error: verifyError } = await supabase
-      .from('regdep')
-      .select('*')
-      .eq('regid', regIdString)
-      .eq('confcode', confcodeString)
-      .eq('linenum', linenum)
-      .single();
+    const { data: existingProof, error: verifyError } = await withTimeout(
+      supabase
+        .from('regdep')
+        .select('*')
+        .eq('regid', regIdString)
+        .eq('confcode', confcodeString)
+        .eq('linenum', linenum)
+        .single(),
+      timeoutPromise
+    ) as { data: any | null; error: any };
 
     if (verifyError || !existingProof) {
       console.error('Verify error:', verifyError);
+      clearTimeout(timeoutId);
       return NextResponse.json(
         { error: 'Payment proof not found or does not belong to this registration' },
         { status: 404 }
@@ -119,12 +131,16 @@ export async function DELETE(request: Request) {
 
     // Delete from regdep table using composite primary key (regid, confcode, linenum)
     // Note: We already verified the record exists above, so proceed with deletion
-    const { error: deleteError } = await supabase
-      .from('regdep')
-      .delete()
-      .eq('regid', regIdString)
-      .eq('confcode', confcodeString)
-      .eq('linenum', linenum);
+    const result = await withTimeout(
+      supabase
+        .from('regdep')
+        .delete()
+        .eq('regid', regIdString)
+        .eq('confcode', confcodeString)
+        .eq('linenum', linenum),
+      timeoutPromise
+    ) as { error: any };
+    const { error: deleteError } = result;
 
     if (deleteError) {
       console.error('Database delete error:', deleteError);
@@ -137,6 +153,7 @@ export async function DELETE(request: Request) {
         errorDetails: deleteError.details,
         errorHint: deleteError.hint
       });
+      clearTimeout(timeoutId);
       return NextResponse.json(
         { 
           error: 'Failed to delete payment proof from database',
@@ -148,6 +165,7 @@ export async function DELETE(request: Request) {
 
     // console.log('Payment proof deleted successfully:', { regId: regIdString, confcode: confcodeString, linenum: linenum, filename });
 
+    clearTimeout(timeoutId);
     return NextResponse.json({
       success: true,
       message: 'Payment proof deleted successfully'
@@ -159,6 +177,17 @@ export async function DELETE(request: Request) {
       }
     });
   } catch (error: any) {
+    clearTimeout(timeoutId);
+    
+    // Handle timeout/abort errors
+    if (error.name === 'AbortError' || abortController.signal.aborted) {
+      console.error('Request timeout:', error);
+      return NextResponse.json(
+        { error: 'Request timeout. Please try again.' },
+        { status: 408 }
+      );
+    }
+
     console.error('Delete error:', error);
     return NextResponse.json(
       { error: 'Failed to delete payment proof: ' + (error?.message || 'Unknown error') },

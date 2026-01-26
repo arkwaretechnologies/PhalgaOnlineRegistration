@@ -25,6 +25,7 @@ interface RegistrationDetail {
   lastname: string;
   firstname: string;
   middleinit: string;
+  suffix: string | null;
   designation: string;
   brgy: string;
   lgu: string;
@@ -599,7 +600,7 @@ export default function ViewRegistration() {
               <div key={detail.linenum} className="border border-gray-300 rounded-lg p-3 bg-gray-50">
                 <div className="font-bold text-xs text-gray-900 mb-2">Participant #{index + 1}</div>
                 <div className="space-y-1.5 text-xs">
-                  <div><span className="font-semibold text-gray-700">Name:</span> <span className="text-gray-900">{detail.lastname}, {detail.firstname} {detail.middleinit}</span></div>
+                  <div><span className="font-semibold text-gray-700">Name:</span> <span className="text-gray-900">{detail.lastname}{detail.suffix ? ' ' + detail.suffix : ''}, {detail.firstname} {detail.middleinit}</span></div>
                   <div><span className="font-semibold text-gray-700">Designation:</span> <span className="text-gray-900">{detail.designation || '-'}</span></div>
                   <div><span className="font-semibold text-gray-700">Barangay:</span> <span className="text-gray-900">{detail.brgy || '-'}</span></div>
                   <div><span className="font-semibold text-gray-700">T-Shirt Size:</span> <span className="text-gray-900">{detail.tshirtsize || '-'}</span></div>
@@ -624,7 +625,7 @@ export default function ViewRegistration() {
                   <tr key={detail.linenum} className="hover:bg-gray-50">
                     <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700">{index + 1}</td>
                     <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-800">
-                      {detail.lastname}, {detail.firstname} {detail.middleinit}
+                      {detail.lastname}{detail.suffix ? ' ' + detail.suffix : ''}, {detail.firstname} {detail.middleinit}
                     </td>
                     <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700">{detail.designation || '-'}</td>
                     <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700">{detail.brgy || '-'}</td>

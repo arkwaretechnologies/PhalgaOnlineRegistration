@@ -348,6 +348,15 @@ export default function RegistrationForm() {
   };
 
   const updateParticipant = (id: number, field: keyof Participant, value: string) => {
+    // Field-specific sanitization
+    // M.I. should allow letters only (no special chars / digits), up to 2 chars
+    if (field === 'middleInit') {
+      value = value
+        .toUpperCase()
+        .replace(/[^A-Z]/g, '')
+        .slice(0, 2);
+    }
+
     setParticipants(participants.map(p => 
       p.id === id ? { ...p, [field]: value } : p
     ));
@@ -1012,7 +1021,7 @@ export default function RegistrationForm() {
                           value={participant.middleInit}
                           onChange={(e) => updateParticipant(participant.id, 'middleInit', e.target.value.toUpperCase())}
                           className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
-                          maxLength={4}
+                          maxLength={2}
                           required
                         />
                       </div>
@@ -1144,7 +1153,7 @@ export default function RegistrationForm() {
                         value={participant.middleInit}
                         onChange={(e) => updateParticipant(participant.id, 'middleInit', e.target.value.toUpperCase())}
                         className="w-full px-2 py-1.5 md:py-1 border-0 bg-transparent uppercase text-gray-900 text-sm"
-                        maxLength={4}
+                        maxLength={2}
                         required
                       />
                     </td>

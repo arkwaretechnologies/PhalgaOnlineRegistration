@@ -73,6 +73,10 @@ export default function ViewRegistration() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [banks, setBanks] = useState<Bank[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [conference, setConference] = useState<{
+    confcode: string;
+    name: string | null;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -199,6 +203,43 @@ export default function ViewRegistration() {
     };
 
     fetchContacts();
+  }, [header?.confcode]);
+
+  // Fetch conference information
+  useEffect(() => {
+    const fetchConference = async () => {
+      try {
+        const timestamp = new Date().getTime();
+        const response = await fetch(
+          `/api/get-conference?_t=${timestamp}`,
+          {
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache'
+            }
+          }
+        );
+        const data = await response.json();
+        if (response.ok && data && !data.error) {
+          setConference(data);
+        } else {
+          console.warn('Conference not found, using defaults');
+          setConference({
+            confcode: header?.confcode || '2026-GCMIN',
+            name: '18th Mindanao Geographic Conference'
+          });
+        }
+      } catch (err) {
+        console.error('Failed to fetch conference:', err);
+        // Set default on error
+        setConference({
+          confcode: header?.confcode || '2026-GCMIN',
+          name: '18th Mindanao Geographic Conference'
+        });
+      }
+    };
+
+    fetchConference();
   }, [header?.confcode]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -364,7 +405,7 @@ export default function ViewRegistration() {
               <h1 className="text-xl sm:text-2xl font-bold text-gray-800 mb-1 sm:mb-2">
                 Registration Details
               </h1>
-              <p className="text-sm sm:text-base text-gray-600">18th Mindanao Geographical Conference</p>
+              <p className="text-sm sm:text-base text-gray-600">{conference?.name || '18th Mindanao Geographic Conference'}</p>
             </div>
             <Link
               href="/"

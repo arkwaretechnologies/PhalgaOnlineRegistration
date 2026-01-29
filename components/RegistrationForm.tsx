@@ -396,6 +396,15 @@ export default function RegistrationForm() {
     return lvl === 'BGY';
   };
 
+  // Helper function to get filtered positions based on LGU
+  // If LGU is "PROVINCE", exclude positions with lvl = 'BGY'
+  const getFilteredPositions = (effectiveLgu: string): Array<{ name: string; lvl: string | null }> => {
+    if (effectiveLgu.toUpperCase().trim() === 'PROVINCE') {
+      return positionOptions.filter(p => p.lvl !== 'BGY');
+    }
+    return positionOptions;
+  };
+
   // Helper function to handle position change and clear barangay if needed
   const handlePositionChange = (participantId: number, newPosition: string) => {
     const newPositionUpper = newPosition.toUpperCase();
@@ -1058,7 +1067,7 @@ export default function RegistrationForm() {
                         required
                       />
                       <datalist id={`position-list-mobile-${participant.id}`}>
-                        {positionOptions.map(position => <option key={position.name} value={position.name} />)}
+                        {getFilteredPositions(participant.lgu || lgu).map(position => <option key={position.name} value={position.name} />)}
                       </datalist>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -1188,7 +1197,7 @@ export default function RegistrationForm() {
                         required
                       />
                       <datalist id={`position-list-${participant.id}`}>
-                        {positionOptions.map(position => <option key={position.name} value={position.name} />)}
+                        {getFilteredPositions(participant.lgu || lgu).map(position => <option key={position.name} value={position.name} />)}
                       </datalist>
                     </td>
                     <td className="border border-gray-300 p-1 bg-blue-50">

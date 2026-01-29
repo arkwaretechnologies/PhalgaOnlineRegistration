@@ -58,6 +58,80 @@ export async function GET(request: Request) {
       return NextResponse.json([]);
     }
 
+    // Special handling for PSGC 1380600000:
+    // - Take first 6 digits
+    // - Find SUBMUN under that prefix
+    // - For each SUBMUN, take first 7 digits and find BGY under that prefix
+    // - Return a combined list of SUBMUN + its BGYs (for dropdown display)
+    if (lguPsgc === '1380600000') {
+      const firstSixDigits = lguPsgc.substring(0, 6);
+      const submunPrefix = `${firstSixDigits}%`;
+
+      const { data: submunData, error: submunError } = await supabase
+        .from('lgus')
+        .select('lguname, psgc, geolevel')
+        .like('psgc', submunPrefix)
+        .eq('geolevel', 'SUBMUN')
+        .order('lguname', { ascending: true });
+
+      if (submunError) {
+        console.error('Database error fetching SUBMUN:', submunError);
+        return NextResponse.json(
+          { error: 'Failed to fetch barangays' },
+          { status: 500 }
+        );
+      }
+
+      if (!submunData || submunData.length === 0) {
+        // No SUBMUN found; fall back to the default barangay lookup below
+      } else {
+        // Fetch ALL BGY under the first 6 digits once, then group by SUBMUN prefix7
+        const bgyPrefix = `${firstSixDigits}%`;
+        const { data: bgyData, error: bgyError } = await supabase
+          .from('lgus')
+          .select('lguname, psgc, geolevel')
+          .like('psgc', bgyPrefix)
+          .eq('geolevel', 'BGY')
+          .order('lguname', { ascending: true });
+
+        if (bgyError) {
+          console.error('Database error fetching BGY for SUBMUN:', bgyError);
+          return NextResponse.json(
+            { error: 'Failed to fetch barangays' },
+            { status: 500 }
+          );
+        }
+
+        const output: string[] = [];
+
+        for (const submun of submunData) {
+          const submunName = submun.lguname;
+          const submunPsgc = (submun.psgc || '').toString();
+          if (submunPsgc.length < 7) continue;
+
+          const submunPrefix7 = submunPsgc.substring(0, 7);
+          const submunBgys = (bgyData || []).filter((b) => {
+            const bpsgc = (b.psgc || '').toString();
+            return bpsgc.startsWith(submunPrefix7);
+          });
+
+          // Include the SUBMUN itself, then its barangays as "SUBMUN - BGY"
+          output.push(submunName);
+          for (const bgy of submunBgys) {
+            output.push(`${submunName} - ${bgy.lguname}`);
+          }
+        }
+
+        return NextResponse.json(output, {
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        });
+      }
+    }
+
     // Get first 7 digits of the LGU PSGC
     const firstSevenDigits = lguPsgc.substring(0, 7);
     const psgcPrefix = `${firstSevenDigits}%`;

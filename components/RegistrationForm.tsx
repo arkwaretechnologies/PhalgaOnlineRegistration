@@ -362,6 +362,27 @@ export default function RegistrationForm() {
     ));
   };
 
+  // Unified handlers for Safari compatibility (work with both onChange and onInput)
+  const handleProvinceChange = (e: React.ChangeEvent<HTMLInputElement> | React.FormEvent<HTMLInputElement>) => {
+    const value = e.currentTarget.value;
+    setProvince(value);
+  };
+
+  const handleLguChange = (e: React.ChangeEvent<HTMLInputElement> | React.FormEvent<HTMLInputElement>) => {
+    if (!isProvinceLgu) {
+      const selectedName = e.currentTarget.value;
+      setLgu(selectedName);
+      // Find matching LGU object and set PSGC
+      const matchedLgu = lguOptions.find(l => l.name.toUpperCase() === selectedName.toUpperCase());
+      setSelectedLguPsgc(matchedLgu?.psgc || '');
+    }
+  };
+
+  const handleBarangayChange = (participantId: number, e: React.ChangeEvent<HTMLInputElement> | React.FormEvent<HTMLInputElement>) => {
+    const value = e.currentTarget.value.toUpperCase();
+    updateParticipant(participantId, 'barangay', value);
+  };
+
   // Helper function to get the lvl for a position name
   const getPositionLvl = (positionName: string): string | null => {
     const position = positionOptions.find(p => p.name.toUpperCase() === positionName.toUpperCase());
@@ -675,7 +696,8 @@ export default function RegistrationForm() {
                 type="text"
                 list="provinces-list-mobile"
                 value={province}
-                onChange={(e) => setProvince(e.target.value)}
+                onChange={handleProvinceChange}
+                onInput={handleProvinceChange}
                 onBlur={(e) => {
                   // Validate that the value exists in the provinces list
                   const enteredValue = e.target.value.trim().toUpperCase();
@@ -698,15 +720,8 @@ export default function RegistrationForm() {
                   type="text"
                   list="lgu-list-mobile"
                   value={lgu}
-                  onChange={(e) => {
-                    if (!isProvinceLgu) {
-                      const selectedName = e.target.value;
-                      setLgu(selectedName);
-                      // Find matching LGU object and set PSGC
-                      const matchedLgu = lguOptions.find(l => l.name.toUpperCase() === selectedName.toUpperCase());
-                      setSelectedLguPsgc(matchedLgu?.psgc || '');
-                    }
-                  }}
+                  onChange={handleLguChange}
+                  onInput={handleLguChange}
                   onBlur={(e) => {
                     if (!isProvinceLgu) {
                       // Validate that the value exists in the LGU options list
@@ -817,7 +832,8 @@ export default function RegistrationForm() {
                     type="text"
                     list="provinces-list"
                     value={province}
-                    onChange={(e) => setProvince(e.target.value)}
+                    onChange={handleProvinceChange}
+                    onInput={handleProvinceChange}
                     onBlur={(e) => {
                       // Validate that the value exists in the provinces list
                       const enteredValue = e.target.value.trim().toUpperCase();
@@ -842,15 +858,8 @@ export default function RegistrationForm() {
                       type="text"
                       list="lgu-list"
                       value={lgu}
-                      onChange={(e) => {
-                        if (!isProvinceLgu) {
-                          const selectedName = e.target.value;
-                          setLgu(selectedName);
-                          // Find matching LGU object and set PSGC
-                          const matchedLgu = lguOptions.find(l => l.name.toUpperCase() === selectedName.toUpperCase());
-                          setSelectedLguPsgc(matchedLgu?.psgc || '');
-                        }
-                      }}
+                      onChange={handleLguChange}
+                      onInput={handleLguChange}
                       onBlur={(e) => {
                         if (!isProvinceLgu) {
                           // Validate that the value exists in the LGU options list
@@ -1073,7 +1082,8 @@ export default function RegistrationForm() {
                           type="text"
                           list={`barangay-list-mobile-${participant.id}`}
                           value={participant.barangay}
-                          onChange={(e) => updateParticipant(participant.id, 'barangay', e.target.value.toUpperCase())}
+                          onChange={(e) => handleBarangayChange(participant.id, e)}
+                          onInput={(e) => handleBarangayChange(participant.id, e)}
                           className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
                           disabled={!lgu || !isBarangayEnabled(participant)}
                         />
@@ -1200,7 +1210,8 @@ export default function RegistrationForm() {
                         type="text"
                         list={`barangay-list-${participant.id}`}
                         value={participant.barangay}
-                        onChange={(e) => updateParticipant(participant.id, 'barangay', e.target.value.toUpperCase())}
+                        onChange={(e) => handleBarangayChange(participant.id, e)}
+                        onInput={(e) => handleBarangayChange(participant.id, e)}
                         className="w-full px-1 py-0.5 border-0 bg-transparent uppercase text-gray-900"
                         disabled={!lgu || !isBarangayEnabled(participant)}
                         title={!lgu ? 'Please select an LGU first' : (!isBarangayEnabled(participant) ? 'Barangay is only enabled for positions with level BGY' : '')}

@@ -197,12 +197,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const province = formData.PROVINCE.toUpperCase();
-    const lgu = formData.LGU.toUpperCase();
+    const province = (formData.PROVINCE || '').toString().trim().toUpperCase();
+    const lgu = (formData.LGU || '').toString().trim().toUpperCase();
 
-    const contactperson = formData.CONTACTPERSON.toUpperCase();
-    const contactnum = formData.CONTACTNUMBER.toUpperCase();
-    const email = formData.EMAILADDRESS.toLowerCase();
+    const contactperson = (formData.CONTACTPERSON || '').toString().trim().toUpperCase();
+    const contactnum = (formData.CONTACTNUMBER || '').toString().trim().toUpperCase();
+    const email = (formData.EMAILADDRESS || '').toString().trim().toLowerCase();
     const detailcount = parseInt(formData.DETAILCOUNT);
 
     // Check for duplicate participants (same last name, first name, middle initial in same province and LGU)
@@ -350,17 +350,17 @@ export async function POST(request: Request) {
     // Prepare detail records
     const detailRecords = [];
     for (let i = 0; i < detailcount; i++) {
-      const lastname = (formData[`LASTNAME|${i}`] || '').toUpperCase();
-      const firstname = (formData[`FIRSTNAME|${i}`] || '').toUpperCase();
-      const middleinit = (formData[`MI|${i}`] || '').toUpperCase();
-      const suffix = (formData[`SUFFIX|${i}`] || '').toUpperCase();
-      const designation = (formData[`DESIGNATION|${i}`] || '').toUpperCase();
-      const brgy = (formData[`BRGY|${i}`] || '').toUpperCase();
-      const tshirtsize = (formData[`TSHIRTSIZE|${i}`] || '').toUpperCase();
-      const contactnumDetail = (formData[`CONTACTNUMBER|${i}`] || '').toUpperCase();
-      const prcnum = (formData[`PRCNUM|${i}`] || '').toUpperCase();
-      const expirydateStr = (formData[`EXPIRYDATE|${i}`] || '').trim();
-      const emailDetail = (formData[`EMAIL|${i}`] || '').toLowerCase();
+      const lastname = (formData[`LASTNAME|${i}`] || '').toString().trim().toUpperCase();
+      const firstname = (formData[`FIRSTNAME|${i}`] || '').toString().trim().toUpperCase();
+      const middleinit = (formData[`MI|${i}`] || '').toString().trim().toUpperCase();
+      const suffix = (formData[`SUFFIX|${i}`] || '').toString().trim().toUpperCase();
+      const designation = (formData[`DESIGNATION|${i}`] || '').toString().trim().toUpperCase();
+      const brgy = (formData[`BRGY|${i}`] || '').toString().trim().toUpperCase();
+      const tshirtsize = (formData[`TSHIRTSIZE|${i}`] || '').toString().trim().toUpperCase();
+      const contactnumDetail = (formData[`CONTACTNUMBER|${i}`] || '').toString().trim().toUpperCase();
+      const prcnum = (formData[`PRCNUM|${i}`] || '').toString().trim().toUpperCase();
+      const expirydateStr = (formData[`EXPIRYDATE|${i}`] || '').toString().trim();
+      const emailDetail = (formData[`EMAIL|${i}`] || '').toString().trim().toLowerCase();
 
       // Convert expiry date string to Date string or null
       let expirydate: string | null = null;
@@ -372,7 +372,7 @@ export async function POST(request: Request) {
       }
 
       // Get participant's LGU (use participant LGU if provided, otherwise use header LGU)
-      const participantLguForRecord = (formData[`LGU|${i}`] || lgu).toUpperCase();
+      const participantLguForRecord = (formData[`LGU|${i}`] || lgu).toString().trim().toUpperCase();
       
       // Note: regd table now uses regid (not regnum) as foreign key to regh
       detailRecords.push({

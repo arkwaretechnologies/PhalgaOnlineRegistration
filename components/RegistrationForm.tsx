@@ -505,26 +505,26 @@ export default function RegistrationForm() {
       return;
     }
 
-    // Build form data
+    // Build form data (trim all string fields so confirmation and payload are clean)
     const formData: any = {
       CONFERENCE: conference?.confcode || '2026-GCMIN', // Use conference code from database
-      PROVINCE: province,
-      LGU: lgu,
-      CONTACTPERSON: contactPerson,
-      CONTACTNUMBER: contactNo,
-      EMAILADDRESS: emailAddress,
+      PROVINCE: (province ?? '').toString().trim(),
+      LGU: (lgu ?? '').toString().trim(),
+      CONTACTPERSON: (contactPerson ?? '').toString().trim(),
+      CONTACTNUMBER: (contactNo ?? '').toString().trim(),
+      EMAILADDRESS: (emailAddress ?? '').toString().trim(),
       DETAILCOUNT: participants.length.toString()
     };
 
     participants.forEach((p, index) => {
-      formData[`LASTNAME|${index}`] = p.lastName;
-      formData[`FIRSTNAME|${index}`] = p.firstName;
-      formData[`MI|${index}`] = p.middleInit;
-      formData[`SUFFIX|${index}`] = p.suffix;
-      formData[`DESIGNATION|${index}`] = p.position;
-      formData[`LGU|${index}`] = p.lgu || lgu; // Use header LGU if participant LGU is empty
-      formData[`BRGY|${index}`] = p.barangay;
-      formData[`TSHIRTSIZE|${index}`] = p.tshirt;
+      formData[`LASTNAME|${index}`] = (p.lastName ?? '').toString().trim();
+      formData[`FIRSTNAME|${index}`] = (p.firstName ?? '').toString().trim();
+      formData[`MI|${index}`] = (p.middleInit ?? '').toString().trim();
+      formData[`SUFFIX|${index}`] = (p.suffix ?? '').toString().trim();
+      formData[`DESIGNATION|${index}`] = (p.position ?? '').toString().trim();
+      formData[`LGU|${index}`] = ((p.lgu || lgu) ?? '').toString().trim(); // Use header LGU if participant LGU is empty
+      formData[`BRGY|${index}`] = (p.barangay ?? '').toString().trim();
+      formData[`TSHIRTSIZE|${index}`] = (p.tshirt ?? '').toString().trim();
     });
 
     // Store form data and show confirmation

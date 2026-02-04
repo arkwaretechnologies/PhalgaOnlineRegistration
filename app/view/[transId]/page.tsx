@@ -416,18 +416,23 @@ export default function ViewRegistration() {
               </h1>
               <p className="text-sm sm:text-base text-gray-600">{conference?.name || '18th Mindanao Geographic Conference'}</p>
               {conference?.date_from && conference?.date_to && (() => {
-                const dateFrom = new Date(conference.date_from);
-                const dateTo = new Date(conference.date_to);
-                const sameMonth = dateFrom.getMonth() === dateTo.getMonth() && dateFrom.getFullYear() === dateTo.getFullYear();
-                
-                const dateFromStr = dateFrom.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
-                const dateToDay = dateTo.toLocaleDateString('en-US', { day: 'numeric' });
-                const dateToMonth = dateTo.toLocaleDateString('en-US', { month: 'long' });
-                const dateToYear = dateTo.toLocaleDateString('en-US', { year: 'numeric' });
-                
+                // Parse stored dates (YYYY-MM-DD) as literal calendar dates, no timezone conversion
+                const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                const parseDateParts = (dateStr: string) => {
+                  const [y, m, d] = (dateStr || '').trim().split('-').map(s => parseInt(s, 10));
+                  const monthIdx = (m || 1) - 1;
+                  return { year: y || 0, monthIdx, day: d || 1, monthName: monthNames[monthIdx] ?? '' };
+                };
+                const from = parseDateParts(conference.date_from);
+                const to = parseDateParts(conference.date_to);
+                const sameMonth = from.monthIdx === to.monthIdx && from.year === to.year;
+                const dateFromStr = `${from.monthName} ${from.day}`;
+                const dateToDay = String(to.day);
+                const dateToMonth = to.monthName;
+                const dateToYear = String(to.year);
                 return (
                   <p className="text-xs sm:text-sm text-gray-500 mt-1">
-                    {sameMonth 
+                    {sameMonth
                       ? `${dateFromStr} - ${dateToDay}, ${dateToYear}`
                       : `${dateFromStr} - ${dateToMonth} ${dateToDay}, ${dateToYear}`
                     }

@@ -42,31 +42,23 @@ export async function sendRegistrationConfirmation(
   }
 
   try {
-    // Format registration date for display
+    // Format registration date for display (use exact time from DB, no timezone conversion)
     const formatDate = (dateString: string): string => {
       try {
-        // Parse the date string (format: YYYY-MM-DD HH:MM:SS)
-        const [datePart, timePart] = dateString.split(' ');
+        // Parse the date string (format: YYYY-MM-DD HH:MM:SS) - stored value is already the intended time
+        const [datePart, timePart] = dateString.trim().split(/\s+/);
+        if (!datePart || !timePart) return dateString;
         const [year, month, day] = datePart.split('-');
-        const [hours, minutes] = timePart.split(':');
-        
-        const date = new Date(
-          parseInt(year),
-          parseInt(month) - 1,
-          parseInt(day),
-          parseInt(hours),
-          parseInt(minutes)
-        );
-        
-        return date.toLocaleString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          timeZone: 'Asia/Manila',
-          timeZoneName: 'short'
-        });
+        const [hoursStr, minutesStr] = timePart.split(':');
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        const monthIndex = parseInt(month, 10) - 1;
+        if (monthIndex < 0 || monthIndex > 11) return dateString;
+        const h = parseInt(hoursStr, 10) || 0;
+        const m = parseInt(minutesStr, 10) || 0;
+        const hour12 = h % 12 || 12;
+        const ampm = h < 12 ? 'AM' : 'PM';
+        const minutePadded = String(m).padStart(2, '0');
+        return `${monthNames[monthIndex]} ${parseInt(day, 10)}, ${year}, ${hour12}:${minutePadded} ${ampm}`;
       } catch (error) {
         return dateString; // Return original if parsing fails
       }

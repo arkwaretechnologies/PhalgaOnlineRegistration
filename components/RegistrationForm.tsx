@@ -335,6 +335,11 @@ export default function RegistrationForm() {
     return !/^\d+$/.test(value.trim());
   };
 
+  const validateContactNumber = (value: string): boolean => {
+    // Required format: 09 + 9 digits (11 digits total)
+    return /^09\d{9}$/.test(value);
+  };
+
   const formatContactNumber = (value: string): string => {
     // Remove all non-numeric characters
     const numbersOnly = value.replace(/\D/g, '');
@@ -429,9 +434,9 @@ export default function RegistrationForm() {
     setSubmitMessage(null);
     setShowErrorModal(false);
 
-    // Validate main contact number (must be exactly 11 digits)
-    if (!contactNo || contactNo.length !== 11) {
-      setErrorModalMessage('Contact number must be exactly 11 digits.');
+    // Validate main contact number (must start with 09 and be exactly 11 digits)
+    if (!contactNo || !validateContactNumber(contactNo)) {
+      setErrorModalMessage('Contact number must start with 09 and be exactly 11 digits.');
       setShowErrorModal(true);
       return;
     }
@@ -797,17 +802,19 @@ export default function RegistrationForm() {
             <div className="border border-gray-300 rounded-lg p-3 bg-blue-50">
               <label className="block font-semibold text-sm text-gray-900 mb-2">CONTACT NO. *</label>
               <input
-                type="text"
+                type="tel"
                 value={contactNo}
                 onChange={(e) => setContactNo(formatContactNumber(e.target.value))}
                 className="w-full px-3 py-2.5 border border-gray-300 rounded text-gray-900 bg-white text-base"
                 required
                 maxLength={11}
-                pattern="[0-9]{11}"
-                title="Contact number must be exactly 11 digits"
+                inputMode="numeric"
+                pattern="09[0-9]{9}"
+                placeholder="09XXXXXXXXX"
+                title="Contact number must start with 09 and be exactly 11 digits"
               />
-              {contactNo && contactNo.length !== 11 && (
-                <p className="text-xs text-red-600 mt-1">Contact number must be exactly 11 digits</p>
+              {contactNo && !validateContactNumber(contactNo) && (
+                <p className="text-xs text-red-600 mt-1">Contact number must start with 09 and be exactly 11 digits</p>
               )}
             </div>
             <div className="border border-gray-300 rounded-lg p-3 bg-blue-50">
@@ -939,17 +946,19 @@ export default function RegistrationForm() {
                 <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">CONTACT NO.</td>
                 <td className="border border-gray-300 p-2 bg-blue-50">
                   <input
-                    type="text"
+                    type="tel"
                     value={contactNo}
                     onChange={(e) => setContactNo(formatContactNumber(e.target.value))}
                     className="w-full px-2 py-1 border border-gray-300 rounded text-gray-900 bg-white"
                     required
                     maxLength={11}
-                    pattern="[0-9]{11}"
-                    title="Contact number must be exactly 11 digits"
+                    inputMode="numeric"
+                    pattern="09[0-9]{9}"
+                    placeholder="09XXXXXXXXX"
+                    title="Contact number must start with 09 and be exactly 11 digits"
                   />
-                  {contactNo && contactNo.length !== 11 && (
-                    <p className="text-xs text-red-600 mt-1">Contact number must be exactly 11 digits</p>
+                  {contactNo && !validateContactNumber(contactNo) && (
+                    <p className="text-xs text-red-600 mt-1">Contact number must start with 09 and be exactly 11 digits</p>
                   )}
                 </td>
               </tr>

@@ -101,32 +101,12 @@ export async function GET(request: Request) {
       );
     }
 
-    // For APPROVED status, compute batch number (1-based rank among approved registrations for this conference)
-    let batchNumber: number | null = null;
-    const statusVal = (headerData.status || '').toString().toUpperCase().trim();
-    if (statusVal === 'APPROVED') {
-      const { data: approvedList } = await withTimeout(
-        supabase
-          .from('regh')
-          .select('regid')
-          .eq('confcode', confcode)
-          .eq('status', 'APPROVED')
-          .order('regdate', { ascending: true })
-          .order('regid', { ascending: true }),
-        timeoutPromise
-      ) as { data: { regid: string }[] | null };
-      if (approvedList && approvedList.length > 0) {
-        const index = approvedList.findIndex((row: { regid: string }) => (row.regid || '').toString().toUpperCase() === (headerData.regid || '').toString().toUpperCase());
-        if (index >= 0) batchNumber = index + 1;
-      }
-    }
-
     clearTimeout(timeoutId);
     
-    // Return response with no-cache headers to ensure fresh data
+    // Return response with no-cache headers to ensure fresh data (batchnum comes from regh column)
     return NextResponse.json(
       {
-        header: { ...headerData, batchNumber: batchNumber ?? undefined },
+        header: headerData,
         details: detailData || []
       },
       {

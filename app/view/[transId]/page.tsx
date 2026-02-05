@@ -16,7 +16,7 @@ interface RegistrationHeader {
   status?: string;
   payment_proof_url?: string;
   remarks?: string;
-  batchNumber?: number;
+  batchnum?: number | null;
 }
 
 interface RegistrationDetail {
@@ -494,8 +494,8 @@ export default function ViewRegistration() {
                           </svg>
                         </span>
                         CONFIRMED
-                        {header.batchNumber != null && (
-                          <span className="text-green-800 font-semibold">Batch {header.batchNumber}</span>
+                        {header.batchnum != null && (
+                          <span className="text-green-800 font-semibold">Batch {header.batchnum}</span>
                         )}
                       </span>
                     );

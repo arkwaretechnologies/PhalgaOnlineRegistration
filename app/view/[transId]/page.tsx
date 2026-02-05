@@ -16,6 +16,7 @@ interface RegistrationHeader {
   status?: string;
   payment_proof_url?: string;
   remarks?: string;
+  batchNumber?: number;
 }
 
 interface RegistrationDetail {
@@ -473,20 +474,40 @@ export default function ViewRegistration() {
                   
                   if (statusValue === 'PENDING') {
                     return (
-                      <span className={`${baseClasses} bg-orange-500 text-white`}>
+                      <span className={`${baseClasses} bg-orange-100 text-orange-800 inline-flex items-center gap-1.5`}>
+                        <span className="inline-flex items-center justify-center w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 rounded-full bg-orange-600">
+                          <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="9" stroke="white" fill="none" />
+                            <path d="M12 12 L12 8" />
+                            <path d="M12 12 L16 12" />
+                          </svg>
+                        </span>
                         {statusValue}
                       </span>
                     );
                   } else if (statusValue === 'APPROVED') {
                     return (
-                      <span className={`${baseClasses} bg-green-100 text-green-800`}>
-                        {statusValue}
+                      <span className={`${baseClasses} bg-green-100 text-green-800 inline-flex items-center gap-1.5`}>
+                        <span className="inline-flex items-center justify-center w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 rounded-full bg-green-600">
+                          <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        </span>
+                        CONFIRMED
+                        {header.batchNumber != null && (
+                          <span className="text-green-800 font-semibold">Batch {header.batchNumber}</span>
+                        )}
                       </span>
                     );
                   } else if (statusValue === 'REJECTED') {
                     return (
-                      <span className={`${baseClasses} bg-red-100 text-red-800`}>
-                        {statusValue}
+                      <span className={`${baseClasses} bg-red-100 text-red-800 inline-flex items-center gap-1.5`}>
+                        <span className="inline-flex items-center justify-center w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 rounded-full bg-red-600">
+                          <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M18 6L6 18M6 6l12 12" />
+                          </svg>
+                        </span>
+                        UNSUCCESSFUL
                       </span>
                     );
                   } else {

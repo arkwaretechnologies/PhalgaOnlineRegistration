@@ -212,14 +212,18 @@ export default function LandingPage() {
 
           {/* Venue */}
           {venueStr && (
-            <div className="flex items-center justify-center gap-2 mb-8">
-              <span style={{ color: '#D4B165' }} aria-hidden>
-                <svg className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </span>
-              <p className="text-sm sm:text-base" style={{ color: '#555555' }}>{venueStr}</p>
+            <div className="flex justify-center mb-8">
+              <div className="relative inline-block max-w-full pl-5 sm:pl-7">
+                <span className="absolute left-0 top-0.5" style={{ color: '#D4B165' }} aria-hidden>
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </span>
+                <p className="text-center text-sm sm:text-base leading-snug break-words" style={{ color: '#555555' }}>
+                  {venueStr}
+                </p>
+              </div>
             </div>
           )}
 

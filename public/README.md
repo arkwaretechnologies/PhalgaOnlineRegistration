@@ -8,10 +8,10 @@ Place your PHALGA logo image files here:
 - **`right.png`** - Logo for the right side of the header
 
 ### Logo Specifications:
-- Recommended height: 96 pixels (h-24)
-- Width: Auto (maintains aspect ratio)
-- Supported formats: PNG, JPG, SVG
-- Logos will automatically hide if files are not found
+- **For sharp display on all screens (including retina):** use at least **256×256 px** (or 128×128 minimum). Low-resolution images will look pixelated.
+- Width/height: Square or any aspect ratio (display area is 40px on mobile, 64px on desktop; `object-cover` is used).
+- Supported formats: PNG (recommended for logos).
+- Files are served unoptimized so full resolution is used for quality.
 
 The logos will appear on either side of the "PHALGA Registration Form" title in the header.
 

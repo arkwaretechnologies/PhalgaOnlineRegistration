@@ -3,8 +3,8 @@ import "./globals.css";
 import Footer from "@/components/Footer";
 
 export const metadata: Metadata = {
-  title: "PhALGA Online Registration",
-  description: "18th Mindanao Geographical Conference Registration",
+  title: "PhALGA Online Registration System",
+  description: "PhALGA Online Registration System",
   icons: {
     icon: '/logo.png',
     shortcut: '/logo.png',

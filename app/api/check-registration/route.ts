@@ -17,62 +17,161 @@ export async function GET(request: Request) {
     const hostname = request.headers.get('host') || request.headers.get('x-forwarded-host');
     const confcode = await getConferenceCode(hostname || undefined);
     
-    // console.log(`=== Registration Check for Conference: ${confcode} ===`);
+    // console.log(`[check-registration] Hostname: ${hostname}`);
+    // console.log(`[check-registration] Detected confcode: "${confcode}"`);
+    // console.log(`[check-registration] Comparing regh.confcode to: "${confcode}"`);
     
-    // Step 1: Get all regd records for this conference with their regh data
-    // Note: regd table now uses regid (not regnum) as foreign key to regh
-    const { data: regdData, error: regdError } = await withTimeout(
-      supabase
-        .from('regd')
-        .select(`
-          regid,
-          confcode,
-          regh!left(regid, status, confcode)
-        `)
-        .eq('confcode', confcode),
-      timeoutPromise
-    ) as { data: any[] | null; error: any };
-    
-    // console.log('=== Direct Query Result ===');
-    // console.log('regdData length:', regdData?.length || 0);
-    // console.log('regdError:', regdError);
-    
-    if (regdError) {
-      console.error('Database error with direct query:', regdError);
-      clearTimeout(timeoutId);
-      return NextResponse.json(
-        { 
-          error: 'Failed to check registration status', 
-          details: regdError.message
-        },
-        { status: 500 }
-      );
+    // Step 1: Get all regd rows (no filter - EXISTS query checks all regd)
+    // SQL equivalent: SELECT COUNT(*) FROM regd WHERE EXISTS(...)
+    // Fetch all rows using pagination (Supabase defaults to 1000 rows)
+    let allRegdData: any[] = [];
+    let regdPage = 0;
+    const regdPageSize = 1000;
+    let hasMoreRegd = true;
+
+    while (hasMoreRegd) {
+      const { data: regdPageData, error: regdError } = await withTimeout(
+        supabase
+          .from('regd')
+          .select('regid')
+          .range(regdPage * regdPageSize, (regdPage + 1) * regdPageSize - 1),
+        timeoutPromise
+      ) as { data: any[] | null; error: any };
+
+      if (regdError) {
+        console.error('Database error fetching regd:', regdError);
+        clearTimeout(timeoutId);
+        return NextResponse.json(
+          { 
+            error: 'Failed to check registration status', 
+            details: regdError.message
+          },
+          { status: 500 }
+        );
+      }
+
+      if (regdPageData && regdPageData.length > 0) {
+        allRegdData = allRegdData.concat(regdPageData);
+        hasMoreRegd = regdPageData.length === regdPageSize;
+        regdPage++;
+      } else {
+        hasMoreRegd = false;
+      }
     }
-    
-    // Step 2: Filter records where status is PENDING or APPROVED (case-insensitive)
-    // AND ensure the regh record belongs to the same conference
-    const validRecords = (regdData || []).filter((record: any) => {
-      // First check if regd belongs to this conference
-      if (record.confcode !== confcode) {
-        return false;
+
+    // console.log(`[check-registration] Fetched ${allRegdData.length} regd rows (across ${regdPage} pages)`);
+
+    // Step 2: Get ALL regh rows (no filter) to check EXISTS condition
+    // The EXISTS query checks confcode in the condition, not in the fetch
+    // Fetch all rows using pagination
+    let reghData: any[] = [];
+    let reghPage = 0;
+    const reghPageSize = 1000;
+    let hasMoreRegh = true;
+
+    while (hasMoreRegh) {
+      const { data: reghPageData, error: reghError } = await withTimeout(
+        supabase
+          .from('regh')
+          .select('regid, confcode, status')
+          .range(reghPage * reghPageSize, (reghPage + 1) * reghPageSize - 1),
+        timeoutPromise
+      ) as { data: any[] | null; error: any };
+
+      if (reghError) {
+        console.error('Database error fetching regh:', reghError);
+        clearTimeout(timeoutId);
+        return NextResponse.json(
+          { 
+            error: 'Failed to check registration status', 
+            details: reghError.message
+          },
+          { status: 500 }
+        );
       }
-      
-      const regh = Array.isArray(record.regh) ? record.regh[0] : record.regh;
-      // Only count records that have a regh record with status
-      if (!regh) {
-        return false;
+
+      if (reghPageData && reghPageData.length > 0) {
+        reghData = reghData.concat(reghPageData);
+        hasMoreRegh = reghPageData.length === reghPageSize;
+        reghPage++;
+      } else {
+        hasMoreRegh = false;
       }
-      
-      // Double-check regh belongs to same conference (if confcode exists in regh)
-      if (regh.confcode && regh.confcode !== confcode) {
-        return false;
+    }
+
+    // console.log(`[check-registration] Fetched ${reghData.length} regh rows (across ${reghPage} pages)`);
+
+    // Build a map of regh by regid for quick EXISTS lookup
+    // Key: regid, Value: array of ALL regh records (confcode check happens in EXISTS condition)
+    const reghByRegid = new Map<number, any[]>();
+    (reghData || []).forEach((regh: any) => {
+      if (!reghByRegid.has(regh.regid)) {
+        reghByRegid.set(regh.regid, []);
       }
+      reghByRegid.get(regh.regid)!.push(regh);
+    });
+
+    // Log sample confcode values from regh for debugging
+    // const sampleReghConfcodes = Array.from(new Set((reghData || []).slice(0, 10).map((r: any) => r.confcode)));
+    // console.log(`[check-registration] Sample regh.confcode values found: ${JSON.stringify(sampleReghConfcodes)}`);
+    // console.log(`[check-registration] Comparing regh.confcode === "${confcode}"`);
+
+    // Step 3: Count ALL regd rows (not regh rows) using EXISTS logic
+    // SQL: SELECT COUNT(*) FROM regd WHERE EXISTS(SELECT * FROM regh WHERE regid=regd.regid AND confcode='...' AND status='PENDING')
+    // SQL: SELECT COUNT(*) FROM regd WHERE EXISTS(SELECT * FROM regh WHERE regid=regd.regid AND confcode='...' AND status='APPROVED')
+    // COUNT(*) counts all regd rows, not distinct regid values
+    let pendingCount = 0;
+    let approvedCount = 0;
+
+    // console.log(`[check-registration] Total regd rows to check: ${allRegdData?.length || 0}`);
+    // console.log(`[check-registration] Total regh rows for conference ${confcode}: ${reghData?.length || 0}`);
+
+    (allRegdData || []).forEach((regd: any) => {
+      const regdRegid = regd.regid;
+      const reghRecords = reghByRegid.get(regdRegid) || [];
       
-      const status = (regh.status || '').toString().toUpperCase().trim();
-      return status === 'PENDING' || status === 'APPROVED';
+      // Check EXISTS for PENDING: EXISTS regh where regid=regd.regid and confcode=confcode and status='PENDING'
+      // Count this regd row if EXISTS condition is true
+      const hasPending = reghRecords.some((regh: any) => {
+        const reghConfcode = (regh.confcode || '').toString().trim();
+        const status = (regh.status || '').toString().toUpperCase().trim();
+        const matches = reghConfcode === confcode && status === 'PENDING';
+        return matches;
+      });
+      
+      if (hasPending) {
+        pendingCount++;
+      }
+
+      // Check EXISTS for APPROVED: EXISTS regh where regid=regd.regid and confcode=confcode and status='APPROVED'
+      // Count this regd row if EXISTS condition is true
+      const hasApproved = reghRecords.some((regh: any) => {
+        const reghConfcode = (regh.confcode || '').toString().trim();
+        const status = (regh.status || '').toString().toUpperCase().trim();
+        const matches = reghConfcode === confcode && status === 'APPROVED';
+        return matches;
+      });
+      
+      if (hasApproved) {
+        approvedCount++;
+      }
     });
     
-    const registrationCount = validRecords.length;
+    // Count is the total number of regd rows that match the EXISTS condition (matches SQL COUNT(*))
+    const registrationCount = pendingCount + approvedCount;
+    
+    // Log individual counts and total with SQL equivalent
+    // console.log(`[check-registration] ========================================`);
+    // console.log(`[check-registration] SQL Query 1:`);
+    // console.log(`[check-registration]   SELECT COUNT(*) FROM regd WHERE EXISTS(SELECT * FROM regh WHERE regid=regd.regid AND confcode='${confcode}' AND status='PENDING')`);
+    // console.log(`[check-registration]   Expected result: 2832`);
+    // console.log(`[check-registration]   Actual result: ${pendingCount}`);
+    // console.log(`[check-registration] SQL Query 2:`);
+    // console.log(`[check-registration]   SELECT COUNT(*) FROM regd WHERE EXISTS(SELECT * FROM regh WHERE regid=regd.regid AND confcode='${confcode}' AND status='APPROVED')`);
+    // console.log(`[check-registration]   Expected result: 3237`);
+    // console.log(`[check-registration]   Actual result: ${approvedCount}`);
+    // console.log(`[check-registration] Total (PENDING + APPROVED): ${registrationCount}`);
+    // console.log(`[check-registration] ========================================`);
     
     // console.log('=== Registration Count Check ===');
     // console.log(`Conference: ${confcode}`);

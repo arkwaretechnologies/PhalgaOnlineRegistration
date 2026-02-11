@@ -573,7 +573,6 @@ export default function RegistrationForm() {
         setTimeout(() => {
           setErrorModalMessage(
             `Registration is closed. All slots are full.\n\n` +
-            `Current: ${currentCount}/${limit} participants\n` +
             `Available slots: 0`
           );
           setShowErrorModal(true);

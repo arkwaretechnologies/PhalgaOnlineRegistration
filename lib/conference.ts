@@ -12,6 +12,8 @@ export interface ConferenceInfo {
   domain: string | null;
   prefix: string | null;
   psgc: string | null;
+  include_psgc: string | null;
+  exclude_psgc: string | null;
 }
 
 /**

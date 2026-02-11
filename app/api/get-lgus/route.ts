@@ -116,10 +116,13 @@ export async function GET(request: Request) {
       }
 
       // console.log(`Found ${allLGUs.length} LGUs with city_class=${cityClass}`);
-      
-      // if (allLGUs.length > 0) {
-      //   console.log('LGUs (first 20):', allLGUs.slice(0, 20));
-      // }
+
+      // Exclude only the specific PSGC codes in exclude_psgc (MUN/CITY/HUC level)
+      const excludeRaw = conference.exclude_psgc;
+      if (excludeRaw && excludeRaw.trim() !== '') {
+        const excludeSet = new Set(excludeRaw.split(',').map(p => p.trim()).filter(p => p !== ''));
+        allLGUs = allLGUs.filter((l) => l.psgc && !excludeSet.has(l.psgc));
+      }
 
       // console.log('=== Final LGUs List ===');
       // console.log('Total LGUs:', allLGUs.length);
@@ -172,13 +175,12 @@ export async function GET(request: Request) {
     // console.log('First 5 digits of PSGC:', firstFiveDigits);
     // console.log('PSGC prefix pattern:', psgcPrefix);
 
-    // Get LGUs where PSGC starts with first 5 digits and geolevel is MUN or CITY
-    // Using ilike for case-insensitive matching (though PSGC is typically numeric)
+    // Get LGUs where PSGC starts with first 5 digits and geolevel is MUN, CITY, or HUC
     const { data: lguData, error: lguError } = await supabase
       .from('lgus')
       .select('lguname, psgc, geolevel')
       .ilike('psgc', psgcPrefix)
-      .in('geolevel', ['MUN', 'CITY'])
+      .in('geolevel', ['MUN', 'CITY', 'HUC'])
       .order('lguname', { ascending: true });
 
     if (lguError) {
@@ -195,7 +197,41 @@ export async function GET(request: Request) {
     //   console.log('LGUs found:', lguData.map(l => ({ name: l.lguname, psgc: l.psgc, geolevel: l.geolevel })));
     // }
 
-    const data = lguData?.map((row) => ({ name: row.lguname, psgc: row.psgc })) || [];
+    let filteredLguData = lguData || [];
+
+    // Apply include_psgc filter only when this province's first 2 digits exist in include_psgc first 2 digits.
+    // Provinces whose first 2 digits are NOT in include_psgc get all their LGUs (no filter).
+    const includePsgcRaw = conference.include_psgc;
+    const provinceFirstTwo = provincePsgc.length >= 2 ? provincePsgc.substring(0, 2) : '';
+    let applyIncludePsgcFilter = false;
+    if (includePsgcRaw && includePsgcRaw.trim() !== '' && provinceFirstTwo !== '') {
+      const firstTwoFromInclude = new Set(
+        includePsgcRaw.split(',').map(p => p.trim()).filter(p => p.length >= 2).map(p => p.substring(0, 2))
+      );
+      applyIncludePsgcFilter = firstTwoFromInclude.has(provinceFirstTwo);
+    }
+
+    if (applyIncludePsgcFilter && includePsgcRaw && includePsgcRaw.trim() !== '') {
+      const allowedPsgcSet = new Set(
+        includePsgcRaw.split(',').map(p => p.trim()).filter(p => p !== '')
+      );
+      filteredLguData = filteredLguData.filter(
+        row => row.psgc && allowedPsgcSet.has(row.psgc) && (row.geolevel === 'MUN' || row.geolevel === 'HUC')
+      );
+    }
+
+    // Exclude only the specific PSGC codes in exclude_psgc (MUN/CITY/HUC level), not whole provinces
+    const excludePsgcRaw = conference.exclude_psgc;
+    if (excludePsgcRaw && excludePsgcRaw.trim() !== '') {
+      const excludePsgcSet = new Set(
+        excludePsgcRaw.split(',').map(p => p.trim()).filter(p => p !== '')
+      );
+      filteredLguData = filteredLguData.filter(
+        row => row.psgc && !excludePsgcSet.has(row.psgc)
+      );
+    }
+
+    const data = filteredLguData.map((row) => ({ name: row.lguname, psgc: row.psgc }));
     
     // console.log('=== Final LGUs List ===');
     // console.log('Total LGUs:', data.length);

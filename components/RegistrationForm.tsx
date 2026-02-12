@@ -572,8 +572,7 @@ export default function RegistrationForm() {
         // Use setTimeout to ensure confirmation modal closes before error modal shows
         setTimeout(() => {
           setErrorModalMessage(
-            `Registration is closed. All slots are full.\n\n` +
-            `Available slots: 0`
+            `Registration is closed. All slots are full.`
           );
           setShowErrorModal(true);
         }, 100);
@@ -587,8 +586,7 @@ export default function RegistrationForm() {
         // Use setTimeout to ensure confirmation modal closes before error modal shows
         setTimeout(() => {
           setErrorModalMessage(
-            `Cannot submit registration. Not enough slots available.\n\n` +
-            `Available slots: ${availableSlots}` 
+            `Cannot submit registration. Not enough slots available.`
           );
           setShowErrorModal(true);
         }, 100);

@@ -205,7 +205,9 @@ export async function POST(request: Request) {
     const email = (formData.EMAILADDRESS || '').toString().trim().toLowerCase();
     const detailcount = parseInt(formData.DETAILCOUNT);
 
-    // Check for duplicate participants (same last name, first name, middle initial in same province and LGU)
+    // Check for duplicate participants based on position level:
+    // - If position LVL = 'BGY': compare Province, LGU, and Barangay
+    // - Otherwise: compare Province and LGU only
     // console.log('=== Checking for Duplicate Participants ===');
     // console.log(`Province: ${province}, LGU: ${lgu}, Conference: ${confcode}, Participant Count: ${detailcount}`);
     
@@ -218,29 +220,57 @@ export async function POST(request: Request) {
         continue; // Skip validation if required fields are empty (handled by client-side validation)
       }
       
-      // Get participant's LGU (use participant LGU if provided, otherwise use header LGU)
+      // Get participant's position and barangay
+      const positionName = (formData[`DESIGNATION|${i}`] || '').toString().trim();
       const participantLgu = (formData[`LGU|${i}`] || lgu).toUpperCase().trim();
+      const participantBarangay = (formData[`BRGY|${i}`] || '').toString().trim().toUpperCase();
       
-      // Query existing participants in the same province and LGU with matching name
+      // Get position LVL from positions table
+      let positionLvl: string | null = null;
+      if (positionName) {
+        const { data: positionData, error: positionError } = await withTimeout(
+          supabase
+            .from('positions')
+            .select('lvl')
+            .eq('name', positionName)
+            .single(),
+          timeoutPromise
+        ) as { data: { lvl: string | null } | null; error: any };
+        
+        if (!positionError && positionData) {
+          positionLvl = positionData.lvl;
+        }
+      }
+      
+      // Build query based on position level
+      let duplicateQuery = supabase
+        .from('regd')
+        .select(`
+          regid,
+          confcode,
+          province,
+          lgu,
+          brgy,
+          lastname,
+          firstname,
+          middleinit,
+          regh!left(regid, status, confcode)
+        `)
+        .eq('confcode', confcode)
+        .eq('province', province)
+        .eq('lgu', participantLgu)
+        .eq('lastname', lastname)
+        .eq('firstname', firstname)
+        .eq('middleinit', middleinit);
+      
+      // If position LVL = 'BGY', also check barangay
+      if (positionLvl === 'BGY' && participantBarangay) {
+        duplicateQuery = duplicateQuery.eq('brgy', participantBarangay);
+      }
+      
+      // Query existing participants
       const { data: existingParticipants, error: duplicateError } = await withTimeout(
-        supabase
-          .from('regd')
-          .select(`
-            regid,
-            confcode,
-            province,
-            lgu,
-            lastname,
-            firstname,
-            middleinit,
-            regh!left(regid, status, confcode)
-          `)
-          .eq('confcode', confcode)
-          .eq('province', province)
-          .eq('lgu', participantLgu)
-          .eq('lastname', lastname)
-          .eq('firstname', firstname)
-          .eq('middleinit', middleinit),
+        duplicateQuery,
         timeoutPromise
       ) as { data: any[] | null; error: any };
       
@@ -267,14 +297,24 @@ export async function POST(request: Request) {
       });
       
       if (validDuplicates.length > 0) {
-        // console.log(`Duplicate found: ${firstname} ${middleinit} ${lastname} in ${province} - ${participantLgu}`);
+        // Build error message based on position level
+        let errorMessage = `Participant "${firstname} ${middleinit} ${lastname}" already exists`;
+        if (positionLvl === 'BGY' && participantBarangay) {
+          errorMessage += ` in ${province} - ${participantLgu} - ${participantBarangay}`;
+        } else {
+          errorMessage += ` in ${province} - ${participantLgu}`;
+        }
+        errorMessage += `. Each participant can only register once.`;
+        
+        // console.log(`Duplicate found: ${firstname} ${middleinit} ${lastname}`);
         clearTimeout(timeoutId);
         return NextResponse.json(
           { 
-            error: `Participant "${firstname} ${middleinit} ${lastname}" already exists in ${province} - ${participantLgu}. Each participant can only register once.`,
+            error: errorMessage,
             duplicateParticipant: `${firstname} ${middleinit} ${lastname}`,
             province: province,
-            lgu: participantLgu
+            lgu: participantLgu,
+            barangay: positionLvl === 'BGY' ? participantBarangay : undefined
           },
           { status: 400 }
         );

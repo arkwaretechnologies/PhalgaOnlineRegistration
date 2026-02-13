@@ -157,12 +157,18 @@ export default function RegistrationForm() {
 
     // Check if registration is open
     fetch('/api/check-registration')
-      .then(res => res.json())
+      .then(res => {
+        if (res.status === 503) {
+          router.replace('/maintenance');
+          return null;
+        }
+        return res.json();
+      })
       .then(data => {
-        setIsRegistrationOpen(data.isOpen);
+        if (data) setIsRegistrationOpen(data.isOpen);
       })
       .catch(err => console.error('Error checking registration:', err));
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     if (province) {
@@ -556,8 +562,12 @@ export default function RegistrationForm() {
 
       if (!checkResponse.ok) {
         setIsSubmitting(false);
-        setShowConfirmation(false); // Close confirmation modal first
-        // Use setTimeout to ensure confirmation modal closes before error modal shows
+        setShowConfirmation(false);
+        // 503 = maintenance mode - redirect to maintenance page
+        if (checkResponse.status === 503) {
+          router.replace('/maintenance');
+          return;
+        }
         setTimeout(() => {
           setErrorModalMessage('Failed to check registration status. Please try again.');
           setShowErrorModal(true);
@@ -618,6 +628,11 @@ export default function RegistrationForm() {
         router.push(`/?success=true&transId=${encodeURIComponent(data.transId)}`);
       } else {
         setIsSubmitting(false);
+        // 503 = maintenance mode - redirect to maintenance page
+        if (response.status === 503) {
+          router.replace('/maintenance');
+          return;
+        }
         // Check if the error is about registration being closed
         if (data.error && data.error.includes('closed')) {
           const errorCurrentCount = data.currentCount || currentCount;

@@ -14,6 +14,7 @@ export interface ConferenceInfo {
   psgc: string | null;
   include_psgc: string | null;
   exclude_psgc: string | null;
+  on_maintenance: string | null;
 }
 
 /**
@@ -100,4 +101,18 @@ export async function getConferenceCode(hostname?: string): Promise<string> {
 export async function getConferenceName(hostname?: string): Promise<string> {
   const conference = await getConferenceByDomain(hostname);
   return conference?.name || 'Mindanao Geographic Conference'; // Default fallback
+}
+
+/**
+ * Check if the conference for the given domain is on maintenance
+ * @param hostname - Optional hostname (will be extracted from headers if not provided)
+ * @returns Object with onMaintenance boolean and optional conference info
+ */
+export async function isConferenceOnMaintenance(hostname?: string): Promise<{
+  onMaintenance: boolean;
+  conference: ConferenceInfo | null;
+}> {
+  const conference = await getConferenceByDomain(hostname);
+  const onMaintenance = conference?.on_maintenance?.toUpperCase() === 'Y';
+  return { onMaintenance, conference };
 }

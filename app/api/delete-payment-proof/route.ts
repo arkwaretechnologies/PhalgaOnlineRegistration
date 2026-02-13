@@ -6,6 +6,13 @@ import { createTimeout, withTimeout } from '@/lib/security';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+export async function GET() {
+  return NextResponse.json(
+    { error: 'Method not allowed. Use DELETE.' },
+    { status: 405 }
+  );
+}
+
 export async function DELETE(request: Request) {
   // Create timeout for request (30 seconds)
   const { abortController, timeoutId, timeoutPromise } = createTimeout(30000);

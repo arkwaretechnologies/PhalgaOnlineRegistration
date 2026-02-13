@@ -121,9 +121,70 @@ function checkRateLimit(
   };
 }
 
-export function middleware(request: NextRequest) {
-  // Only apply to API routes
+/**
+ * Check maintenance status via internal API (avoids Edge/Supabase compatibility issues)
+ */
+async function checkMaintenance(
+  hostname: string,
+  request: NextRequest
+): Promise<boolean> {
+  try {
+    const baseUrl = request.nextUrl.origin;
+    const url = new URL('/api/check-maintenance', baseUrl);
+    const res = await fetch(url.toString(), {
+      headers: {
+        'x-maintenance-check-host': hostname,
+      },
+      cache: 'no-store',
+    });
+    const data = await res.json();
+    return data?.onMaintenance === true;
+  } catch {
+    return false;
+  }
+}
+
+export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
+
+  // Allow check-maintenance API through (needed for maintenance check)
+  if (path === '/api/check-maintenance') {
+    return NextResponse.next();
+  }
+
+  const hostname =
+    request.headers.get('x-forwarded-host') ||
+    request.headers.get('host') ||
+    'localhost';
+
+  let onMaintenance = false;
+  try {
+    onMaintenance = await checkMaintenance(hostname, request);
+  } catch (e) {
+    console.warn('Maintenance check failed:', e);
+  }
+
+  // If on /maintenance but NOT on maintenance, redirect to landing page
+  if (path === '/maintenance') {
+    if (!onMaintenance) {
+      return NextResponse.redirect(new URL('/', request.url));
+    }
+    return NextResponse.next();
+  }
+
+  if (onMaintenance) {
+    // Redirect page requests to maintenance page
+    if (!path.startsWith('/api/')) {
+      return NextResponse.redirect(new URL('/maintenance', request.url));
+    }
+    // Block API requests with 503
+    return NextResponse.json(
+      { error: 'System is currently under maintenance. Please try again later.' },
+      { status: 503 }
+    );
+  }
+
+  // Only apply rate limiting to API routes
   if (!path.startsWith('/api/')) {
     return NextResponse.next();
   }
@@ -173,5 +234,14 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: '/api/:path*',
+  matcher: [
+    /*
+     * Match all request paths except:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico
+     * - public folder assets
+     */
+    '/((?!_next/static|_next/image|favicon.ico|logo.png|left.png|right.png|bg.jpg|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
+  ],
 };

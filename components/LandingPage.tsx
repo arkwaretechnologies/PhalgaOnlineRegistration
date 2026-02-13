@@ -91,6 +91,10 @@ export default function LandingPage() {
             }
           }
         } else {
+          if (response.status === 503) {
+            router.replace('/maintenance');
+            return;
+          }
           setError(data.error || 'Failed to check registration status');
         }
       } catch (err) {
@@ -119,6 +123,10 @@ export default function LandingPage() {
       if (response.ok && data) {
         router.push(`/view/${transId.trim().toUpperCase()}`);
       } else {
+        if (response.status === 503) {
+          router.replace('/maintenance');
+          return;
+        }
         setError(data.error || 'Registration ID not found');
       }
     } catch (err) {
@@ -136,6 +144,10 @@ export default function LandingPage() {
       if (response.ok && data.isOpen) {
         router.push('/register');
       } else {
+        if (response.status === 503) {
+          router.replace('/maintenance');
+          return;
+        }
         setError('Registration is currently closed. Slots are already full.');
         setRegistrationStatus(data);
       }

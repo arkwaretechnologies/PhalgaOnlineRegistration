@@ -26,7 +26,7 @@ export default function MaintenancePage() {
           </svg>
         </div>
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">
-          Under Maintenance
+          Site is under maintenance.
         </h1>
         <p className="text-gray-600 mb-6 leading-relaxed">
           We are currently performing scheduled maintenance to improve our

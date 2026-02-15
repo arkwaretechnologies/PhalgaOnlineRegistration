@@ -33,45 +33,51 @@ export async function getConferenceByDomain(hostname?: string): Promise<Conferen
         'localhost';
     }
 
-    // Extract domain without port
-    const domain = hostname.split(':')[0].toLowerCase();
-    
+    // Extract domain without port and normalize
+    const domain = hostname.split(':')[0].toLowerCase().trim();
+    // Try with and without www for production (e.g. www.reg.example.com vs reg.example.com)
+    const domainsToTry = [domain];
+    if (domain.startsWith('www.')) {
+      domainsToTry.push(domain.slice(4));
+    } else if (!domain.includes('localhost') && domain !== '127.0.0.1') {
+      domainsToTry.push('www.' + domain);
+    }
+
     // console.log(`Detecting conference for domain: ${domain}`);
 
-    // Query conference table by domain
-    const { data, error } = await supabase
-      .from('conference')
-      .select('*')
-      .eq('domain', domain)
-      .single();
+    let data: ConferenceInfo | null = null;
+    let lastError: any = null;
 
-    if (error) {
-      if (error.code === 'PGRST116') {
-        // Not found - use default for localhost/development
-        if (domain.includes('localhost') || domain === '127.0.0.1') {
-          console.warn(`No conference found for domain: ${domain}. Using default for localhost.`);
-          // Query for a default conference (first active one)
-          const { data: defaultConf } = await supabase
-            .from('conference')
-            .select('*')
-            .limit(1)
-            .single();
-          
-          if (defaultConf) {
-            // console.log(`Using default conference: ${defaultConf.confcode}`);
-            return defaultConf;
-          }
-        } else {
-          console.error(`Conference not found for domain: ${domain}`);
-        }
-      } else {
-        console.error(`Error fetching conference for domain ${domain}:`, error.message);
+    for (const d of domainsToTry) {
+      const { data: row, error } = await supabase
+        .from('conference')
+        .select('*')
+        .eq('domain', d)
+        .maybeSingle();
+
+      if (!error && row) {
+        data = row;
+        break;
       }
-      return null;
+      if (error && error.code !== 'PGRST116') lastError = error;
     }
 
     if (!data) {
-      console.warn(`No conference data returned for domain: ${domain}`);
+      // Not found - use default for localhost/development
+      if (domain.includes('localhost') || domain === '127.0.0.1') {
+        console.warn(`No conference found for domain: ${domain}. Using default for localhost.`);
+        const { data: defaultConf } = await supabase
+          .from('conference')
+          .select('*')
+          .limit(1)
+          .single();
+
+        if (defaultConf) {
+          return defaultConf;
+        }
+      } else if (lastError) {
+        console.error(`Error fetching conference for domain ${domain}:`, lastError.message);
+      }
       return null;
     }
 

@@ -98,6 +98,8 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
   } | null>(null);
   const [provinces, setProvinces] = useState<string[]>([]); // Start with empty array - only show fetched provinces
   const [isProvinceLgu, setIsProvinceLgu] = useState(false);
+  const [venues, setVenues] = useState<Array<{ confcode: string; name: string | null; venue: string | null }>>([]);
+  const [venuesLoading, setVenuesLoading] = useState(true);
 
   // Session timer (only when a slot is open)
   const [registrationChecked, setRegistrationChecked] = useState(false);
@@ -205,6 +207,28 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
         setRegistrationChecked(true);
       });
   }, [router, confcode]);
+
+  // Fetch venues to detect multi-venue; when on /register with no confcode and multiple venues, show "select a venue"
+  useEffect(() => {
+    let cancelled = false;
+    setVenuesLoading(true);
+    fetch('/api/get-venues', { cache: 'no-store' })
+      .then(res => res.json())
+      .then(data => {
+        if (!cancelled && Array.isArray(data)) {
+          setVenues(data);
+        } else if (!cancelled) {
+          setVenues([]);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setVenues([]);
+      })
+      .finally(() => {
+        if (!cancelled) setVenuesLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   // Start 30-minute session timer only when registration is open and we've received check-registration
   useEffect(() => {
@@ -606,6 +630,44 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       return;
     }
 
+    // Check for duplicate participants (same info)
+    const normalize = (s: string) => (s ?? '').toString().trim().toUpperCase();
+    const participantKeys = participants.map((p, index) => {
+      const effectiveLgu = p.lgu && p.lgu.trim() !== '' ? p.lgu : lgu;
+      return {
+        index: index + 1,
+        key: [
+          normalize(p.lastName),
+          normalize(p.firstName),
+          normalize(p.middleInit),
+          normalize(p.suffix),
+          normalize(p.position),
+          normalize(effectiveLgu),
+          normalize(p.barangay)
+        ].join('|')
+      };
+    });
+    const keyToFirstIndex = new Map<string, number>();
+    const duplicateIndices: number[] = [];
+    for (const { index, key } of participantKeys) {
+      if (keyToFirstIndex.has(key)) {
+        if (!duplicateIndices.includes(keyToFirstIndex.get(key)!)) {
+          duplicateIndices.push(keyToFirstIndex.get(key)!);
+        }
+        duplicateIndices.push(index);
+      } else {
+        keyToFirstIndex.set(key, index);
+      }
+    }
+    if (duplicateIndices.length > 0) {
+      const sorted = Array.from(new Set(duplicateIndices)).sort((a, b) => a - b);
+      setErrorModalMessage(
+        `Duplicate participant(s) detected. The following participants have the same information: ${sorted.join(', ')}. Please remove or update duplicate entries.`
+      );
+      setShowErrorModal(true);
+      return;
+    }
+
     // Build form data (trim all string fields so confirmation and payload are clean)
     const formData: any = {
       CONFERENCE: conference?.confcode || '2026-GCMIN', // Use conference code from database
@@ -772,6 +834,43 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       router.replace('/?slotsFull=1');
     }
   };
+
+  // While checking if multi-venue (no confcode), show loading to avoid flashing form then "select venue"
+  if (!confcode && venuesLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <p className="text-gray-600">Loading...</p>
+      </div>
+    );
+  }
+
+  // On /register with no confcode and multiple venues, require user to select a venue from the homepage
+  if (!confcode && !venuesLoading && venues.length > 1) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="bg-white p-8 sm:p-10 rounded-lg shadow-lg max-w-2xl w-full text-center">
+          <div className="mb-6">
+            <svg className="mx-auto h-16 w-16 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <p className="text-lg sm:text-xl text-gray-700 leading-relaxed mb-6">
+            Please select a venue from the homepage to register.
+          </p>
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 px-6 py-3 font-semibold text-white rounded-xl transition-opacity hover:opacity-95"
+            style={{ backgroundColor: '#367C46' }}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Go to homepage
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   if (!isRegistrationOpen) {
     return (

@@ -474,7 +474,7 @@ export async function POST(request: Request) {
         regdate: regdate,
         participantCount: detailcount,
         viewUrl: process.env.NEXT_PUBLIC_APP_URL 
-          ? `${process.env.NEXT_PUBLIC_APP_URL}/view/${regId}`
+          ? `${process.env.NEXT_PUBLIC_APP_URL}/view/${regId}${confcode ? `?confcode=${encodeURIComponent(confcode)}` : ''}`
           : undefined,
         conferenceName: conference.name || undefined,
         confcode: confcode

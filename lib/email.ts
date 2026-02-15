@@ -156,7 +156,7 @@ export async function sendRegistrationConfirmation(
     
     const leftImageUrl = `${baseUrl}/left.png`;
     const rightImageUrl = `${baseUrl}/right.png`;
-    const viewUrl = data.viewUrl || `${baseUrl}/view/${data.transId}`;
+    const viewUrl = data.viewUrl || `${baseUrl}/view/${data.transId}${data.confcode ? `?confcode=${encodeURIComponent(data.confcode)}` : ''}`;
     
     // // console.log('Email image URLs:', { 
     // //   leftImageUrl, 

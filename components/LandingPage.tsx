@@ -25,6 +25,8 @@ export default function LandingPage() {
   const [registrationStatus, setRegistrationStatus] = useState<{ count: number; limit: number; isOpen: boolean; regAlertCount?: number } | null>(null);
   const [checkingStatus, setCheckingStatus] = useState(true);
   const [showRemainingSlotsModal, setShowRemainingSlotsModal] = useState(false);
+  const [showSessionExpiredModal, setShowSessionExpiredModal] = useState(false);
+  const [showSlotsFullModal, setShowSlotsFullModal] = useState(false);
   const [remainingSlots, setRemainingSlots] = useState<number | null>(null);
   const [conference, setConference] = useState<{
     confcode: string;
@@ -39,10 +41,22 @@ export default function LandingPage() {
   useEffect(() => {
     const success = searchParams.get('success');
     const transIdParam = searchParams.get('transId');
+    const sessionExpiredParam = searchParams.get('sessionExpired');
+    const slotsFullParam = searchParams.get('slotsFull');
 
     if (success === 'true' && transIdParam) {
       setSuccessMessage(`Registration successful! Your Registration ID is: ${transIdParam}`);
       setTransId(transIdParam.toUpperCase());
+      router.replace('/', { scroll: false });
+    }
+
+    if (sessionExpiredParam === '1') {
+      setShowSessionExpiredModal(true);
+      router.replace('/', { scroll: false });
+    }
+
+    if (slotsFullParam === '1') {
+      setShowSlotsFullModal(true);
       router.replace('/', { scroll: false });
     }
 
@@ -379,6 +393,62 @@ export default function LandingPage() {
                 disabled={loading || (registrationStatus !== null && !registrationStatus.isOpen)}
               >
                 Register Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Session expired modal */}
+      {showSessionExpiredModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowSessionExpiredModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 sm:p-8" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-center mb-4">
+              <div className="w-14 h-14 rounded-full bg-amber-100 flex items-center justify-center">
+                <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 text-center mb-4">Session expired</h2>
+            <p className="text-center text-gray-700 mb-6">
+              Your registration session has expired. You can start a new registration if slots are still available.
+            </p>
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => setShowSessionExpiredModal(false)}
+                className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl transition-colors"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* All slots fully taken modal */}
+      {showSlotsFullModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowSlotsFullModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 sm:p-8" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-center mb-4">
+              <div className="w-14 h-14 rounded-full bg-orange-100 flex items-center justify-center">
+                <svg className="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 text-center mb-4">All slots fully taken</h2>
+            <p className="text-center text-gray-700 mb-6">
+              Thank you for your interest. All registration slots for this conference are now fully taken.
+            </p>
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => setShowSlotsFullModal(false)}
+                className="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl transition-colors"
+              >
+                OK
               </button>
             </div>
           </div>

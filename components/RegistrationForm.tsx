@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -79,6 +79,17 @@ export default function RegistrationForm() {
   } | null>(null);
   const [provinces, setProvinces] = useState<string[]>([]); // Start with empty array - only show fetched provinces
   const [isProvinceLgu, setIsProvinceLgu] = useState(false);
+
+  // Session timer (only when a slot is open)
+  const [registrationChecked, setRegistrationChecked] = useState(false);
+  const [sessionEndTime, setSessionEndTime] = useState<number | null>(null);
+  const [timerSecondsLeft, setTimerSecondsLeft] = useState<number | null>(null);
+  const [extensionUsed, setExtensionUsed] = useState(false);
+  const [showExtensionModal, setShowExtensionModal] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const sessionEndTimeRef = useRef<number | null>(null);
+  const notified5Ref = useRef(false);
+  const hasStartedTimerRef = useRef(false);
 
   useEffect(() => {
     // Fetch conference information
@@ -165,10 +176,64 @@ export default function RegistrationForm() {
         return res.json();
       })
       .then(data => {
-        if (data) setIsRegistrationOpen(data.isOpen);
+        if (data) {
+          setIsRegistrationOpen(data.isOpen);
+        }
+        setRegistrationChecked(true);
       })
-      .catch(err => console.error('Error checking registration:', err));
+      .catch(err => {
+        console.error('Error checking registration:', err);
+        setRegistrationChecked(true);
+      });
   }, [router]);
+
+  // Start 30-minute session timer only when registration is open and we've received check-registration
+  useEffect(() => {
+    if (!registrationChecked || !isRegistrationOpen || hasStartedTimerRef.current) return;
+    hasStartedTimerRef.current = true;
+    const endTime = Date.now() + 30 * 60 * 1000;
+    sessionEndTimeRef.current = endTime;
+    setSessionEndTime(endTime);
+  }, [registrationChecked, isRegistrationOpen]);
+
+  // Timer tick: update display, trigger 10/5 min notifications, handle expiry
+  useEffect(() => {
+    if (sessionEndTime === null || sessionEndTimeRef.current === null) return;
+
+    const tick = async () => {
+      const end = sessionEndTimeRef.current;
+      if (end === null) return;
+      const remaining = Math.max(0, Math.floor((end - Date.now()) / 1000));
+      setTimerSecondsLeft(remaining);
+
+      if (remaining <= 0) {
+        setSessionEndTime(null);
+        sessionEndTimeRef.current = null;
+        setTimerSecondsLeft(null);
+        setSessionExpired(true);
+        router.replace('/?sessionExpired=1');
+        return;
+      }
+
+      // 5 minutes left: re-check slot, show extension modal only if still open
+      if (remaining <= 300 && !notified5Ref.current) {
+        notified5Ref.current = true;
+        try {
+          const res = await fetch('/api/check-registration');
+          const data = await res.json();
+          if (data?.isOpen) {
+            setShowExtensionModal(true);
+          }
+        } catch {
+          setShowExtensionModal(true);
+        }
+      }
+    };
+
+    tick();
+    const intervalId = setInterval(tick, 1000);
+    return () => clearInterval(intervalId);
+  }, [sessionEndTime]);
 
   useEffect(() => {
     if (province) {
@@ -668,6 +733,26 @@ export default function RegistrationForm() {
     setPendingFormData(null);
   };
 
+  const handleExtensionYes = async () => {
+    try {
+      const res = await fetch('/api/check-registration');
+      const data = await res.json();
+      if (!res.ok || !data?.isOpen) {
+        setShowExtensionModal(false);
+        router.replace('/?slotsFull=1');
+        return;
+      }
+      if (sessionEndTimeRef.current !== null && !extensionUsed) {
+        sessionEndTimeRef.current += 10 * 60 * 1000;
+        setExtensionUsed(true);
+      }
+      setShowExtensionModal(false);
+    } catch {
+      setShowExtensionModal(false);
+      router.replace('/?slotsFull=1');
+    }
+  };
+
   if (!isRegistrationOpen) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
@@ -715,6 +800,13 @@ export default function RegistrationForm() {
               />
             </div>
           </div>
+
+          {/* Session expired notice */}
+          {sessionExpired && (
+            <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm sm:text-base">
+              Your session time has expired. Please refresh the page to check if slots are still available.
+            </div>
+          )}
 
           {/* Header Section - Mobile Card Layout, Desktop Table Layout */}
           <div className="block sm:hidden mb-6 space-y-3">
@@ -1375,6 +1467,38 @@ export default function RegistrationForm() {
                     className="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
                   >
                     OK
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Need additional time? modal (at 5 min mark) */}
+        {showExtensionModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden border border-orange-200/80 ring-2 ring-orange-400/20">
+              <div className="bg-gradient-to-r from-orange-500 to-amber-600 px-6 py-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h2 className="text-xl font-bold text-white">Time almost up</h2>
+                </div>
+              </div>
+              <div className="p-6">
+                <p className="text-gray-700 text-base leading-relaxed mb-6">
+                  5 minutes remaining. Do you need additional time?
+                </p>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleExtensionYes}
+                    className="px-6 py-2.5 bg-amber-500 text-white font-semibold rounded-lg hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 transition-colors"
+                  >
+                    Yes
                   </button>
                 </div>
               </div>

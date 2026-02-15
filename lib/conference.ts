@@ -15,6 +15,7 @@ export interface ConferenceInfo {
   include_psgc: string | null;
   exclude_psgc: string | null;
   on_maintenance: string | null;
+  notification: string | null;
 }
 
 /**
@@ -85,6 +86,74 @@ export async function getConferenceByDomain(hostname?: string): Promise<Conferen
     return data;
   } catch (error: any) {
     console.error(`Error detecting conference: ${error?.message || error}`);
+    return null;
+  }
+}
+
+/**
+ * Get all conference (venue) rows for the given domain (multiple rows when same domain).
+ * Used to show venue selection when conference table has multiple rows with same domain.
+ * @param hostname - Optional hostname (will be extracted from headers if not provided)
+ * @returns ConferenceInfo[] (empty if none; multiple when same domain has multiple venues)
+ */
+export async function getConferencesByDomain(hostname?: string): Promise<ConferenceInfo[]> {
+  try {
+    if (!hostname) {
+      const headersList = await headers();
+      hostname =
+        headersList.get('x-forwarded-host') ||
+        headersList.get('host') ||
+        'localhost';
+    }
+    const domain = hostname.split(':')[0].toLowerCase().trim();
+    const domainsToTry = [domain];
+    if (domain.startsWith('www.')) {
+      domainsToTry.push(domain.slice(4));
+    } else if (!domain.includes('localhost') && domain !== '127.0.0.1') {
+      domainsToTry.push('www.' + domain);
+    }
+    for (const d of domainsToTry) {
+      const { data: rows, error } = await supabase
+        .from('conference')
+        .select('*')
+        .eq('domain', d);
+      if (!error && rows && rows.length > 0) {
+        return rows as ConferenceInfo[];
+      }
+    }
+    if (domain.includes('localhost') || domain === '127.0.0.1') {
+      const { data: defaultRows } = await supabase
+        .from('conference')
+        .select('*')
+        .limit(10);
+      if (defaultRows && defaultRows.length > 0) {
+        return defaultRows as ConferenceInfo[];
+      }
+    }
+    return [];
+  } catch (error: any) {
+    console.error(`Error fetching conferences by domain: ${error?.message || error}`);
+    return [];
+  }
+}
+
+/**
+ * Get conference by confcode (one venue).
+ * @param confcode - Conference code
+ * @returns ConferenceInfo or null
+ */
+export async function getConferenceByConfcode(confcode: string): Promise<ConferenceInfo | null> {
+  if (!confcode || !confcode.trim()) return null;
+  try {
+    const { data, error } = await supabase
+      .from('conference')
+      .select('*')
+      .eq('confcode', confcode.trim())
+      .maybeSingle();
+    if (error || !data) return null;
+    return data as ConferenceInfo;
+  } catch (error: any) {
+    console.error(`Error fetching conference by confcode: ${error?.message || error}`);
     return null;
   }
 }

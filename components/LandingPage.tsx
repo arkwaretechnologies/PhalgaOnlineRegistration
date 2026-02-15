@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -28,15 +28,43 @@ export default function LandingPage() {
   const [showSessionExpiredModal, setShowSessionExpiredModal] = useState(false);
   const [showSlotsFullModal, setShowSlotsFullModal] = useState(false);
   const [remainingSlots, setRemainingSlots] = useState<number | null>(null);
+  const [venues, setVenues] = useState<Array<{
+    confcode: string;
+    name: string | null;
+    date_from: string | null;
+    date_to: string | null;
+    venue: string | null;
+    notification?: string | null;
+  }>>([]);
+  const [venuesLoading, setVenuesLoading] = useState(true);
+  const [selectedConfcode, setSelectedConfcode] = useState<string>('');
+  const [venueDropdownOpen, setVenueDropdownOpen] = useState(false);
+  const venueDropdownRef = useRef<HTMLDivElement>(null);
+  const [checkingVenueStatus, setCheckingVenueStatus] = useState(false);
   const [conference, setConference] = useState<{
     confcode: string;
     name: string | null;
     date_from: string | null;
     date_to: string | null;
     venue: string | null;
+    notification?: string | null;
   } | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  const multiVenueMode = venues.length > 1;
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (venueDropdownRef.current && !venueDropdownRef.current.contains(e.target as Node)) {
+        setVenueDropdownOpen(false);
+      }
+    };
+    if (venueDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [venueDropdownOpen]);
 
   useEffect(() => {
     const success = searchParams.get('success');
@@ -60,13 +88,22 @@ export default function LandingPage() {
       router.replace('/', { scroll: false });
     }
 
-    const fetchConference = async () => {
+    const fetchVenues = async () => {
+      setVenuesLoading(true);
       try {
-        const response = await fetch('/api/get-conference');
+        const response = await fetch('/api/get-venues', { cache: 'no-store' });
         const data = await response.json();
-        if (response.ok && data && !data.error) {
-          setConference(data);
+        if (response.ok && Array.isArray(data)) {
+          setVenues(data);
+          if (data.length === 1) {
+            setConference(data[0]);
+            setSelectedConfcode('');
+          } else {
+            setConference(null);
+            setSelectedConfcode('');
+          }
         } else {
+          setVenues([]);
           setConference({
             confcode: '2026-GCMIN',
             name: '18th Mindanao Geographic Conference',
@@ -76,7 +113,8 @@ export default function LandingPage() {
           });
         }
       } catch (err) {
-        console.error('Failed to fetch conference:', err);
+        console.error('Failed to fetch venues:', err);
+        setVenues([]);
         setConference({
           confcode: '2026-GCMIN',
           name: '18th Mindanao Geographic Conference',
@@ -84,10 +122,13 @@ export default function LandingPage() {
           date_to: null,
           venue: null
         });
+      } finally {
+        setVenuesLoading(false);
       }
     };
 
     const checkRegistrationStatus = async () => {
+      if (venues.length !== 1) return;
       try {
         const response = await fetch('/api/check-registration');
         const data = await response.json();
@@ -119,9 +160,92 @@ export default function LandingPage() {
       }
     };
 
-    fetchConference();
-    checkRegistrationStatus();
+    fetchVenues();
   }, [searchParams, router]);
+
+  useEffect(() => {
+    if (venues.length !== 1) {
+      setCheckingStatus(false);
+      return;
+    }
+    setCheckingStatus(true);
+    const run = async () => {
+      try {
+        const response = await fetch('/api/check-registration');
+        const data = await response.json();
+        if (response.ok) {
+          setRegistrationStatus(data);
+          if (data.conference) {
+            setConference(prev => prev ? { ...prev, ...data.conference } : null);
+          }
+          if (data.count !== undefined && data.limit !== undefined && data.isOpen) {
+            const remaining = data.limit - data.count;
+            setRemainingSlots(remaining);
+            const alertThreshold = data.regAlertCount || 100;
+            if (remaining > 0 && remaining <= alertThreshold) {
+              setShowRemainingSlotsModal(true);
+            }
+          }
+        } else {
+          if (response.status === 503) {
+            router.replace('/maintenance');
+            return;
+          }
+          setError(data.error || 'Failed to check registration status');
+        }
+      } catch (err) {
+        console.error('Failed to check registration status:', err);
+        setError('Failed to check registration status. Please refresh the page.');
+      } finally {
+        setCheckingStatus(false);
+      }
+    };
+    run();
+  }, [venues.length]);
+
+  // When a venue is selected in multi-venue mode, check reg_limit and reg_alert_count for that conference
+  useEffect(() => {
+    if (!multiVenueMode || !selectedConfcode) {
+      setRegistrationStatus(null);
+      setRemainingSlots(null);
+      setCheckingVenueStatus(false);
+      return;
+    }
+    setCheckingVenueStatus(true);
+    setRegistrationStatus(null);
+    setRemainingSlots(null);
+    const run = async () => {
+      try {
+        const response = await fetch(`/api/check-registration?confcode=${encodeURIComponent(selectedConfcode)}`);
+        const data = await response.json();
+        if (response.ok) {
+          setRegistrationStatus(data);
+          if (data.count !== undefined && data.limit !== undefined && data.isOpen) {
+            const remaining = data.limit - data.count;
+            setRemainingSlots(remaining);
+            const alertThreshold = data.regAlertCount ?? 100;
+            if (remaining > 0 && remaining <= alertThreshold) {
+              setShowRemainingSlotsModal(true);
+            }
+          } else if (!data.isOpen) {
+            setRemainingSlots(0);
+          }
+        } else {
+          if (response.status === 503) {
+            router.replace('/maintenance');
+            return;
+          }
+          setRegistrationStatus(null);
+        }
+      } catch (err) {
+        console.error('Failed to check registration status for venue:', err);
+        setRegistrationStatus(null);
+      } finally {
+        setCheckingVenueStatus(false);
+      }
+    };
+    run();
+  }, [multiVenueMode, selectedConfcode, router]);
 
   const handleLookup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,10 +256,19 @@ export default function LandingPage() {
     }
     setLoading(true);
     try {
-      const response = await fetch(`/api/get-registration?transId=${encodeURIComponent(transId.trim().toUpperCase())}`);
+      const transIdUpper = transId.trim().toUpperCase();
+      const url = new URL('/api/get-registration', window.location.origin);
+      url.searchParams.set('transId', transIdUpper);
+      if (multiVenueMode && selectedConfcode) {
+        url.searchParams.set('confcode', selectedConfcode);
+      }
+      const response = await fetch(url.toString());
       const data = await response.json();
       if (response.ok && data) {
-        router.push(`/view/${transId.trim().toUpperCase()}`);
+        const viewPath = multiVenueMode && selectedConfcode
+          ? `/view/${transIdUpper}?confcode=${encodeURIComponent(selectedConfcode)}`
+          : `/view/${transIdUpper}`;
+        router.push(viewPath);
       } else {
         if (response.status === 503) {
           router.replace('/maintenance');
@@ -164,6 +297,28 @@ export default function LandingPage() {
         }
         setError('Registration is currently closed. Slots are already full.');
         setRegistrationStatus(data);
+      }
+    } catch (err) {
+      setError('Failed to check registration status. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRegisterVenue = async (confcode: string) => {
+    setError('');
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/check-registration?confcode=${encodeURIComponent(confcode)}`);
+      const data = await response.json();
+      if (response.ok && data.isOpen) {
+        router.push(`/register?confcode=${encodeURIComponent(confcode)}`);
+      } else {
+        if (response.status === 503) {
+          router.replace('/maintenance');
+          return;
+        }
+        setError('Registration is currently closed for this venue. Slots are already full.');
       }
     } catch (err) {
       setError('Failed to check registration status. Please try again.');
@@ -219,7 +374,219 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Conference name - plain text */}
+          {venuesLoading ? (
+            <div className="py-8 text-center text-gray-600">Loading...</div>
+          ) : venues.length === 0 ? (
+            <div className="py-8 text-center text-gray-600">No venues available for this domain.</div>
+          ) : multiVenueMode ? (
+            <>
+              {/* Conference name - same style as single venue */}
+              {venues[0]?.name && (
+                <p className="text-center text-sm sm:text-base font-semibold tracking-wide mb-1 mt-6" style={{ color: '#555555' }}>
+                  {venues[0].name}
+                </p>
+              )}
+              {/* Venue dropdown - styled like Registration Verification input */}
+              <div className="mb-4" ref={venueDropdownRef}>
+                <label id="venue-select-label" className="sr-only">Select venue</label>
+                <div className="relative">
+                  <button
+                    type="button"
+                    id="venue-select"
+                    aria-haspopup="listbox"
+                    aria-expanded={venueDropdownOpen}
+                    aria-labelledby="venue-select-label"
+                    onClick={() => setVenueDropdownOpen((open) => !open)}
+                    className="w-full pl-4 pr-11 py-3 rounded-xl text-left text-sm sm:text-base border border-transparent focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none min-h-[3rem]"
+                    style={{ backgroundColor: '#F0F4F0' }}
+                  >
+                    {selectedConfcode ? (() => {
+                      const v = venues.find((x) => x.confcode === selectedConfcode);
+                      if (!v) return <span style={{ color: '#555555' }}>{selectedConfcode}</span>;
+                      return (
+                        <span className="block whitespace-pre-wrap" style={{ color: '#555555' }}>
+                          {v.venue || v.name || v.confcode}
+                          {formatConferenceDateRange(v.date_from, v.date_to) && (
+                            <span className="block text-gray-500 text-xs mt-0.5 font-normal">
+                              {formatConferenceDateRange(v.date_from, v.date_to)}
+                            </span>
+                          )}
+                        </span>
+                      );
+                    })() : (
+                      <span className="text-gray-400">Click here to select a venue</span>
+                    )}
+                  </button>
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: '#D4B165' }} aria-hidden>
+                    <svg className={`w-5 h-5 transition-transform ${venueDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </span>
+                </div>
+                {venueDropdownOpen && (
+                  <ul
+                    role="listbox"
+                    aria-labelledby="venue-select-label"
+                    className="mt-1 max-h-60 overflow-auto rounded-xl border border-gray-200 bg-white shadow-lg py-1 z-10"
+                  >
+                    {venues.map((v) => (
+                      <li
+                        key={v.confcode}
+                        role="option"
+                        aria-selected={selectedConfcode === v.confcode}
+                        onClick={() => {
+                          setSelectedConfcode(v.confcode);
+                          setVenueDropdownOpen(false);
+                        }}
+                        className={`px-4 py-3 cursor-pointer text-left text-sm sm:text-base whitespace-pre-wrap break-words ${
+                          selectedConfcode === v.confcode
+                            ? 'bg-green-50 text-gray-900'
+                            : 'text-gray-900 hover:bg-gray-50'
+                        }`}
+                        style={{ color: selectedConfcode === v.confcode ? undefined : '#555555' }}
+                      >
+                        <span className="block font-medium">{v.venue || v.name || v.confcode}</span>
+                        {formatConferenceDateRange(v.date_from, v.date_to) && (
+                          <span className="block text-gray-500 text-xs mt-0.5 font-normal">
+                            {formatConferenceDateRange(v.date_from, v.date_to)}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              {/* When venue selected: date + venue with icons - same as single venue */}
+              {selectedConfcode && (() => {
+                const v = venues.find((x) => x.confcode === selectedConfcode);
+                if (!v) return null;
+                const dateStr = formatConferenceDateRange(v.date_from, v.date_to);
+                const venueStr = v.venue || '';
+                return (
+                  <>
+                    {dateStr && (
+                      <div className="flex items-center justify-center gap-2 mb-1">
+                        <span style={{ color: '#D4B165' }} aria-hidden>
+                          <svg className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          </svg>
+                        </span>
+                        <p className="text-sm sm:text-base" style={{ color: '#555555' }}>{dateStr}</p>
+                      </div>
+                    )}
+                    {venueStr && (
+                      <div className="flex justify-center mb-8">
+                        <div className="relative inline-block max-w-full pl-5 sm:pl-7">
+                          <span className="absolute left-0 top-0.5" style={{ color: '#D4B165' }} aria-hidden>
+                            <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                          </span>
+                          <p className="text-center text-sm sm:text-base leading-snug break-words" style={{ color: '#555555' }}>
+                            {venueStr}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {v.notification && v.notification.trim() && (
+                      <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm text-amber-800">
+                        {(v.notification.trim().split('\\').map((line, i) => (
+                          <p key={i} className={i > 0 ? 'mt-1.5' : ''}>{line.trim()}</p>
+                        )))}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+              {/* Register Now button - same style as single venue, uses reg_limit and reg_alert_count for selected venue */}
+              <div className="mb-6">
+                {checkingVenueStatus ? (
+                  <div className="w-full rounded-xl py-3.5 px-4 text-center font-semibold text-white text-sm sm:text-base" style={{ backgroundColor: '#9e9e9e' }}>
+                    Checking availability...
+                  </div>
+                ) : registrationStatus && !registrationStatus.isOpen ? (
+                  <div className="space-y-3">
+                    <div className="rounded-lg border px-4 py-3 text-center text-sm text-amber-800 bg-amber-50 border-amber-200">
+                      Thank you for your interest. All slots are fully taken.
+                    </div>
+                    <button
+                      disabled
+                      className="w-full rounded-xl py-3.5 px-4 font-semibold text-white text-sm sm:text-base cursor-not-allowed"
+                      style={{ backgroundColor: '#9e9e9e' }}
+                    >
+                      Register Now
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => selectedConfcode && handleRegisterVenue(selectedConfcode)}
+                    disabled={loading || !selectedConfcode}
+                    className="w-full rounded-xl py-3.5 px-4 font-semibold text-white text-sm sm:text-base shadow-md hover:opacity-95 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                    style={selectedConfcode && !loading ? { background: 'linear-gradient(180deg, #3d8b4d 0%, #367C46 100%)', backgroundColor: '#367C46' } : { backgroundColor: '#9e9e9e' }}
+                  >
+                    {loading ? 'Checking...' : 'Register Now'}
+                  </button>
+                )}
+              </div>
+              {/* OR divider - same as single venue */}
+              <div className="relative flex items-center justify-center gap-3 my-6">
+                <div className="flex-1 h-px bg-gray-300" />
+                <span className="text-sm font-medium" style={{ color: '#AAAAAA' }}>OR</span>
+                <div className="flex-1 h-px bg-gray-300" />
+              </div>
+              {/* Registration Verification - requires venue selection first */}
+              <div>
+                <h2 className="flex items-center gap-2 text-base sm:text-lg font-semibold mb-3" style={{ color: '#555555' }}>
+                  <span
+                    className="inline-flex items-center justify-center w-7 h-7 rounded-full flex-shrink-0 border-2"
+                    style={{ borderColor: '#D4B165' }}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5} style={{ color: '#D4B165' }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </span>
+                  Registration Verification
+                </h2>
+                {!selectedConfcode ? (
+                  <p className="text-sm text-gray-500 mb-2">Please select a venue above first to look up a registration.</p>
+                ) : null}
+                <form onSubmit={handleLookup}>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      id="transId"
+                      value={transId}
+                      onChange={(e) => setTransId(e.target.value.toUpperCase())}
+                      placeholder={selectedConfcode ? 'Enter your Registration ID to verify status' : 'Select a venue first'}
+                      className="w-full pl-4 pr-11 py-3 rounded-xl text-base border border-transparent focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none placeholder-gray-400 disabled:cursor-not-allowed disabled:opacity-70"
+                      style={{ backgroundColor: '#F0F4F0' }}
+                      maxLength={10}
+                      disabled={loading || !selectedConfcode}
+                    />
+                    <button
+                      type="submit"
+                      disabled={loading || !transId.trim() || !selectedConfcode}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-green-600 disabled:text-gray-300 disabled:cursor-not-allowed transition-colors"
+                      aria-label="Search registration"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </button>
+                  </div>
+                  {error && (
+                    <div className="mt-3 px-4 py-2.5 rounded-lg text-sm text-red-700 bg-red-50 border border-red-200">
+                      {error}
+                    </div>
+                  )}
+                </form>
+              </div>
+            </>
+          ) : (
+            <>
+          {/* Conference name - plain text (single venue) */}
           <p className="text-center text-sm sm:text-base font-semibold  tracking-wide mb-1 mt-6" style={{ color: '#555555' }}>
             {conferenceName}
           </p>
@@ -353,6 +720,8 @@ export default function LandingPage() {
               )}
             </form>
           </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -386,7 +755,11 @@ export default function LandingPage() {
                 type="button"
                 onClick={() => {
                   setShowRemainingSlotsModal(false);
-                  handleNewRegistration();
+                  if (multiVenueMode && selectedConfcode) {
+                    handleRegisterVenue(selectedConfcode);
+                  } else {
+                    handleNewRegistration();
+                  }
                 }}
                 className="flex-1 px-4 py-3 text-white font-semibold rounded-xl transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ backgroundColor: '#367C46' }}

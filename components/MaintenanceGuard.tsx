@@ -1,23 +1,26 @@
 'use client';
 
 import { useEffect } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 
 /**
  * Client-side guard to redirect to maintenance page when on maintenance.
- * Uses full page redirect (window.location) so production always lands on maintenance page.
- * Catches browser back/forward cache (bfcache) and client-side navigations
- * that might bypass middleware.
+ * When on /register?confcode=XXX, passes confcode to check-maintenance so the correct venue is checked.
  */
 export default function MaintenanceGuard() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const confcode = pathname === '/register' ? searchParams.get('confcode') : null;
 
   useEffect(() => {
     const checkAndRedirect = async () => {
       if (pathname === '/maintenance') return;
 
       try {
-        const res = await fetch('/api/check-maintenance', {
+        const url = confcode
+          ? `/api/check-maintenance?confcode=${encodeURIComponent(confcode)}`
+          : '/api/check-maintenance';
+        const res = await fetch(url, {
           cache: 'no-store',
           credentials: 'same-origin',
           headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
@@ -32,7 +35,7 @@ export default function MaintenanceGuard() {
     };
 
     checkAndRedirect();
-  }, [pathname]);
+  }, [pathname, confcode]);
 
   // Handle browser back/forward cache - page can be restored without middleware running
   useEffect(() => {
@@ -46,7 +49,12 @@ export default function MaintenanceGuard() {
       if (typeof window === 'undefined' || window.location.pathname === '/maintenance') return;
 
       try {
-        const res = await fetch('/api/check-maintenance', {
+        const params = new URLSearchParams(window.location.search);
+        const confcodeParam = window.location.pathname === '/register' ? params.get('confcode') : null;
+        const url = confcodeParam
+          ? `/api/check-maintenance?confcode=${encodeURIComponent(confcodeParam)}`
+          : '/api/check-maintenance';
+        const res = await fetch(url, {
           cache: 'no-store',
           credentials: 'same-origin',
           headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },

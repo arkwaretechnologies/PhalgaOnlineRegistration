@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
-import { getConferenceByDomain } from '@/lib/conference';
+import { getConferenceByDomain, getConferenceByConfcode, getConferencesByDomain } from '@/lib/conference';
 import { createTimeout, withTimeout } from '@/lib/security';
 
 // Disable caching for this route to ensure fresh data
@@ -12,9 +12,79 @@ export async function GET(request: Request) {
   const { abortController, timeoutId, timeoutPromise } = createTimeout(10000);
 
   try {
-    // Detect conference from domain
+    const { searchParams } = new URL(request.url);
+    const confcodeParam = searchParams.get('confcode')?.trim();
+    const regId = searchParams.get('transId') || searchParams.get('regId');
     const hostname = request.headers.get('host') || request.headers.get('x-forwarded-host');
-    const conference = await getConferenceByDomain(hostname || undefined);
+
+    if (!regId) {
+      clearTimeout(timeoutId);
+      return NextResponse.json(
+        { error: 'Registration ID parameter is required' },
+        { status: 400 }
+      );
+    }
+
+    const regIdUpper = regId.toUpperCase();
+    let conference: Awaited<ReturnType<typeof getConferenceByDomain>> = null;
+    let headerData: any = null;
+    let headerError: any = null;
+
+    if (confcodeParam) {
+      conference = await getConferenceByConfcode(confcodeParam);
+      if (!conference) {
+        clearTimeout(timeoutId);
+        return NextResponse.json(
+          { error: 'Conference not found for this confcode' },
+          { status: 404 }
+        );
+      }
+      const res = await withTimeout(
+        supabase
+          .from('regh')
+          .select('*')
+          .eq('regid', regIdUpper)
+          .eq('confcode', conference.confcode)
+          .single(),
+        timeoutPromise
+      ) as { data: any | null; error: any };
+      headerData = res.data;
+      headerError = res.error;
+    } else {
+      const venues = await getConferencesByDomain(hostname || undefined);
+      for (const v of venues) {
+        const res = await withTimeout(
+          supabase
+            .from('regh')
+            .select('*')
+            .eq('regid', regIdUpper)
+            .eq('confcode', v.confcode)
+            .maybeSingle(),
+          timeoutPromise
+        ) as { data: any | null; error: any };
+        if (!res.error && res.data) {
+          headerData = res.data;
+          conference = v;
+          break;
+        }
+      }
+      if (!conference) {
+        conference = await getConferenceByDomain(hostname || undefined);
+        if (conference) {
+          const res = await withTimeout(
+            supabase
+              .from('regh')
+              .select('*')
+              .eq('regid', regIdUpper)
+              .eq('confcode', conference.confcode)
+              .single(),
+            timeoutPromise
+          ) as { data: any | null; error: any };
+          headerData = res.data;
+          headerError = res.error;
+        }
+      }
+    }
 
     if (!conference) {
       clearTimeout(timeoutId);
@@ -25,39 +95,9 @@ export async function GET(request: Request) {
     }
 
     const confcode = conference.confcode;
-    // console.log(`=== Getting Registration for Conference: ${confcode} (${conference.name}) ===`);
-
-    const { searchParams } = new URL(request.url);
-    const regId = searchParams.get('transId') || searchParams.get('regId'); // Support both for backward compatibility
-
-    if (!regId) {
-      clearTimeout(timeoutId);
-      return NextResponse.json(
-        { error: 'Registration ID parameter is required' },
-        { status: 400 }
-      );
-    }
-
-    // Get registration header - filter by both regid and confcode
-    const { data: headerData, error: headerError } = await withTimeout(
-      supabase
-        .from('regh')
-        .select('*')
-        .eq('regid', regId.toUpperCase())
-        .eq('confcode', confcode)
-        .single(),
-      timeoutPromise
-    ) as { data: any | null; error: any };
-
-    // console.log('=== Get Registration Debug ===');
-    // console.log('Conference:', confcode);
-    // console.log('regId:', regId);
-    // console.log('headerData:', JSON.stringify(headerData, null, 2));
-    // console.log('headerError:', headerError);
 
     if (headerError || !headerData) {
       clearTimeout(timeoutId);
-      // Check if it's a "not found" error or if confcode doesn't match
       if (headerError?.code === 'PGRST116') {
         return NextResponse.json(
           { error: 'Registration ID not found for this conference' },
@@ -66,16 +106,6 @@ export async function GET(request: Request) {
       }
       return NextResponse.json(
         { error: 'Registration ID not found' },
-        { status: 404 }
-      );
-    }
-
-    // Double-check that the registration belongs to the current conference
-    if (headerData.confcode && headerData.confcode !== confcode) {
-      console.warn(`Registration ${regId} belongs to conference ${headerData.confcode}, but current conference is ${confcode}`);
-      clearTimeout(timeoutId);
-      return NextResponse.json(
-        { error: 'Registration ID not found for this conference' },
         { status: 404 }
       );
     }

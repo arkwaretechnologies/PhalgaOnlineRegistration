@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
 import { getRegistrationLimitByConference } from '@/lib/config';
-import { getConferenceByDomain, getConferenceCode } from '@/lib/conference';
+import { getConferenceByDomain, getConferenceByConfcode, getConferenceCode } from '@/lib/conference';
 import { sendRegistrationConfirmation } from '@/lib/email';
 import {
   validateRequestSize,
@@ -109,14 +109,21 @@ export async function POST(request: Request) {
       );
     }
 
-    // Detect conference from domain at the start
     const hostname = request.headers.get('host') || request.headers.get('x-forwarded-host');
-    const conference = await getConferenceByDomain(hostname || undefined);
+    const { searchParams } = new URL(request.url);
+    const confcodeParam = searchParams.get('confcode')?.trim();
+
+    let conference = null;
+    if (confcodeParam) {
+      conference = await getConferenceByConfcode(confcodeParam);
+    } else {
+      conference = await getConferenceByDomain(hostname || undefined);
+    }
 
     if (!conference) {
       clearTimeout(timeoutId);
       return NextResponse.json(
-        { error: 'Conference not found for this domain. Please check your configuration.' },
+        { error: 'Conference not found for this domain or confcode. Please check your configuration.' },
         { status: 400 }
       );
     }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
-import { getConferenceCode, getConferenceByDomain } from '@/lib/conference';
+import { getConferenceCode, getConferenceByDomain, getConferenceByConfcode } from '@/lib/conference';
 import { getRegistrationLimitByConference } from '@/lib/config';
 import { createTimeout, withTimeout } from '@/lib/security';
 
@@ -13,9 +13,26 @@ export async function GET(request: Request) {
   const { abortController, timeoutId, timeoutPromise } = createTimeout(10000);
 
   try {
-    // Detect conference from domain
+    const { searchParams } = new URL(request.url);
+    const confcodeParam = searchParams.get('confcode')?.trim();
     const hostname = request.headers.get('host') || request.headers.get('x-forwarded-host');
-    const confcode = await getConferenceCode(hostname || undefined);
+
+    let confcode: string;
+    let conference = null;
+    if (confcodeParam) {
+      conference = await getConferenceByConfcode(confcodeParam);
+      if (!conference) {
+        clearTimeout(timeoutId);
+        return NextResponse.json(
+          { error: 'Conference not found for this confcode' },
+          { status: 404 }
+        );
+      }
+      confcode = conference.confcode;
+    } else {
+      confcode = await getConferenceCode(hostname || undefined);
+      conference = await getConferenceByDomain(hostname || undefined);
+    }
     
     // console.log(`[check-registration] Hostname: ${hostname}`);
     // console.log(`[check-registration] Detected confcode: "${confcode}"`);
@@ -188,8 +205,7 @@ export async function GET(request: Request) {
     const limit = await getRegistrationLimitByConference(confcode);
     const isOpen = registrationCount < limit;
     
-    // Get conference details for response
-    const conference = await getConferenceByDomain(hostname || undefined);
+    // conference already resolved at top (by confcode param or domain)
     
     // console.log(`Registration Count: ${registrationCount}`);
     // console.log(`Registration Limit: ${limit}`);

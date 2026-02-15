@@ -1,23 +1,33 @@
 import { NextResponse } from 'next/server';
-import { isConferenceOnMaintenance } from '@/lib/conference';
+import { isConferenceOnMaintenance, getConferenceByConfcode } from '@/lib/conference';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 /**
- * Check if the conference for the current domain is on maintenance.
+ * Check if the conference for the current domain (or confcode) is on maintenance.
  * Used by client-side MaintenanceGuard and middleware.
  */
 export async function GET(request: Request) {
   try {
-    // Allow middleware to pass the original host for maintenance check
+    const { searchParams } = new URL(request.url);
+    const confcodeParam = searchParams.get('confcode')?.trim();
     const hostname =
       request.headers.get('x-maintenance-check-host') ||
       request.headers.get('x-forwarded-host') ||
       request.headers.get('host') ||
       'localhost';
 
-    const { onMaintenance, conference } = await isConferenceOnMaintenance(hostname);
+    let onMaintenance: boolean;
+    let conference = null;
+    if (confcodeParam) {
+      conference = await getConferenceByConfcode(confcodeParam);
+      onMaintenance = conference?.on_maintenance?.toUpperCase() === 'Y';
+    } else {
+      const result = await isConferenceOnMaintenance(hostname);
+      onMaintenance = result.onMaintenance;
+      conference = result.conference;
+    }
 
     return NextResponse.json(
       {

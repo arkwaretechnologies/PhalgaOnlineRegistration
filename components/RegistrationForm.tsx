@@ -39,7 +39,26 @@ const DEFAULT_PROVINCES = [
 
 const TSHIRT_SIZES = ['S', 'M', 'L', 'XL', 'XXL'];
 
-export default function RegistrationForm() {
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+function formatConferenceDateRange(dateFrom: string | null, dateTo: string | null): string {
+  if (!dateFrom || !dateTo) return '';
+  const [y1, m1, d1] = (dateFrom || '').trim().split('-').map(s => parseInt(s, 10));
+  const [y2, m2, d2] = (dateTo || '').trim().split('-').map(s => parseInt(s, 10));
+  const month1 = MONTH_NAMES[(m1 || 1) - 1] ?? '';
+  const month2 = MONTH_NAMES[(m2 || 1) - 1] ?? '';
+  const sameMonth = m1 === m2 && y1 === y2;
+  if (sameMonth) return `${month1} ${d1} - ${d2}, ${y2}`;
+  return `${month1} ${d1} - ${month2} ${d2}, ${y2}`;
+}
+
+function appendConfcode(url: string, confcode: string | null | undefined): string {
+  if (!confcode || !confcode.trim()) return url;
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url}${sep}confcode=${encodeURIComponent(confcode.trim())}`;
+}
+
+export default function RegistrationForm({ confcode }: { confcode?: string | null }) {
   const router = useRouter();
   const [province, setProvince] = useState('');
   const [lgu, setLgu] = useState('');
@@ -92,8 +111,8 @@ export default function RegistrationForm() {
   const hasStartedTimerRef = useRef(false);
 
   useEffect(() => {
-    // Fetch conference information
-    fetch('/api/get-conference')
+    // Fetch conference information (by confcode when multi-venue)
+    fetch(appendConfcode('/api/get-conference', confcode))
       .then(res => res.json())
       .then(data => {
         if (data && !data.error) {
@@ -126,7 +145,7 @@ export default function RegistrationForm() {
 
     // Fetch provinces filtered by conference PSGC
     // console.log('=== Fetching Provinces from API ===');
-    fetch('/api/get-provinces')
+    fetch(appendConfcode('/api/get-provinces', confcode))
       .then(res => res.json())
       .then(data => {
         // console.log('API Response:', data);
@@ -167,7 +186,7 @@ export default function RegistrationForm() {
       });
 
     // Check if registration is open
-    fetch('/api/check-registration')
+    fetch(appendConfcode('/api/check-registration', confcode))
       .then(res => {
         if (res.status === 503) {
           router.replace('/maintenance');
@@ -185,7 +204,7 @@ export default function RegistrationForm() {
         console.error('Error checking registration:', err);
         setRegistrationChecked(true);
       });
-  }, [router]);
+  }, [router, confcode]);
 
   // Start 30-minute session timer only when registration is open and we've received check-registration
   useEffect(() => {
@@ -219,7 +238,7 @@ export default function RegistrationForm() {
       if (remaining <= 300 && !notified5Ref.current) {
         notified5Ref.current = true;
         try {
-          const res = await fetch('/api/check-registration');
+          const res = await fetch(appendConfcode('/api/check-registration', confcode));
           const data = await res.json();
           if (data?.isOpen) {
             setShowExtensionModal(true);
@@ -233,11 +252,11 @@ export default function RegistrationForm() {
     tick();
     const intervalId = setInterval(tick, 1000);
     return () => clearInterval(intervalId);
-  }, [sessionEndTime]);
+  }, [sessionEndTime, confcode]);
 
   useEffect(() => {
     if (province) {
-      fetch(`/api/get-lgus?province=${encodeURIComponent(province)}`)
+      fetch(appendConfcode(`/api/get-lgus?province=${encodeURIComponent(province)}`, confcode))
         .then(res => res.json())
         .then(data => {
           // Handle both old format (array of strings) and new format (array of objects)
@@ -267,7 +286,7 @@ export default function RegistrationForm() {
       setLgu('');
       setSelectedLguPsgc('');
     }
-  }, [province]);
+  }, [province, confcode]);
 
   // Fetch barangays when LGU changes
   useEffect(() => {
@@ -622,7 +641,7 @@ export default function RegistrationForm() {
 
     try {
       // Check registration count before submitting
-      const checkResponse = await fetch('/api/check-registration');
+      const checkResponse = await fetch(appendConfcode('/api/check-registration', confcode));
       const checkData = await checkResponse.json();
 
       if (!checkResponse.ok) {
@@ -678,7 +697,8 @@ export default function RegistrationForm() {
       // All checks passed - proceed with submission
       setShowConfirmation(false);
 
-      const response = await fetch('/api/submit-registration', {
+      const submitUrl = appendConfcode('/api/submit-registration', confcode);
+      const response = await fetch(submitUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -735,7 +755,7 @@ export default function RegistrationForm() {
 
   const handleExtensionYes = async () => {
     try {
-      const res = await fetch('/api/check-registration');
+      const res = await fetch(appendConfcode('/api/check-registration', confcode));
       const data = await res.json();
       if (!res.ok || !data?.isOpen) {
         setShowExtensionModal(false);
@@ -814,6 +834,12 @@ export default function RegistrationForm() {
             <div className="border border-gray-300 rounded-lg p-3 bg-gray-50">
               <div className="font-semibold text-sm text-gray-900 mb-1">CONFERENCE</div>
               <div className="text-sm text-gray-900">{conference?.name?.toUpperCase() || '18TH MINDANAO GEOGRAPHIC CONFERENCE'}</div>
+              {formatConferenceDateRange(conference?.date_from ?? null, conference?.date_to ?? null) && (
+                <div className="mt-1.5 text-sm text-gray-600">{formatConferenceDateRange(conference?.date_from ?? null, conference?.date_to ?? null)}</div>
+              )}
+              {conference?.venue && (
+                <div className="mt-1.5 text-sm text-gray-600">{conference.venue}</div>
+              )}
             </div>
             <div className="border border-gray-300 rounded-lg p-3 bg-blue-50">
               <label className="block font-semibold text-sm text-gray-900 mb-2">PROVINCE *</label>
@@ -952,6 +978,18 @@ export default function RegistrationForm() {
                 <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">CONFERENCE</td>
                 <td className="border border-gray-300 p-2 text-gray-900">{conference?.name?.toUpperCase() || '18TH MINDANAO GEOGRAPHIC CONFERENCE'}</td>
               </tr>
+              {formatConferenceDateRange(conference?.date_from ?? null, conference?.date_to ?? null) && (
+                <tr>
+                  <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">DATE</td>
+                  <td className="border border-gray-300 p-2 text-gray-900">{formatConferenceDateRange(conference?.date_from ?? null, conference?.date_to ?? null)}</td>
+                </tr>
+              )}
+              {conference?.venue && (
+                <tr>
+                  <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">VENUE</td>
+                  <td className="border border-gray-300 p-2 text-gray-900">{conference.venue}</td>
+                </tr>
+              )}
               <tr>
                 <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">PROVINCE</td>
                 <td className="border border-gray-300 p-2 bg-blue-50">
@@ -1522,6 +1560,12 @@ export default function RegistrationForm() {
                     <div className="border border-gray-300 rounded p-2 bg-gray-100">
                       <div className="text-xs font-semibold text-gray-900 mb-1">Conference</div>
                       <div className="text-xs text-gray-900">{conference?.name?.toUpperCase() || '18TH MINDANAO GEOGRAPHIC CONFERENCE'}</div>
+                      {formatConferenceDateRange(conference?.date_from ?? null, conference?.date_to ?? null) && (
+                        <div className="text-xs text-gray-600 mt-1">{formatConferenceDateRange(conference?.date_from ?? null, conference?.date_to ?? null)}</div>
+                      )}
+                      {conference?.venue && (
+                        <div className="text-xs text-gray-600 mt-1">{conference.venue}</div>
+                      )}
                     </div>
                     <div className="border border-gray-300 rounded p-2">
                       <div className="text-xs font-semibold text-gray-900 mb-1">Province</div>
@@ -1551,6 +1595,18 @@ export default function RegistrationForm() {
                         <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900 w-1/3">Conference</td>
                         <td className="border border-gray-300 p-2 text-gray-900">{conference?.name?.toUpperCase() || '18TH MINDANAO GEOGRAPHIC CONFERENCE'}</td>
                       </tr>
+                      {formatConferenceDateRange(conference?.date_from ?? null, conference?.date_to ?? null) && (
+                        <tr>
+                          <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">Date</td>
+                          <td className="border border-gray-300 p-2 text-gray-900">{formatConferenceDateRange(conference?.date_from ?? null, conference?.date_to ?? null)}</td>
+                        </tr>
+                      )}
+                      {conference?.venue && (
+                        <tr>
+                          <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">Venue</td>
+                          <td className="border border-gray-300 p-2 text-gray-900">{conference.venue}</td>
+                        </tr>
+                      )}
                       <tr>
                         <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">Province</td>
                         <td className="border border-gray-300 p-2 text-gray-900">{pendingFormData.PROVINCE || 'Not provided'}</td>

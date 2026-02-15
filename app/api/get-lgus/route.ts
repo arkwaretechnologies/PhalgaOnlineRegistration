@@ -1,15 +1,19 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
-import { getConferenceByDomain } from '@/lib/conference';
+import { getConferenceByDomain, getConferenceByConfcode } from '@/lib/conference';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function GET(request: Request) {
   try {
-    // Detect conference from domain
+    const { searchParams } = new URL(request.url);
+    const confcodeParam = searchParams.get('confcode')?.trim();
     const hostname = request.headers.get('host') || request.headers.get('x-forwarded-host');
-    const conference = await getConferenceByDomain(hostname || undefined);
+
+    const conference = confcodeParam
+      ? await getConferenceByConfcode(confcodeParam)
+      : await getConferenceByDomain(hostname || undefined);
 
     if (!conference) {
       return NextResponse.json(
@@ -18,7 +22,6 @@ export async function GET(request: Request) {
       );
     }
 
-    const { searchParams } = new URL(request.url);
     const province = searchParams.get('province');
 
     // console.log('=== Fetching LGUs ===');

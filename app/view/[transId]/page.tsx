@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
 interface RegistrationHeader {
@@ -58,7 +58,9 @@ interface Contact {
 export default function ViewRegistration() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const transId = params.transId as string;
+  const confcodeFromUrl = searchParams.get('confcode')?.trim() || undefined;
   const [header, setHeader] = useState<RegistrationHeader | null>(null);
   const [details, setDetails] = useState<RegistrationDetail[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,15 +90,18 @@ export default function ViewRegistration() {
       try {
         // Add cache-busting timestamp to ensure fresh data
         const timestamp = new Date().getTime();
-        const response = await fetch(
-          `/api/get-registration?transId=${encodeURIComponent(transId)}&_t=${timestamp}`,
-          {
-            cache: 'no-store',
-            headers: {
-              'Cache-Control': 'no-cache'
-            }
+        const url = new URL('/api/get-registration', window.location.origin);
+        url.searchParams.set('transId', transId);
+        url.searchParams.set('_t', String(timestamp));
+        if (confcodeFromUrl) {
+          url.searchParams.set('confcode', confcodeFromUrl);
+        }
+        const response = await fetch(url.toString(), {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache'
           }
-        );
+        });
         const data = await response.json();
 
         // console.log('=== View Registration Fetch ===');
@@ -145,7 +150,7 @@ export default function ViewRegistration() {
       fetchRegistration();
       fetchPaymentProofs();
     }
-  }, [transId]);
+  }, [transId, confcodeFromUrl]);
 
   // Fetch banks when header (and confcode) is available
   useEffect(() => {
@@ -209,13 +214,16 @@ export default function ViewRegistration() {
     fetchContacts();
   }, [header?.confcode]);
 
-  // Fetch conference information
+  // Fetch conference information by confcode so we show the exact venue and dates for this registration
   useEffect(() => {
+    const confcode = header?.confcode;
+    if (!confcode) return;
+
     const fetchConference = async () => {
       try {
         const timestamp = new Date().getTime();
         const response = await fetch(
-          `/api/get-conference?_t=${timestamp}`,
+          `/api/get-conference?confcode=${encodeURIComponent(confcode)}&_t=${timestamp}`,
           {
             cache: 'no-store',
             headers: {
@@ -227,9 +235,8 @@ export default function ViewRegistration() {
         if (response.ok && data && !data.error) {
           setConference(data);
         } else {
-          console.warn('Conference not found, using defaults');
           setConference({
-            confcode: header?.confcode || '2026-GCMIN',
+            confcode,
             name: '18th Mindanao Geographic Conference',
             date_from: null,
             date_to: null,
@@ -238,9 +245,8 @@ export default function ViewRegistration() {
         }
       } catch (err) {
         console.error('Failed to fetch conference:', err);
-        // Set default on error
         setConference({
-          confcode: header?.confcode || '2026-GCMIN',
+          confcode,
           name: '18th Mindanao Geographic Conference',
           date_from: null,
           date_to: null,

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/db';
-import { getConferenceCode } from '@/lib/conference';
+import { getConferenceCode, getConferenceByDomain, getConferenceByConfcode } from '@/lib/conference';
 
 // Disable caching for this route to ensure fresh data
 export const dynamic = 'force-dynamic';
@@ -19,9 +19,17 @@ export async function GET(request: Request) {
       );
     }
 
-    // Detect conference from domain
+    const confcodeParam = searchParams.get('confcode')?.trim();
     const hostname = request.headers.get('host') || request.headers.get('x-forwarded-host');
-    const confcode = await getConferenceCode(hostname || undefined);
+    const confcode = confcodeParam
+      ? (await getConferenceByConfcode(confcodeParam))?.confcode ?? null
+      : await getConferenceCode(hostname || undefined);
+    if (!confcode) {
+      return NextResponse.json(
+        { error: 'Conference not found for this domain or confcode' },
+        { status: 400 }
+      );
+    }
 
     // Get all regd records with matching province, lgu, and conference, joined with regh to check status
     // Count only records where status is NULL, PENDING, or APPROVED and same conference

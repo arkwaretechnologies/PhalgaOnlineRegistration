@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import "./globals.css";
 import Footer from "@/components/Footer";
 import MaintenanceGuard from "@/components/MaintenanceGuard";
@@ -28,7 +29,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="flex flex-col min-h-screen">
-        <MaintenanceGuard />
+        <Suspense fallback={null}>
+          <MaintenanceGuard />
+        </Suspense>
         <main className="flex-grow">
           {children}
         </main>

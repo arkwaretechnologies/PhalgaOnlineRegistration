@@ -212,6 +212,14 @@ export async function POST(request: Request) {
     const email = (formData.EMAILADDRESS || '').toString().trim().toLowerCase();
     const detailcount = parseInt(formData.DETAILCOUNT);
 
+    // Confcodes to check for duplicate participants: current + linked_conference (comma-separated)
+    const linkedRaw = (conference as { linked_conference?: string | null }).linked_conference || '';
+    const linkedConfcodes = linkedRaw
+      .split(',')
+      .map((c: string) => c.trim())
+      .filter((c: string) => c.length > 0 && c !== confcode);
+    const confcodesForDuplicateCheck = [confcode, ...linkedConfcodes];
+
     // Check for duplicate participants based on position level:
     // - If position LVL = 'BGY': compare Province, LGU, and Barangay
     // - Otherwise: compare Province and LGU only
@@ -249,7 +257,7 @@ export async function POST(request: Request) {
         }
       }
       
-      // Build query based on position level
+      // Build query based on position level (check current confcode and linked_conference confcodes)
       let duplicateQuery = supabase
         .from('regd')
         .select(`
@@ -263,7 +271,7 @@ export async function POST(request: Request) {
           middleinit,
           regh!left(regid, status, confcode)
         `)
-        .eq('confcode', confcode)
+        .in('confcode', confcodesForDuplicateCheck)
         .eq('province', province)
         .eq('lgu', participantLgu)
         .eq('lastname', lastname)
@@ -290,13 +298,13 @@ export async function POST(request: Request) {
         );
       }
       
-      // Filter to only include records with PENDING or APPROVED status (or NULL status)
+      // Filter to only include records with PENDING or APPROVED status (or NULL status) and confcode in current or linked
       const validDuplicates = (existingParticipants || []).filter((record: any) => {
         const regh = Array.isArray(record.regh) ? record.regh[0] : record.regh;
         if (!regh) {
           return true; // Include records with NULL status
         }
-        if (regh.confcode && regh.confcode !== confcode) {
+        if (regh.confcode && !confcodesForDuplicateCheck.includes(regh.confcode)) {
           return false;
         }
         const status = (regh.status || '').toString().toUpperCase().trim();

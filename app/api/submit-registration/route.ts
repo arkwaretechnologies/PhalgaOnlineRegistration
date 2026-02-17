@@ -203,7 +203,7 @@ export async function POST(request: Request) {
             return NextResponse.json(
               availableSlots > 0
                 ? {
-                    error: `Not enough slots available. Available slots: ${availableSlots}.`,
+                    error: `Not enough slots available`,
                     availableSlots,
                   }
                 : { error: 'Thank you for your interest. All slots are fully taken.' },
@@ -237,7 +237,7 @@ export async function POST(request: Request) {
             return NextResponse.json(
               availableSlots > 0
                 ? {
-                    error: `Not enough slots available. Available slots: ${availableSlots}.`,
+                    error: `Not enough slots available.`,
                     availableSlots,
                   }
                 : { error: 'Thank you for your interest. All slots are fully taken.' },

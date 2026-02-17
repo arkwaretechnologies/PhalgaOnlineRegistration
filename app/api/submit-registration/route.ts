@@ -25,65 +25,6 @@ interface RegistrationData {
   [key: string]: string; // For dynamic participant fields
 }
 
-// Function to generate random numeric string
-// If prefix is provided, it will be prepended to the generated string
-// Total length will be: prefix.length + randomLength
-// Returns: prefix + numeric_id (e.g., "MGC001234")
-function generateRegId(prefix: string | null = null, randomLength: number = 6): string {
-  const chars = '0123456789'; // Only numbers
-  let result = '';
-  
-  // Generate random numeric part
-  for (let i = 0; i < randomLength; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  
-  // Prepend prefix if provided
-  if (prefix && prefix.trim() !== '') {
-    return prefix.trim().toUpperCase() + result;
-  }
-  
-  return result;
-}
-
-// Function to generate unique REGID that doesn't exist in database
-// Format: [PREFIX][NUMERIC_ID] (e.g., "MGC001234")
-// Prefix from conference table will be prepended if available
-// The numeric ID part uses only numbers (0-9)
-async function generateUniqueRegId(prefix: string | null = null): Promise<string> {
-  let regId: string;
-  let isUnique = false;
-  let attempts = 0;
-  const maxAttempts = 100; // Prevent infinite loop
-
-  while (!isUnique && attempts < maxAttempts) {
-    regId = generateRegId(prefix);
-    
-    // Check if REGID already exists
-    const { data, error } = await supabase
-      .from('regh')
-      .select('regid')
-      .eq('regid', regId)
-      .limit(1);
-    
-    if (error) {
-      throw new Error(`Failed to check regid uniqueness: ${error.message}`);
-    }
-    
-    if (!data || data.length === 0) {
-      isUnique = true;
-    } else {
-      attempts++;
-    }
-  }
-
-  if (!isUnique) {
-    throw new Error('Failed to generate unique regid after multiple attempts');
-  }
-
-  return regId!;
-}
-
 export async function POST(request: Request) {
   // Create timeout for request (30 seconds)
   const { abortController, timeoutId, timeoutPromise } = createTimeout(30000);
@@ -218,257 +159,84 @@ export async function POST(request: Request) {
       .split(',')
       .map((c: string) => c.trim())
       .filter((c: string) => c.length > 0 && c !== confcode);
-    const confcodesForDuplicateCheck = [confcode, ...linkedConfcodes];
-
-    // Check for duplicate participants based on position level:
-    // - If position LVL = 'BGY': compare Province, LGU, and Barangay
-    // - Otherwise: compare Province and LGU only
-    // console.log('=== Checking for Duplicate Participants ===');
-    // console.log(`Province: ${province}, LGU: ${lgu}, Conference: ${confcode}, Participant Count: ${detailcount}`);
-    
-    for (let i = 0; i < detailcount; i++) {
-      const lastname = (formData[`LASTNAME|${i}`] || '').toUpperCase().trim();
-      const firstname = (formData[`FIRSTNAME|${i}`] || '').toUpperCase().trim();
-      const middleinit = (formData[`MI|${i}`] || '').toUpperCase().trim();
-      
-      if (!lastname || !firstname || !middleinit) {
-        continue; // Skip validation if required fields are empty (handled by client-side validation)
-      }
-      
-      // Get participant's position and barangay
-      const positionName = (formData[`DESIGNATION|${i}`] || '').toString().trim();
-      const participantLgu = (formData[`LGU|${i}`] || lgu).toUpperCase().trim();
-      const participantBarangay = (formData[`BRGY|${i}`] || '').toString().trim().toUpperCase();
-      
-      // Get position LVL from positions table
-      let positionLvl: string | null = null;
-      if (positionName) {
-        const { data: positionData, error: positionError } = await withTimeout(
-          supabase
-            .from('positions')
-            .select('lvl')
-            .eq('name', positionName)
-            .single(),
-          timeoutPromise
-        ) as { data: { lvl: string | null } | null; error: any };
-        
-        if (!positionError && positionData) {
-          positionLvl = positionData.lvl;
-        }
-      }
-      
-      // Build query based on position level (check current confcode and linked_conference confcodes)
-      let duplicateQuery = supabase
-        .from('regd')
-        .select(`
-          regid,
-          confcode,
-          province,
-          lgu,
-          brgy,
-          lastname,
-          firstname,
-          middleinit,
-          regh!left(regid, status, confcode)
-        `)
-        .in('confcode', confcodesForDuplicateCheck)
-        .eq('province', province)
-        .eq('lgu', participantLgu)
-        .eq('lastname', lastname)
-        .eq('firstname', firstname)
-        .eq('middleinit', middleinit);
-      
-      // If position LVL = 'BGY', also check barangay
-      if (positionLvl === 'BGY' && participantBarangay) {
-        duplicateQuery = duplicateQuery.eq('brgy', participantBarangay);
-      }
-      
-      // Query existing participants
-      const { data: existingParticipants, error: duplicateError } = await withTimeout(
-        duplicateQuery,
-        timeoutPromise
-      ) as { data: any[] | null; error: any };
-      
-      if (duplicateError) {
-        console.error('Error checking for duplicates:', duplicateError);
-        clearTimeout(timeoutId);
-        return NextResponse.json(
-          { error: 'Failed to validate registration data' },
-          { status: 500 }
-        );
-      }
-      
-      // Filter to only include records with PENDING or APPROVED status (or NULL status) and confcode in current or linked
-      const validDuplicates = (existingParticipants || []).filter((record: any) => {
-        const regh = Array.isArray(record.regh) ? record.regh[0] : record.regh;
-        if (!regh) {
-          return true; // Include records with NULL status
-        }
-        if (regh.confcode && !confcodesForDuplicateCheck.includes(regh.confcode)) {
-          return false;
-        }
-        const status = (regh.status || '').toString().toUpperCase().trim();
-        return !status || status === 'PENDING' || status === 'APPROVED';
-      });
-      
-      if (validDuplicates.length > 0) {
-        // Build error message based on position level
-        let errorMessage = `Participant "${firstname} ${middleinit} ${lastname}" already exists`;
-        if (positionLvl === 'BGY' && participantBarangay) {
-          errorMessage += ` in ${province} - ${participantLgu} - ${participantBarangay}`;
-        } else {
-          errorMessage += ` in ${province} - ${participantLgu}`;
-        }
-        errorMessage += `. Each participant can only register once.`;
-        
-        // console.log(`Duplicate found: ${firstname} ${middleinit} ${lastname}`);
-        clearTimeout(timeoutId);
-        return NextResponse.json(
-          { 
-            error: errorMessage,
-            duplicateParticipant: `${firstname} ${middleinit} ${lastname}`,
-            province: province,
-            lgu: participantLgu,
-            barangay: positionLvl === 'BGY' ? participantBarangay : undefined
-          },
-          { status: 400 }
-        );
-      }
-    }
-    
-    // console.log('✓ No duplicate participants found');
-
-    // Generate unique REGID with conference prefix
-    const prefix = conference.prefix || null;
-    // Wrap generateUniqueRegId with timeout
-    const regId = await Promise.race([
-      generateUniqueRegId(prefix),
-      timeoutPromise
-    ]) as string;
-    
-    // console.log(`Generated REGID with prefix: ${prefix || 'none'} -> ${regId}`);
-
-    // Get current time in Manila timezone (UTC+8)
+    // Build Manila time for regdate (UTC+8)
     const getManilaTime = (): string => {
       const now = new Date();
-      // Manila is UTC+8
-      const manilaOffset = 8 * 60; // 8 hours in minutes
+      const manilaOffset = 8 * 60;
       const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
       const manilaTime = new Date(utc + (manilaOffset * 60000));
-      
-      // Format as YYYY-MM-DD HH:MM:SS for PostgreSQL TIMESTAMP
-      const year = manilaTime.getFullYear();
-      const month = String(manilaTime.getMonth() + 1).padStart(2, '0');
-      const day = String(manilaTime.getDate()).padStart(2, '0');
-      const hours = String(manilaTime.getHours()).padStart(2, '0');
-      const minutes = String(manilaTime.getMinutes()).padStart(2, '0');
-      const seconds = String(manilaTime.getSeconds()).padStart(2, '0');
-      
-      // Return in PostgreSQL TIMESTAMP format: YYYY-MM-DD HH:MM:SS
-      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+      const y = manilaTime.getFullYear();
+      const m = String(manilaTime.getMonth() + 1).padStart(2, '0');
+      const d = String(manilaTime.getDate()).padStart(2, '0');
+      const h = String(manilaTime.getHours()).padStart(2, '0');
+      const min = String(manilaTime.getMinutes()).padStart(2, '0');
+      const s = String(manilaTime.getSeconds()).padStart(2, '0');
+      return `${y}-${m}-${d} ${h}:${min}:${s}`;
     };
-
-    // Insert header - REGID is the only identifier needed (REGNUM has been removed)
-    // REGDATE now includes date and time in Manila timezone (UTC+8)
     const regdate = getManilaTime();
-    const { data: headerData, error: headerError } = await withTimeout(
-      supabase
-        .from('regh')
-        .insert({
-          confcode: confcode,
-          province: province,
-          lgu: lgu,
-          contactperson: contactperson,
-          contactnum: contactnum,
-          email: email,
-          regdate: regdate,
-          regid: regId,
-          status: 'PENDING' // Set status to PENDING for new registrations
-          // Note: REGID is the only identifier needed (REGNUM has been removed)
-        })
-        .select('regid')
-        .single(),
-      timeoutPromise
-    ) as { data: { regid: string } | null; error: any };
 
-    if (headerError || !headerData) {
-      console.error('Header insert error:', headerError);
-      clearTimeout(timeoutId);
-      return NextResponse.json(
-        { error: 'Failed to create registration header' },
-        { status: 500 }
-      );
-    }
-
-    const regidFromHeader = headerData.regid || regId; // Use regid from header or fallback to generated regId
-
-    // Prepare detail records
-    const detailRecords = [];
+    // Build participants array for atomic RPC (duplicate check + insert under advisory lock)
+    const participants: Record<string, string | null>[] = [];
     for (let i = 0; i < detailcount; i++) {
-      const lastname = (formData[`LASTNAME|${i}`] || '').toString().trim().toUpperCase();
-      const firstname = (formData[`FIRSTNAME|${i}`] || '').toString().trim().toUpperCase();
-      const middleinit = (formData[`MI|${i}`] || '').toString().trim().toUpperCase();
-      const suffix = (formData[`SUFFIX|${i}`] || '').toString().trim().toUpperCase();
-      const designation = (formData[`DESIGNATION|${i}`] || '').toString().trim().toUpperCase();
-      const brgy = (formData[`BRGY|${i}`] || '').toString().trim().toUpperCase();
-      const tshirtsize = (formData[`TSHIRTSIZE|${i}`] || '').toString().trim().toUpperCase();
-      const contactnumDetail = (formData[`CONTACTNUMBER|${i}`] || '').toString().trim().toUpperCase();
-      const prcnum = (formData[`PRCNUM|${i}`] || '').toString().trim().toUpperCase();
       const expirydateStr = (formData[`EXPIRYDATE|${i}`] || '').toString().trim();
-      const emailDetail = (formData[`EMAIL|${i}`] || '').toString().trim().toLowerCase();
-
-      // Convert expiry date string to Date string or null
       let expirydate: string | null = null;
       if (expirydateStr) {
         const dateObj = new Date(expirydateStr);
-        if (!isNaN(dateObj.getTime())) {
-          expirydate = dateObj.toISOString().split('T')[0]; // Format as YYYY-MM-DD
-        }
+        if (!isNaN(dateObj.getTime())) expirydate = dateObj.toISOString().split('T')[0];
       }
-
-      // Get participant's LGU (use participant LGU if provided, otherwise use header LGU)
-      const participantLguForRecord = (formData[`LGU|${i}`] || lgu).toString().trim().toUpperCase();
-      
-      // Note: regd table now uses regid (not regnum) as foreign key to regh
-      detailRecords.push({
-        confcode: confcode,
-        regid: regidFromHeader, // Use regid as foreign key (regnum column removed from regd)
-        linenum: i + 1, // Line numbers start at 1
-        lastname: lastname,
-        firstname: firstname,
-        middleinit: middleinit,
-        suffix: suffix || null, // Save suffix, use null if empty
-        designation: designation,
-        brgy: brgy,
-        lgu: participantLguForRecord, // Use participant's LGU if different from header
-        province: province,
-        tshirtsize: tshirtsize,
-        contactnum: contactnumDetail,
-        prcnum: prcnum,
-        expirydate: expirydate,
-        email: emailDetail
+      participants.push({
+        lastname: (formData[`LASTNAME|${i}`] || '').toString().trim().toUpperCase(),
+        firstname: (formData[`FIRSTNAME|${i}`] || '').toString().trim().toUpperCase(),
+        middleinit: (formData[`MI|${i}`] || '').toString().trim().toUpperCase(),
+        suffix: (formData[`SUFFIX|${i}`] || '').toString().trim().toUpperCase() || null,
+        designation: (formData[`DESIGNATION|${i}`] || '').toString().trim().toUpperCase(),
+        brgy: (formData[`BRGY|${i}`] || '').toString().trim().toUpperCase(),
+        lgu: (formData[`LGU|${i}`] || lgu).toString().trim().toUpperCase(),
+        province,
+        tshirtsize: (formData[`TSHIRTSIZE|${i}`] || '').toString().trim().toUpperCase(),
+        contactnum: (formData[`CONTACTNUMBER|${i}`] || '').toString().trim().toUpperCase(),
+        prcnum: (formData[`PRCNUM|${i}`] || '').toString().trim().toUpperCase(),
+        expirydate,
+        email: (formData[`EMAIL|${i}`] || '').toString().trim().toLowerCase()
       });
     }
 
-    // Insert all detail records
-    const result = await withTimeout(
-      supabase
-        .from('regd')
-        .insert(detailRecords),
-      timeoutPromise
-    ) as { error: any };
-    const { error: detailError } = result;
+    const payload = {
+      confcode,
+      linked_confcodes: linkedConfcodes.join(','),
+      province,
+      lgu,
+      contactperson,
+      contactnum,
+      email,
+      regdate,
+      prefix: (conference as { prefix?: string | null }).prefix ?? null,
+      participants
+    };
 
-    if (detailError) {
-      console.error('Detail insert error:', detailError);
+    const { data: rpcData, error: rpcError } = await withTimeout(
+      supabase.rpc('submit_registration_atomic', { payload }),
+      timeoutPromise
+    ) as { data: { regid: string } | null; error: { message?: string } | null };
+
+    if (rpcError) {
       clearTimeout(timeoutId);
-      // Attempt to rollback header insert using regid
-      await supabase.from('regh').delete().eq('regid', regidFromHeader);
+      const msg = (rpcError as { message?: string }).message ?? '';
+      const isDuplicate = /already exists|Duplicate participant|only register once/i.test(msg);
       return NextResponse.json(
-        { error: 'Failed to submit registration details' },
+        { error: isDuplicate ? msg : 'Failed to submit registration' },
+        { status: isDuplicate ? 400 : 500 }
+      );
+    }
+    if (!rpcData?.regid) {
+      clearTimeout(timeoutId);
+      return NextResponse.json(
+        { error: 'Failed to submit registration' },
         { status: 500 }
       );
     }
+
+    const regId = rpcData.regid;
 
     // Send confirmation email (non-blocking - registration succeeds even if email fails)
     try {

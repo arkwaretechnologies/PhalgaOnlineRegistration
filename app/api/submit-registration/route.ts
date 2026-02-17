@@ -200,7 +200,7 @@ export async function POST(request: Request) {
           if (lguCount + detailcount > lguRegLimit) {
             clearTimeout(timeoutId);
             return NextResponse.json(
-              { error: 'Slots are fully taken.' },
+              { error: 'Thank you for your interest. All slots are fully taken.' },
               { status: 400 }
             );
           }
@@ -228,7 +228,7 @@ export async function POST(request: Request) {
           if (lguCount + detailcount > lguRegLimit) {
             clearTimeout(timeoutId);
             return NextResponse.json(
-              { error: 'Slots are fully taken..' },
+              { error: 'Thank you for your interest. All slots are fully taken.' },
               { status: 400 }
             );
           }

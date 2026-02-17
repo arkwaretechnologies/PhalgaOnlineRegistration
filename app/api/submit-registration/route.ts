@@ -198,9 +198,15 @@ export async function POST(request: Request) {
         if (!isNaN(lguRegLimit) && lguRegLimit >= 0) {
           const lguCount = validRecords.filter((r: any) => getRProvince(r) === province).length;
           if (lguCount + detailcount > lguRegLimit) {
+            const availableSlots = Math.max(0, lguRegLimit - lguCount);
             clearTimeout(timeoutId);
             return NextResponse.json(
-              { error: 'Thank you for your interest. All slots are fully taken.' },
+              availableSlots > 0
+                ? {
+                    error: `Not enough slots available. Available slots: ${availableSlots}.`,
+                    availableSlots,
+                  }
+                : { error: 'Thank you for your interest. All slots are fully taken.' },
               { status: 400 }
             );
           }
@@ -226,9 +232,15 @@ export async function POST(request: Request) {
         if (!isNaN(lguRegLimit) && lguRegLimit >= 0) {
           const lguCount = validRecords.filter((r: any) => getRProvince(r) === province && getRLgu(r) === lgu).length;
           if (lguCount + detailcount > lguRegLimit) {
+            const availableSlots = Math.max(0, lguRegLimit - lguCount);
             clearTimeout(timeoutId);
             return NextResponse.json(
-              { error: 'Thank you for your interest. All slots are fully taken.' },
+              availableSlots > 0
+                ? {
+                    error: `Not enough slots available. Available slots: ${availableSlots}.`,
+                    availableSlots,
+                  }
+                : { error: 'Thank you for your interest. All slots are fully taken.' },
               { status: 400 }
             );
           }

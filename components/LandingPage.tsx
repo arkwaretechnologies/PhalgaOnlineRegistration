@@ -620,6 +620,15 @@ export default function LandingPage() {
             </div>
           )}
 
+          {/* Notification (single venue) */}
+          {conference?.notification && conference.notification.trim() && (
+            <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm text-amber-800">
+              {(conference.notification.trim().split('\\').map((line, i) => (
+                <p key={i} className={i > 0 ? 'mt-1.5' : ''}>{line.trim()}</p>
+              )))}
+            </div>
+          )}
+
           {/* Register Now button */}
           <div className="mb-6">
             {checkingStatus ? (

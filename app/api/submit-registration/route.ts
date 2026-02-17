@@ -200,7 +200,7 @@ export async function POST(request: Request) {
           if (lguCount + detailcount > lguRegLimit) {
             clearTimeout(timeoutId);
             return NextResponse.json(
-              { error: 'Registration limit for this province has been reached.' },
+              { error: 'Slots are fully taken.' },
               { status: 400 }
             );
           }
@@ -228,7 +228,7 @@ export async function POST(request: Request) {
           if (lguCount + detailcount > lguRegLimit) {
             clearTimeout(timeoutId);
             return NextResponse.json(
-              { error: 'Registration limit for this LGU has been reached.' },
+              { error: 'Slots are fully taken..' },
               { status: 400 }
             );
           }

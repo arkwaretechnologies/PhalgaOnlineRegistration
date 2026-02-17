@@ -17,6 +17,8 @@ DECLARE
   p_regdate text;
   p_prefix text;
   p_participants jsonb;
+  p_province_psgc text;
+  p_lgu_psgc text;
   confcodes_arr text[];
   lock_key bigint;
   regid_candidate text;
@@ -31,6 +33,13 @@ DECLARE
   part_designation text;
   position_lvl text;
   dup_count int;
+  conf_reg_limit bigint;
+  conf_count int;
+  prov_limit_row record;
+  prov_count int;
+  lgu_limit_row record;
+  lgu_count int;
+  participant_count int;
   i int;
 BEGIN
   -- Extract payload
@@ -44,9 +53,12 @@ BEGIN
   p_regdate := trim(coalesce(payload->>'regdate', ''));
   p_prefix := nullif(trim(coalesce(payload->>'prefix', '')), '');
   p_participants := payload->'participants';
+  p_province_psgc := nullif(trim(coalesce(payload->>'province_psgc', '')), '');
+  p_lgu_psgc := nullif(trim(coalesce(payload->>'lgu_psgc', '')), '');
   IF p_participants IS NULL OR jsonb_array_length(p_participants) = 0 THEN
     RAISE EXCEPTION 'No participants in payload';
   END IF;
+  participant_count := jsonb_array_length(p_participants);
 
   -- Build confcodes array (current + linked, distinct)
   confcodes_arr := ARRAY[p_confcode];
@@ -58,6 +70,67 @@ BEGIN
   -- Advisory lock key: same conference set + same participant set => same lock (so concurrent same submission serializes)
   lock_key := abs(hashtext(p_confcode || array_to_string(confcodes_arr, ',') || p_participants::text))::bigint;
   PERFORM pg_advisory_xact_lock(lock_key);
+
+  -- Limit checks under lock (counts are accurate for concurrent submissions)
+  -- 1) Conference-level reg_limit check
+  SELECT reg_limit INTO conf_reg_limit FROM public.conference WHERE confcode = p_confcode LIMIT 1;
+  IF conf_reg_limit IS NOT NULL AND conf_reg_limit >= 0 THEN
+    SELECT COUNT(*) INTO conf_count
+    FROM public.regd r
+    JOIN public.regh h ON h.regid = r.regid AND h.confcode = r.confcode
+    WHERE r.confcode = p_confcode
+      AND upper(trim(coalesce(h.status, ''))) IN ('PENDING', 'APPROVED');
+    IF conf_count + participant_count > conf_reg_limit THEN
+      RAISE EXCEPTION 'Registration limit for this conference has been reached.';
+    END IF;
+  END IF;
+
+  -- 2) Province-level limit check (if province_psgc provided)
+  IF p_province_psgc IS NOT NULL AND p_province_psgc <> '' THEN
+    SELECT geolevel, reg_limit INTO prov_limit_row
+    FROM public.lgu_count_limit
+    WHERE confcode = p_confcode AND psgcode = p_province_psgc AND geolevel = 'PROV'
+    LIMIT 1;
+    IF FOUND AND prov_limit_row.reg_limit IS NOT NULL AND prov_limit_row.reg_limit >= 0 THEN
+      SELECT COUNT(*) INTO prov_count
+      FROM public.regd r
+      JOIN public.regh h ON h.regid = r.regid AND h.confcode = r.confcode
+      WHERE r.confcode = p_confcode
+        AND r.province = p_province
+        AND upper(trim(coalesce(h.status, ''))) IN ('PENDING', 'APPROVED');
+      IF prov_count + participant_count > prov_limit_row.reg_limit THEN
+        IF prov_limit_row.reg_limit > prov_count THEN
+          RAISE EXCEPTION 'Not enough slots available.';
+        ELSE
+          RAISE EXCEPTION 'Thank you for your interest. All slots are fully taken.';
+        END IF;
+      END IF;
+    END IF;
+  END IF;
+
+  -- 3) LGU-level limit check (if lgu_psgc provided)
+  IF p_lgu_psgc IS NOT NULL AND p_lgu_psgc <> '' THEN
+    SELECT geolevel, reg_limit INTO lgu_limit_row
+    FROM public.lgu_count_limit
+    WHERE confcode = p_confcode AND psgcode = p_lgu_psgc AND geolevel IN ('MUN', 'CITY', 'HUC')
+    LIMIT 1;
+    IF FOUND AND lgu_limit_row.reg_limit IS NOT NULL AND lgu_limit_row.reg_limit >= 0 THEN
+      SELECT COUNT(*) INTO lgu_count
+      FROM public.regd r
+      JOIN public.regh h ON h.regid = r.regid AND h.confcode = r.confcode
+      WHERE r.confcode = p_confcode
+        AND r.province = p_province
+        AND r.lgu = p_lgu
+        AND upper(trim(coalesce(h.status, ''))) IN ('PENDING', 'APPROVED');
+      IF lgu_count + participant_count > lgu_limit_row.reg_limit THEN
+        IF lgu_limit_row.reg_limit > lgu_count THEN
+          RAISE EXCEPTION 'Not enough slots available.';
+        ELSE
+          RAISE EXCEPTION 'Thank you for your interest. All slots are fully taken.';
+        END IF;
+      END IF;
+    END IF;
+  END IF;
 
   -- Duplicate check per participant
   FOR i IN 0 .. jsonb_array_length(p_participants) - 1 LOOP

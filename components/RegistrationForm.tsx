@@ -749,8 +749,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
         // Use setTimeout to ensure confirmation modal closes before error modal shows
         setTimeout(() => {
           setErrorModalMessage(
-            `Cannot submit registration. Not enough slots available.\n\n` +
-            `Available slots: ${availableSlots}`
+            `Cannot submit registration. Not enough slots available.`
           );
           setShowErrorModal(true);
         }, 100);

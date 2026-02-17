@@ -75,36 +75,47 @@ export async function POST(request: Request) {
     // Parse request body
     const formData: RegistrationData = await request.json();
     
-    // Check registration count - filter by conference
+    // Check registration count - filter by conference (paginate to count ALL records, not just first 1000)
     // Note: regd table now uses regid (not regnum) as foreign key to regh
-    const { data: regdData, error: regdError } = await withTimeout(
-      supabase
-        .from('regd')
-        .select(`
-          regid,
-          confcode,
-          regh!left(regid, status, confcode)
-        `)
-        .eq('confcode', confcode),
-      timeoutPromise
-    ) as { data: any[] | null; error: any };
+    const regdPageSize = 1000;
+    let regdData: any[] = [];
+    let regdPage = 0;
+    let hasMoreRegd = true;
 
-    // console.log('=== Registration Count Check (Submit) ===');
-    // console.log('Conference:', confcode);
-    // console.log('regdData length:', regdData?.length || 0);
-    // console.log('regdError:', regdError);
+    while (hasMoreRegd) {
+      const { data: regdPageData, error: regdError } = await withTimeout(
+        supabase
+          .from('regd')
+          .select(`
+            regid,
+            confcode,
+            regh!left(regid, status, confcode)
+          `)
+          .eq('confcode', confcode)
+          .range(regdPage * regdPageSize, (regdPage + 1) * regdPageSize - 1),
+        timeoutPromise
+      ) as { data: any[] | null; error: any };
 
-    if (regdError) {
-      console.error('Database error:', regdError);
-      clearTimeout(timeoutId);
-      return NextResponse.json(
-        { error: 'Failed to check registration status' },
-        { status: 500 }
-      );
+      if (regdError) {
+        console.error('Database error:', regdError);
+        clearTimeout(timeoutId);
+        return NextResponse.json(
+          { error: 'Failed to check registration status' },
+          { status: 500 }
+        );
+      }
+
+      if (regdPageData && regdPageData.length > 0) {
+        regdData = regdData.concat(regdPageData);
+        hasMoreRegd = regdPageData.length === regdPageSize;
+        regdPage++;
+      } else {
+        hasMoreRegd = false;
+      }
     }
 
     // Filter records where status is PENDING or APPROVED and same conference
-    const validRecords = (regdData || []).filter((record: any) => {
+    const validRecords = regdData.filter((record: any) => {
       if (record.confcode !== confcode) {
         return false;
       }

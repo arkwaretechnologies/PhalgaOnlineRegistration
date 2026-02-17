@@ -31,42 +31,52 @@ export async function GET(request: Request) {
       );
     }
 
-    // Get all regd records with matching province, lgu, and conference, joined with regh to check status
+    // Get ALL regd records with matching province, lgu, and conference (paginate to count all, not just first 1000)
     // Count only records where status is NULL, PENDING, or APPROVED and same conference
-    // Note: regd table now uses regid (not regnum) as foreign key to regh
-    const { data: regdData, error: regdError } = await supabase
-      .from('regd')
-      .select(`
-        regid,
-        confcode,
-        province,
-        lgu,
-        regh!left(regid, status, confcode)
-      `)
-      .eq('province', province.toUpperCase())
-      .eq('lgu', lgu.toUpperCase())
-      .eq('confcode', confcode); // Add conference filter
+    const regdPageSize = 1000;
+    let regdData: any[] = [];
+    let regdPage = 0;
+    let hasMoreRegd = true;
+    const provinceUpper = province.toUpperCase();
+    const lguUpper = lgu.toUpperCase();
 
-    // console.log('=== Province-LGU Count Check ===');
-    // console.log(`Conference: ${confcode}`);
-    // console.log('Province:', province);
-    // console.log('LGU:', lgu);
-    // console.log('regdData length:', regdData?.length || 0);
-    // console.log('regdError:', regdError);
+    while (hasMoreRegd) {
+      const { data: regdPageData, error: regdError } = await supabase
+        .from('regd')
+        .select(`
+          regid,
+          confcode,
+          province,
+          lgu,
+          regh!left(regid, status, confcode)
+        `)
+        .eq('province', provinceUpper)
+        .eq('lgu', lguUpper)
+        .eq('confcode', confcode)
+        .range(regdPage * regdPageSize, (regdPage + 1) * regdPageSize - 1);
 
-    if (regdError) {
-      console.error('Database error:', regdError);
-      return NextResponse.json(
-        { 
-          error: 'Failed to check Province-LGU registration status', 
-          details: regdError.message
-        },
-        { status: 500 }
-      );
+      if (regdError) {
+        console.error('Database error:', regdError);
+        return NextResponse.json(
+          {
+            error: 'Failed to check Province-LGU registration status',
+            details: regdError.message
+          },
+          { status: 500 }
+        );
+      }
+
+      if (regdPageData && regdPageData.length > 0) {
+        regdData = regdData.concat(regdPageData);
+        hasMoreRegd = regdPageData.length === regdPageSize;
+        regdPage++;
+      } else {
+        hasMoreRegd = false;
+      }
     }
 
     // Filter records where status is NULL, PENDING, or APPROVED (case-insensitive) and same conference
-    const validRecords = (regdData || []).filter((record: any) => {
+    const validRecords = regdData.filter((record: any) => {
       if (record.confcode !== confcode) {
         return false;
       }

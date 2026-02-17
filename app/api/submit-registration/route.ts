@@ -89,6 +89,8 @@ export async function POST(request: Request) {
           .select(`
             regid,
             confcode,
+            province,
+            lgu,
             regh!left(regid, status, confcode)
           `)
           .eq('confcode', confcode)
@@ -158,11 +160,85 @@ export async function POST(request: Request) {
 
     const province = (formData.PROVINCE || '').toString().trim().toUpperCase();
     const lgu = (formData.LGU || '').toString().trim().toUpperCase();
+    const detailcount = parseInt(String(formData.DETAILCOUNT || '0'), 10) || 0;
+
+    // LGU/province registration limit from lgu_count_limit (by psgcode)
+    // PROV: always use PSGC from PROVINCE field (resolve province name -> province PSGC from lgus). MUN/CITY/HUC: use LGU_PSGC from form.
+    // validRecords above is built from paginated regd fetch, so it includes ALL records for this confcode
+    const getRProvince = (r: any) => (r.province ?? r.PROVINCE ?? '').toString().trim().toUpperCase();
+    const getRLgu = (r: any) => (r.lgu ?? r.LGU ?? '').toString().trim().toUpperCase();
+
+    // 1) PROV limit: use PSGC from PROVINCE field only (resolve from lgus, geolevel PROV), not LGU_PSGC
+    let provincePsgc: string | null = null;
+    if (province) {
+      const { data: provRow } = await withTimeout(
+        supabase
+          .from('lgus')
+          .select('psgc')
+          .eq('geolevel', 'PROV')
+          .ilike('lguname', province)
+          .limit(1)
+          .maybeSingle(),
+        timeoutPromise
+      ) as { data: { psgc?: string } | null };
+      if (provRow?.psgc) provincePsgc = String(provRow.psgc).trim();
+    }
+    if (provincePsgc) {
+      const { data: provLimitRow, error: provLimitError } = await withTimeout(
+        supabase
+          .from('lgu_count_limit')
+          .select('geolevel, reg_limit')
+          .eq('confcode', confcode)
+          .eq('psgcode', provincePsgc)
+          .maybeSingle(),
+        timeoutPromise
+      ) as { data: { geolevel?: string; reg_limit?: number | null } | null; error: any };
+      if (!provLimitError && provLimitRow && (provLimitRow.geolevel || '').toString().toUpperCase().trim() === 'PROV' && provLimitRow.reg_limit != null) {
+        const lguRegLimit = Number(provLimitRow.reg_limit);
+        if (!isNaN(lguRegLimit) && lguRegLimit >= 0) {
+          const lguCount = validRecords.filter((r: any) => getRProvince(r) === province).length;
+          if (lguCount + detailcount > lguRegLimit) {
+            clearTimeout(timeoutId);
+            return NextResponse.json(
+              { error: 'Registration limit for this province has been reached.' },
+              { status: 400 }
+            );
+          }
+        }
+      }
+    }
+
+    // 2) LGU limit (MUN/CITY/HUC): use LGU_PSGC from form only
+    const lguPsgc = String(formData.LGU_PSGC || formData.PSGC || '').trim();
+    if (lguPsgc) {
+      const { data: lguLimitRow, error: lguLimitError } = await withTimeout(
+        supabase
+          .from('lgu_count_limit')
+          .select('geolevel, reg_limit')
+          .eq('confcode', confcode)
+          .eq('psgcode', lguPsgc)
+          .maybeSingle(),
+        timeoutPromise
+      ) as { data: { geolevel?: string; reg_limit?: number | null } | null; error: any };
+      const geolevel = (lguLimitRow?.geolevel || '').toString().toUpperCase().trim();
+      if (!lguLimitError && lguLimitRow && (geolevel === 'MUN' || geolevel === 'CITY' || geolevel === 'HUC') && lguLimitRow.reg_limit != null) {
+        const lguRegLimit = Number(lguLimitRow.reg_limit);
+        if (!isNaN(lguRegLimit) && lguRegLimit >= 0) {
+          const lguCount = validRecords.filter((r: any) => getRProvince(r) === province && getRLgu(r) === lgu).length;
+          if (lguCount + detailcount > lguRegLimit) {
+            clearTimeout(timeoutId);
+            return NextResponse.json(
+              { error: 'Registration limit for this LGU has been reached.' },
+              { status: 400 }
+            );
+          }
+        }
+      }
+    }
 
     const contactperson = (formData.CONTACTPERSON || '').toString().trim().toUpperCase();
     const contactnum = (formData.CONTACTNUMBER || '').toString().trim().toUpperCase();
     const email = (formData.EMAILADDRESS || '').toString().trim().toLowerCase();
-    const detailcount = parseInt(formData.DETAILCOUNT);
 
     // Confcodes to check for duplicate participants: current + linked_conference (comma-separated)
     const linkedRaw = (conference as { linked_conference?: string | null }).linked_conference || '';

@@ -673,6 +673,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       CONFERENCE: conference?.confcode || '2026-GCMIN', // Use conference code from database
       PROVINCE: (province ?? '').toString().trim(),
       LGU: (lgu ?? '').toString().trim(),
+      LGU_PSGC: (selectedLguPsgc ?? '').toString().trim(),
       CONTACTPERSON: (contactPerson ?? '').toString().trim(),
       CONTACTNUMBER: (contactNo ?? '').toString().trim(),
       EMAILADDRESS: (emailAddress ?? '').toString().trim(),
@@ -778,6 +779,16 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
         // 503 = maintenance mode - redirect to maintenance page
         if (response.status === 503) {
           router.replace('/maintenance');
+          return;
+        }
+        // Registration limit reached (province or LGU) - do not show notification
+        if (
+          data.error &&
+          (data.error === 'Registration limit for this province has been reached.' ||
+            data.error === 'Registration limit for this LGU has been reached.')
+        ) {
+          setIsSubmitting(false);
+          setShowConfirmation(false);
           return;
         }
         // Check if the error is about registration being closed

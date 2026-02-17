@@ -83,8 +83,8 @@ export default function LandingPage() {
       router.replace('/', { scroll: false });
     }
 
+    // When registration limit is reached, do not show the slots-full notification on landing page
     if (slotsFullParam === '1') {
-      setShowSlotsFullModal(true);
       router.replace('/', { scroll: false });
     }
 
@@ -489,7 +489,7 @@ export default function LandingPage() {
                         </div>
                       </div>
                     )}
-                    {v.notification && v.notification.trim() && (
+                    {v.notification && v.notification.trim() && (!registrationStatus || registrationStatus.isOpen) && (
                       <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm text-amber-800">
                         {(v.notification.trim().split('\\').map((line, i) => (
                           <p key={i} className={i > 0 ? 'mt-1.5' : ''}>{line.trim()}</p>
@@ -620,8 +620,8 @@ export default function LandingPage() {
             </div>
           )}
 
-          {/* Notification (single venue) */}
-          {conference?.notification && conference.notification.trim() && (
+          {/* Notification (single venue) - hide when slots are full */}
+          {conference?.notification && conference.notification.trim() && (!registrationStatus || registrationStatus.isOpen) && (
             <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm text-amber-800">
               {(conference.notification.trim().split('\\').map((line, i) => (
                 <p key={i} className={i > 0 ? 'mt-1.5' : ''}>{line.trim()}</p>

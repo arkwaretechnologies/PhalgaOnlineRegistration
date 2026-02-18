@@ -100,11 +100,7 @@ if (data) {
 
       if (allProvinces.length > 0) {
         allProvinces.sort((a, b) => a.localeCompare(b));
-        const fixedCityClasses = [
-          'HIGHLY URBANIZED CITY',
-          'INDEPENDENT COMPONENT CITY',
-          'COMPONENT CITY'
-        ];
+        const fixedCityClasses = ['HIGHLY URBANIZED CITY'];
         const finalProvinces = [...fixedCityClasses, ...allProvinces];
         return NextResponse.json(finalProvinces, {
           headers: {
@@ -137,12 +133,8 @@ if (data) {
       const provinces = allProvincesData?.map((row) => row.lguname) ?? [];
       
       // Add fixed city class provinces at the top
-      const fixedCityClasses = [
-        'HIGHLY URBANIZED CITY',
-        'INDEPENDENT COMPONENT CITY',
-        'COMPONENT CITY'
-      ];
-      
+      const fixedCityClasses = ['HIGHLY URBANIZED CITY'];
+
       // Sort provinces alphabetically
       provinces.sort((a, b) => a.localeCompare(b));
       
@@ -231,12 +223,8 @@ if (data) {
     allProvinces.sort((a, b) => a.localeCompare(b));
 
     // Add fixed city class provinces at the top
-    const fixedCityClasses = [
-      'HIGHLY URBANIZED CITY',
-      'INDEPENDENT COMPONENT CITY',
-      'COMPONENT CITY'
-    ];
-    
+    const fixedCityClasses = ['HIGHLY URBANIZED CITY'];
+
     // Combine fixed provinces at the top with fetched provinces
     const finalProvinces = [...fixedCityClasses, ...allProvinces];
 

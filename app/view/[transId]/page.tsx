@@ -411,6 +411,9 @@ export default function ViewRegistration() {
     );
   }
 
+  const headerStatus = (header.status || (header as any).STATUS || 'PENDING').toString().toUpperCase().trim();
+  const isRejectedOrUnsuccessful = headerStatus === 'REJECTED';
+
   return (
     <div className="min-h-screen bg-gray-50 py-4 sm:py-6 md:py-8 px-3 sm:px-4">
       <div className="max-w-4xl mx-auto">
@@ -656,13 +659,13 @@ export default function ViewRegistration() {
                   onChange={handleFileUpload}
                   accept="image/*,.pdf"
                   className="hidden"
-                  disabled={uploading}
+                  disabled={uploading || isRejectedOrUnsuccessful}
                 />
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                  className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors text-sm sm:text-base flex items-center justify-center gap-2 touch-target"
+                  disabled={uploading || isRejectedOrUnsuccessful}
+                  className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors text-sm sm:text-base flex items-center justify-center gap-2 touch-target"
                 >
                   {uploading ? (
                     <>

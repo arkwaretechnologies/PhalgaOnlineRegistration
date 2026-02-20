@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getConferenceByDomain, getConferenceByConfcode } from '@/lib/conference';
+import { getConferenceByDomain, getConferenceByConfcode, type ConferenceInfo } from '@/lib/conference';
+
+function sanitizeConferenceForClient(conference: ConferenceInfo) {
+  const { exclude_psgc, include_psgc, reg_limit, ...rest } = conference;
+  return rest;
+}
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -18,7 +23,7 @@ export async function GET(request: Request) {
           { status: 404 }
         );
       }
-      return NextResponse.json(conference, {
+      return NextResponse.json(sanitizeConferenceForClient(conference), {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
           Pragma: 'no-cache',
@@ -42,7 +47,7 @@ export async function GET(request: Request) {
       );
     }
 
-    return NextResponse.json(conference, {
+    return NextResponse.json(sanitizeConferenceForClient(conference), {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
         'Pragma': 'no-cache',

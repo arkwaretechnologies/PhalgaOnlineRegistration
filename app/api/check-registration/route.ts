@@ -204,23 +204,18 @@ export async function GET(request: Request) {
     // Get limit from conference table (falls back to config table)
     const limit = await getRegistrationLimitByConference(confcode);
     const isOpen = registrationCount < limit;
-    
-    // conference already resolved at top (by confcode param or domain)
-    
-    // console.log(`Registration Count: ${registrationCount}`);
-    // console.log(`Registration Limit: ${limit}`);
-    // console.log(`Is Open: ${isOpen}`);
-    // console.log('================================');
-    
+    const remaining = limit - registrationCount;
+    const alertThreshold = conference?.reg_alert_count ?? 100;
+    const slotsRunningLow = isOpen && remaining > 0 && remaining <= alertThreshold;
+
     clearTimeout(timeoutId);
-    
-    // Return response with short cache (5 seconds) to reduce load while keeping data relatively fresh
+
+    // Return isOpen, slotsRunningLow, remainingSlots (for notification display), and conference
     return NextResponse.json(
-      { 
-        count: registrationCount,
-        limit: limit,
-        isOpen: isOpen,
-        regAlertCount: conference?.reg_alert_count || 100, // Default to 100 if not set
+      {
+        isOpen,
+        slotsRunningLow,
+        remainingSlots: isOpen && remaining > 0 ? remaining : undefined,
         conference: {
           confcode: conference?.confcode || confcode,
           name: conference?.name || null

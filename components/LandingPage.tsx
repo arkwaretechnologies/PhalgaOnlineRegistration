@@ -22,12 +22,11 @@ export default function LandingPage() {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
-  const [registrationStatus, setRegistrationStatus] = useState<{ count: number; limit: number; isOpen: boolean; regAlertCount?: number } | null>(null);
+  const [registrationStatus, setRegistrationStatus] = useState<{ isOpen: boolean; slotsRunningLow?: boolean; remainingSlots?: number } | null>(null);
   const [checkingStatus, setCheckingStatus] = useState(true);
   const [showRemainingSlotsModal, setShowRemainingSlotsModal] = useState(false);
   const [showSessionExpiredModal, setShowSessionExpiredModal] = useState(false);
   const [showSlotsFullModal, setShowSlotsFullModal] = useState(false);
-  const [remainingSlots, setRemainingSlots] = useState<number | null>(null);
   const [venues, setVenues] = useState<Array<{
     confcode: string;
     name: string | null;
@@ -133,17 +132,12 @@ export default function LandingPage() {
         const response = await fetch('/api/check-registration');
         const data = await response.json();
         if (response.ok) {
-          setRegistrationStatus(data);
+          setRegistrationStatus({ isOpen: data.isOpen, slotsRunningLow: data.slotsRunningLow ?? false, remainingSlots: data.remainingSlots });
           if (data.conference) {
             setConference(prev => prev ? { ...prev, ...data.conference } : null);
           }
-          if (data.count !== undefined && data.limit !== undefined && data.isOpen) {
-            const remaining = data.limit - data.count;
-            setRemainingSlots(remaining);
-            const alertThreshold = data.regAlertCount || 100;
-            if (remaining > 0 && remaining <= alertThreshold) {
-              setShowRemainingSlotsModal(true);
-            }
+          if (data.slotsRunningLow) {
+            setShowRemainingSlotsModal(true);
           }
         } else {
           if (response.status === 503) {
@@ -174,17 +168,12 @@ export default function LandingPage() {
         const response = await fetch('/api/check-registration');
         const data = await response.json();
         if (response.ok) {
-          setRegistrationStatus(data);
+          setRegistrationStatus({ isOpen: data.isOpen, slotsRunningLow: data.slotsRunningLow ?? false, remainingSlots: data.remainingSlots });
           if (data.conference) {
             setConference(prev => prev ? { ...prev, ...data.conference } : null);
           }
-          if (data.count !== undefined && data.limit !== undefined && data.isOpen) {
-            const remaining = data.limit - data.count;
-            setRemainingSlots(remaining);
-            const alertThreshold = data.regAlertCount || 100;
-            if (remaining > 0 && remaining <= alertThreshold) {
-              setShowRemainingSlotsModal(true);
-            }
+          if (data.slotsRunningLow) {
+            setShowRemainingSlotsModal(true);
           }
         } else {
           if (response.status === 503) {
@@ -207,28 +196,19 @@ export default function LandingPage() {
   useEffect(() => {
     if (!multiVenueMode || !selectedConfcode) {
       setRegistrationStatus(null);
-      setRemainingSlots(null);
       setCheckingVenueStatus(false);
       return;
     }
     setCheckingVenueStatus(true);
     setRegistrationStatus(null);
-    setRemainingSlots(null);
     const run = async () => {
       try {
         const response = await fetch(`/api/check-registration?confcode=${encodeURIComponent(selectedConfcode)}`);
         const data = await response.json();
         if (response.ok) {
-          setRegistrationStatus(data);
-          if (data.count !== undefined && data.limit !== undefined && data.isOpen) {
-            const remaining = data.limit - data.count;
-            setRemainingSlots(remaining);
-            const alertThreshold = data.regAlertCount ?? 100;
-            if (remaining > 0 && remaining <= alertThreshold) {
-              setShowRemainingSlotsModal(true);
-            }
-          } else if (!data.isOpen) {
-            setRemainingSlots(0);
+          setRegistrationStatus({ isOpen: data.isOpen, slotsRunningLow: data.slotsRunningLow ?? false, remainingSlots: data.remainingSlots });
+          if (data.slotsRunningLow) {
+            setShowRemainingSlotsModal(true);
           }
         } else {
           if (response.status === 503) {
@@ -296,7 +276,7 @@ export default function LandingPage() {
           return;
         }
         setError('Registration is currently closed. Slots are already full.');
-        setRegistrationStatus(data);
+        setRegistrationStatus({ isOpen: data.isOpen, slotsRunningLow: data.slotsRunningLow ?? false, remainingSlots: data.remainingSlots });
       }
     } catch (err) {
       setError('Failed to check registration status. Please try again.');
@@ -734,8 +714,8 @@ export default function LandingPage() {
         </div>
       </div>
 
-      {/* Remaining Slots Modal */}
-      {showRemainingSlotsModal && remainingSlots !== null && remainingSlots > 0 && (
+      {/* Slots running low modal */}
+      {showRemainingSlotsModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowRemainingSlotsModal(false)}>
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 sm:p-8" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-center mb-4">
@@ -748,7 +728,11 @@ export default function LandingPage() {
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 text-center mb-4">Limited Slots Available!</h2>
             <div className="text-center mb-6">
               <p className="text-base sm:text-lg text-gray-700 mb-2">
-                Only <span className="font-bold text-red-600 text-xl sm:text-2xl">{remainingSlots}</span> {remainingSlots === 1 ? 'slot' : 'slots'} remaining
+                {registrationStatus?.remainingSlots != null && registrationStatus.remainingSlots > 0 ? (
+                  <>Only <span className="font-bold text-red-600 text-xl sm:text-2xl">{registrationStatus.remainingSlots}</span> {registrationStatus.remainingSlots === 1 ? 'slot' : 'slots'} remaining</>
+                ) : (
+                  'Slots are running low. Register soon!'
+                )}
               </p>
               <p className="text-sm text-gray-600">Register now to secure your slot for the conference.</p>
             </div>

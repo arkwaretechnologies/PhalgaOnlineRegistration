@@ -722,41 +722,21 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
         return;
       }
 
-      const currentCount = checkData.count || 0;
-      const limit = checkData.limit || 3;
-      const participantsToAdd = parseInt(pendingFormData.DETAILCOUNT) || 0;
-      const totalAfterSubmission = currentCount + participantsToAdd;
-      const availableSlots = limit - currentCount;
-
-      // Check if registration is already closed
+      // Check if registration is already closed (server enforces limits on submit)
       if (!checkData.isOpen) {
         setIsSubmitting(false);
         setShowConfirmation(false); // Close confirmation modal first
         // Use setTimeout to ensure confirmation modal closes before error modal shows
         setTimeout(() => {
           setErrorModalMessage(
-            `Registration is closed. All slots are full.`
+            `Thank you for your interest. All slots are fully taken.`
           );
           setShowErrorModal(true);
         }, 100);
         return;
       }
 
-      // Check if adding these participants would exceed the limit
-      if (totalAfterSubmission > limit) {
-        setIsSubmitting(false);
-        setShowConfirmation(false); // Close confirmation modal first
-        // Use setTimeout to ensure confirmation modal closes before error modal shows
-        setTimeout(() => {
-          setErrorModalMessage(
-            `Cannot submit registration. Not enough slots available.`
-          );
-          setShowErrorModal(true);
-        }, 100);
-        return;
-      }
-
-      // All checks passed - proceed with submission
+      // Proceed with submission (server will enforce limits)
       setShowConfirmation(false);
 
       const submitUrl = appendConfcode('/api/submit-registration', confcode);
@@ -790,14 +770,26 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
           setShowConfirmation(false);
           return;
         }
+        // Conference limit: submitted count exceeds remaining slots
+        if (data.error && data.error.includes('Registration limit for this conference has been reached')) {
+          setTimeout(() => {
+            const availableSlots = typeof data.availableSlots === 'number' && data.availableSlots >= 0
+              ? data.availableSlots
+              : null;
+            setErrorModalMessage(
+              availableSlots != null
+                ? `Not enough slots are available. Only ${availableSlots} slot(s) available.`
+                : 'Not enough slots are available.'
+            );
+            setShowErrorModal(true);
+          }, 100);
+          return;
+        }
         // Check if the error is about registration being closed
         if (data.error && data.error.includes('closed')) {
-          const errorCurrentCount = data.currentCount || currentCount;
-          const errorLimit = data.limit || limit;
-          // Use setTimeout to ensure any modals close before error modal shows
           setTimeout(() => {
             setErrorModalMessage(
-              `Registration is closed. All slots are full.`
+              `Thank you for your interest. All slots are fully taken.`
             );
             setShowErrorModal(true);
           }, 100);

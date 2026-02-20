@@ -1323,7 +1323,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                               onChange={(e) => updateParticipant(participant.id, 'middleNameNotApplicable', e.target.checked)}
                               className="rounded border-gray-300"
                             />
-                            <span className="text-xs text-gray-600">Middle name not applicable</span>
+                            <span className="text-xs text-gray-600">N/A</span>
                           </label>
                         </div>
                       </div>

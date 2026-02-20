@@ -9,6 +9,7 @@ interface Participant {
   lastName: string;
   firstName: string;
   middleInit: string;
+  middleNameNotApplicable?: boolean;
   suffix: string;
   position: string;
   lgu: string;
@@ -75,6 +76,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
     lastName: '',
     firstName: '',
     middleInit: '',
+    middleNameNotApplicable: false,
     suffix: '',
     position: '',
     lgu: '',
@@ -400,6 +402,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       lastName: '',
       firstName: '',
       middleInit: '',
+      middleNameNotApplicable: false,
       suffix: '',
       position: '',
       lgu: lgu, // Default to header LGU
@@ -427,6 +430,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       lastName: '',
       firstName: '',
       middleInit: '',
+      middleNameNotApplicable: false,
       suffix: '',
       position: '',
       lgu: lgu, // Default to header LGU
@@ -466,18 +470,29 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
     return value.replace(/\D/g, '');
   };
 
-  const updateParticipant = (id: number, field: keyof Participant, value: string) => {
+  const updateParticipant = (id: number, field: keyof Participant, value: string | boolean) => {
     // Field-specific sanitization
+    if (field === 'middleNameNotApplicable') {
+      const checked = value === true;
+      setParticipants(participants.map(p =>
+        p.id === id
+          ? { ...p, middleNameNotApplicable: checked, middleInit: checked ? '' : p.middleInit }
+          : p
+      ));
+      return;
+    }
+    const strValue = typeof value === 'string' ? value : '';
     // M.I. should allow letters only (no special chars / digits), up to 2 chars
+    let finalValue = strValue;
     if (field === 'middleInit') {
-      value = value
+      finalValue = strValue
         .toUpperCase()
         .replace(/[^A-Z]/g, '')
         .slice(0, 2);
     }
 
-    setParticipants(participants.map(p => 
-      p.id === id ? { ...p, [field]: value } : p
+    setParticipants(participants.map(p =>
+      p.id === id ? { ...p, [field]: finalValue } : p
     ));
   };
 
@@ -575,8 +590,8 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
         setShowErrorModal(true);
         return;
       }
-      if (!p.middleInit || p.middleInit.trim() === '') {
-        setErrorModalMessage(`Participant ${i + 1}: Middle Initial is required.`);
+      if (!p.middleNameNotApplicable && (!p.middleInit || p.middleInit.trim() === '')) {
+        setErrorModalMessage(`Participant ${i + 1}: Middle Initial is required (or check "Middle name not applicable").`);
         setShowErrorModal(true);
         return;
       }
@@ -634,18 +649,17 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
     const normalize = (s: string) => (s ?? '').toString().trim().toUpperCase();
     const participantKeys = participants.map((p, index) => {
       const effectiveLgu = p.lgu && p.lgu.trim() !== '' ? p.lgu : lgu;
-      return {
-        index: index + 1,
-        key: [
-          normalize(p.lastName),
-          normalize(p.firstName),
-          normalize(p.middleInit),
-          normalize(p.suffix),
-          normalize(p.position),
-          normalize(effectiveLgu),
-          normalize(p.barangay)
-        ].join('|')
-      };
+      const miNorm = normalize(p.middleInit);
+      const keyParts = [
+        normalize(p.lastName),
+        normalize(p.firstName),
+        ...(miNorm !== '' ? [miNorm] : []),
+        normalize(p.suffix),
+        normalize(p.position),
+        normalize(effectiveLgu),
+        normalize(p.barangay)
+      ];
+      return { index: index + 1, key: keyParts.join('|') };
     });
     const keyToFirstIndex = new Map<string, number>();
     const duplicateIndices: number[] = [];
@@ -683,7 +697,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
     participants.forEach((p, index) => {
       formData[`LASTNAME|${index}`] = (p.lastName ?? '').toString().trim();
       formData[`FIRSTNAME|${index}`] = (p.firstName ?? '').toString().trim();
-      formData[`MI|${index}`] = (p.middleInit ?? '').toString().trim();
+      formData[`MI|${index}`] = p.middleNameNotApplicable ? '' : (p.middleInit ?? '').toString().trim();
       formData[`SUFFIX|${index}`] = (p.suffix ?? '').toString().trim();
       formData[`DESIGNATION|${index}`] = (p.position ?? '').toString().trim();
       formData[`LGU|${index}`] = ((p.lgu || lgu) ?? '').toString().trim(); // Use header LGU if participant LGU is empty
@@ -1292,15 +1306,26 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-gray-700 mb-1">M.I. *</label>
-                        <input
-                          type="text"
-                          value={participant.middleInit}
-                          onChange={(e) => updateParticipant(participant.id, 'middleInit', e.target.value.toUpperCase())}
-                          className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
-                          maxLength={2}
-                          required
-                        />
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">{participant.middleNameNotApplicable ? 'M.I.' : 'M.I. *'}</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={participant.middleInit}
+                            onChange={(e) => updateParticipant(participant.id, 'middleInit', e.target.value.toUpperCase())}
+                            className="w-12 flex-shrink-0 px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            maxLength={2}
+                            disabled={!!participant.middleNameNotApplicable}
+                          />
+                          <label className="flex items-center gap-1.5 cursor-pointer flex-shrink-0">
+                            <input
+                              type="checkbox"
+                              checked={!!participant.middleNameNotApplicable}
+                              onChange={(e) => updateParticipant(participant.id, 'middleNameNotApplicable', e.target.checked)}
+                              className="rounded border-gray-300"
+                            />
+                            <span className="text-xs text-gray-600">Middle name not applicable</span>
+                          </label>
+                        </div>
                       </div>
                       <div>
                         <label className="block text-xs font-semibold text-gray-700 mb-1">Suffix</label>
@@ -1399,7 +1424,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                   <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">LAST NAME</th>
                   <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">FIRST NAME</th>
                   <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-16">M.I.</th>
-                  <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-16">SUFFIX</th>
+                  <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-20">SUFFIX</th>
                   <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-48">POSITION</th>
                   <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">LGU</th>
                   <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">BARANGAY</th>
@@ -1428,15 +1453,26 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                         required
                       />
                     </td>
-                    <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 w-16">
-                      <input
-                        type="text"
-                        value={participant.middleInit}
-                        onChange={(e) => updateParticipant(participant.id, 'middleInit', e.target.value.toUpperCase())}
-                        className="w-full px-2 py-1.5 md:py-1 border-0 bg-transparent uppercase text-gray-900 text-sm"
-                        maxLength={2}
-                        required
-                      />
+                    <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50">
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="text"
+                          value={participant.middleInit}
+                          onChange={(e) => updateParticipant(participant.id, 'middleInit', e.target.value.toUpperCase())}
+                          className="w-10 flex-shrink-0 px-2 py-1.5 md:py-1 border-0 bg-transparent uppercase text-gray-900 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          maxLength={2}
+                          disabled={!!participant.middleNameNotApplicable}
+                        />
+                        <label className="flex items-center gap-1 cursor-pointer flex-shrink-0">
+                          <input
+                            type="checkbox"
+                            checked={!!participant.middleNameNotApplicable}
+                            onChange={(e) => updateParticipant(participant.id, 'middleNameNotApplicable', e.target.checked)}
+                            className="rounded border-gray-300"
+                          />
+                          <span className="text-xs text-gray-600">N/A</span>
+                        </label>
+                      </div>
                     </td>
                     <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 w-16">
                       <input

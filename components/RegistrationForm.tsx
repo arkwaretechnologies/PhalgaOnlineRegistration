@@ -364,14 +364,14 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
     }
   }, [lgu, selectedLguPsgc]);
 
-  // Update all participant LGUs when header LGU changes
+  // LGU cell always matches header: keep all participant LGUs in sync with header LGU
   useEffect(() => {
     if (lgu) {
-      setParticipants(prevParticipants => 
+      setParticipants(prevParticipants =>
         prevParticipants.map(p => ({
           ...p,
-          lgu: lgu, // Update all participant LGUs to match header LGU
-          barangay: '' // Reset barangay when LGU changes
+          lgu: lgu,
+          barangay: p.lgu !== lgu ? '' : p.barangay
         }))
       );
     }
@@ -999,8 +999,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                       }
                     }
                   }}
-                  className="flex-1 px-3 py-2.5 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  disabled={isProvinceLgu}
+                  className="flex-1 px-3 py-2.5 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
                   required
                 />
                 <label htmlFor="province-lgu-checkbox-mobile" className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 cursor-pointer">
@@ -1151,8 +1150,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                           }
                         }
                       }}
-                      className="flex-1 px-2 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      disabled={isProvinceLgu}
+                      className="flex-1 px-2 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white"
                       required
                     />
                     <label htmlFor="province-lgu-checkbox" className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 cursor-pointer">
@@ -1360,13 +1358,10 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                         <input
                           type="text"
                           value={participant.lgu || lgu}
-                          onChange={(e) => {
-                            const newValue = e.target.value.toUpperCase();
-                            updateParticipant(participant.id, 'lgu', newValue === lgu ? '' : newValue);
-                          }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
-                          placeholder={lgu || 'Enter LGU'}
-                          required
+                          readOnly
+                          disabled
+                          className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-700 bg-gray-100 text-base disabled:cursor-not-allowed disabled:opacity-100"
+                          aria-label="LGU (from header)"
                         />
                       </div>
                       <div>
@@ -1426,7 +1421,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                   <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-16">M.I.</th>
                   <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-20">SUFFIX</th>
                   <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-48">POSITION</th>
-                  <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">LGU</th>
+                  <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[120px]">LGU</th>
                   <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">BARANGAY</th>
                   <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-32">T-SHIRT</th>
                   <th className="border border-gray-300 p-2 bg-gray-200 w-40 text-gray-900">ACTIONS</th>
@@ -1498,18 +1493,14 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                         {getFilteredPositions(participant.lgu || lgu).map(position => <option key={position.name} value={position.name} />)}
                       </datalist>
                     </td>
-                    <td className="border border-gray-300 p-1 bg-blue-50">
+                    <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 min-w-[120px]">
                       <input
                         type="text"
                         value={participant.lgu || lgu}
-                        onChange={(e) => {
-                          const newValue = e.target.value.toUpperCase();
-                          // If user clears the field, set to empty string so it defaults to header LGU
-                          updateParticipant(participant.id, 'lgu', newValue === lgu ? '' : newValue);
-                        }}
-                        className="w-full px-1 py-0.5 border-0 bg-transparent uppercase text-gray-900"
-                        placeholder={lgu || 'Enter LGU'}
-                        required
+                        readOnly
+                        disabled
+                        className="w-full min-w-0 px-2 py-1.5 md:py-1 border border-gray-300 rounded bg-gray-100 uppercase text-gray-700 text-sm disabled:cursor-not-allowed disabled:opacity-100"
+                        aria-label="LGU (from header)"
                       />
                     </td>
                     <td className="border border-gray-300 p-1 bg-blue-50">

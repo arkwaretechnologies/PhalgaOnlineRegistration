@@ -38,7 +38,7 @@ const DEFAULT_PROVINCES = [
   'ZAMBOANGA DEL SUR'
 ];
 
-const TSHIRT_SIZES = ['S', 'M', 'L', 'XL', 'XXL'];
+const TSHIRT_SIZES = ['XS','S', 'M', 'L', 'XL', 'XXL','XXXL','8XL'];
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -1253,7 +1253,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
           </table>
 
           <p className="mb-4 text-xs sm:text-sm text-gray-600">
-            <strong>NOTE:</strong> T-shirt size is limited to S, M, L, XL, XXL
+            <strong>NOTE:</strong> T-shirt size is limited to XS,S, M, L, XL, XXL,XXXL,8XL
           </p>
 
           {/* Participants Section - Mobile Card Layout */}

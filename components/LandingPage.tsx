@@ -22,7 +22,7 @@ export default function LandingPage() {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
-  const [registrationStatus, setRegistrationStatus] = useState<{ isOpen: boolean; slotsRunningLow?: boolean; remainingSlots?: number } | null>(null);
+  const [registrationStatus, setRegistrationStatus] = useState<{ isOpen: boolean; slotsRunningLow?: boolean; remainingSlots?: number; closedByConference?: boolean } | null>(null);
   const [checkingStatus, setCheckingStatus] = useState(true);
   const [showRemainingSlotsModal, setShowRemainingSlotsModal] = useState(false);
   const [showSessionExpiredModal, setShowSessionExpiredModal] = useState(false);
@@ -132,7 +132,7 @@ export default function LandingPage() {
         const response = await fetch('/api/check-registration');
         const data = await response.json();
         if (response.ok) {
-          setRegistrationStatus({ isOpen: data.isOpen, slotsRunningLow: data.slotsRunningLow ?? false, remainingSlots: data.remainingSlots });
+          setRegistrationStatus({ isOpen: data.isOpen, slotsRunningLow: data.slotsRunningLow ?? false, remainingSlots: data.remainingSlots, closedByConference: !!data.closedByConference });
           if (data.conference) {
             setConference(prev => prev ? { ...prev, ...data.conference } : null);
           }
@@ -168,7 +168,7 @@ export default function LandingPage() {
         const response = await fetch('/api/check-registration');
         const data = await response.json();
         if (response.ok) {
-          setRegistrationStatus({ isOpen: data.isOpen, slotsRunningLow: data.slotsRunningLow ?? false, remainingSlots: data.remainingSlots });
+          setRegistrationStatus({ isOpen: data.isOpen, slotsRunningLow: data.slotsRunningLow ?? false, remainingSlots: data.remainingSlots, closedByConference: !!data.closedByConference });
           if (data.conference) {
             setConference(prev => prev ? { ...prev, ...data.conference } : null);
           }
@@ -206,7 +206,7 @@ export default function LandingPage() {
         const response = await fetch(`/api/check-registration?confcode=${encodeURIComponent(selectedConfcode)}`);
         const data = await response.json();
         if (response.ok) {
-          setRegistrationStatus({ isOpen: data.isOpen, slotsRunningLow: data.slotsRunningLow ?? false, remainingSlots: data.remainingSlots });
+          setRegistrationStatus({ isOpen: data.isOpen, slotsRunningLow: data.slotsRunningLow ?? false, remainingSlots: data.remainingSlots, closedByConference: !!data.closedByConference });
           if (data.slotsRunningLow) {
             setShowRemainingSlotsModal(true);
           }
@@ -275,8 +275,8 @@ export default function LandingPage() {
           router.replace('/maintenance');
           return;
         }
-        setError('Registration is currently closed. Slots are already full.');
-        setRegistrationStatus({ isOpen: data.isOpen, slotsRunningLow: data.slotsRunningLow ?? false, remainingSlots: data.remainingSlots });
+        setError(data.closedByConference ? 'Registration is now closed. Thank you for your interest.' : 'Thank you for your interest. All slots are full.');
+        setRegistrationStatus({ isOpen: data.isOpen, slotsRunningLow: data.slotsRunningLow ?? false, remainingSlots: data.remainingSlots, closedByConference: !!data.closedByConference });
       }
     } catch (err) {
       setError('Failed to check registration status. Please try again.');
@@ -298,7 +298,7 @@ export default function LandingPage() {
           router.replace('/maintenance');
           return;
         }
-        setError('Registration is currently closed for this venue. Slots are already full.');
+        setError(data.closedByConference ? 'Registration is now closed. Thank you for your interest.' : 'Thank you for your interest. All slots are full.');
       }
     } catch (err) {
       setError('Failed to check registration status. Please try again.');
@@ -488,7 +488,7 @@ export default function LandingPage() {
                 ) : registrationStatus && !registrationStatus.isOpen ? (
                   <div className="space-y-3">
                     <div className="rounded-lg border px-4 py-3 text-center text-sm text-amber-800 bg-amber-50 border-amber-200">
-                      Thank you for your interest. All slots are fully taken.
+                      {registrationStatus.closedByConference ? 'Registration is now closed. Thank you for your interest.' : 'Thank you for your interest. All slots are full.'}
                     </div>
                     <button
                       disabled
@@ -618,7 +618,7 @@ export default function LandingPage() {
             ) : registrationStatus && !registrationStatus.isOpen ? (
               <div className="space-y-3">
                 <div className="rounded-lg border px-4 py-3 text-center text-sm text-amber-800 bg-amber-50 border-amber-200">
-                  Thank you for your interest. All slots are fully taken.
+                  {registrationStatus.closedByConference ? 'Registration is now closed. Thank you for your interest.' : 'Thank you for your interest. All slots are full.'}
                 </div>
                 <button
                   disabled
@@ -793,7 +793,7 @@ export default function LandingPage() {
         </div>
       )}
 
-      {/* All slots fully taken modal */}
+      {/* All slots full modal */}
       {showSlotsFullModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowSlotsFullModal(false)}>
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 sm:p-8" onClick={(e) => e.stopPropagation()}>
@@ -804,9 +804,9 @@ export default function LandingPage() {
                 </svg>
               </div>
             </div>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 text-center mb-4">All slots fully taken</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 text-center mb-4">All slots are full</h2>
             <p className="text-center text-gray-700 mb-6">
-              Thank you for your interest. All registration slots for this conference are now fully taken.
+              Thank you for your interest. All slots are full.
             </p>
             <div className="flex justify-center">
               <button

@@ -33,6 +33,26 @@ export async function GET(request: Request) {
       confcode = await getConferenceCode(hostname || undefined);
       conference = await getConferenceByDomain(hostname || undefined);
     }
+
+    const closedConference = (conference as { closed_conference?: string | null } | null)?.closed_conference;
+    if (closedConference && String(closedConference).toUpperCase().trim() === 'Y') {
+      clearTimeout(timeoutId);
+      return NextResponse.json(
+        {
+          isOpen: false,
+          closedByConference: true,
+          conference: {
+            confcode: conference?.confcode || confcode,
+            name: conference?.name || null
+          }
+        },
+        {
+          headers: {
+            'Cache-Control': 'public, s-maxage=5, stale-while-revalidate=10',
+          }
+        }
+      );
+    }
     
     // console.log(`[check-registration] Hostname: ${hostname}`);
     // console.log(`[check-registration] Detected confcode: "${confcode}"`);
@@ -210,12 +230,13 @@ export async function GET(request: Request) {
 
     clearTimeout(timeoutId);
 
-    // Return isOpen, slotsRunningLow, remainingSlots (for notification display), and conference
+    // Return isOpen, slotsRunningLow, remainingSlots (for notification display), closedByConference, and conference
     return NextResponse.json(
       {
         isOpen,
         slotsRunningLow,
         remainingSlots: isOpen && remaining > 0 ? remaining : undefined,
+        closedByConference: false,
         conference: {
           confcode: conference?.confcode || confcode,
           name: conference?.name || null

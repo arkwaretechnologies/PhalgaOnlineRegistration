@@ -17,6 +17,7 @@ export interface ConferenceInfo {
   on_maintenance: string | null;
   notification: string | null;
   linked_conference: string | null;
+  closed_conference: string | null;
 }
 
 /**

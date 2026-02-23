@@ -70,6 +70,14 @@ export async function POST(request: Request) {
     }
 
     const confcode = conference.confcode;
+    const closedConference = (conference as { closed_conference?: string | null }).closed_conference;
+    if (closedConference && String(closedConference).toUpperCase().trim() === 'Y') {
+      clearTimeout(timeoutId);
+      return NextResponse.json(
+        { error: 'Registration is now closed. Thank you for your interest.' },
+        { status: 400 }
+      );
+    }
     // console.log(`=== Submitting Registration for Conference: ${confcode} (${conference.name}) ===`);
 
     // Parse request body
@@ -258,7 +266,7 @@ export async function POST(request: Request) {
       clearTimeout(timeoutId);
       const msg = (rpcError as { message?: string }).message ?? '';
       const isDuplicate = /already exists|Duplicate participant|only register once/i.test(msg);
-      const isLimitReached = /Registration limit.*has been reached|Not enough slots|All slots are fully taken/i.test(msg);
+      const isLimitReached = /Registration limit.*has been reached|Not enough slots|All slots are fully taken|All slots are full/i.test(msg);
       if (isDuplicate) {
         return NextResponse.json({ error: msg }, { status: 400 });
       }

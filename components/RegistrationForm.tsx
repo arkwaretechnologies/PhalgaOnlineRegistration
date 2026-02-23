@@ -86,6 +86,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [isRegistrationOpen, setIsRegistrationOpen] = useState(true);
+  const [closedByConference, setClosedByConference] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [pendingFormData, setPendingFormData] = useState<any>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -201,6 +202,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       .then(data => {
         if (data) {
           setIsRegistrationOpen(data.isOpen);
+          setClosedByConference(!!data.closedByConference);
         }
         setRegistrationChecked(true);
       })
@@ -740,10 +742,11 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       if (!checkData.isOpen) {
         setIsSubmitting(false);
         setShowConfirmation(false); // Close confirmation modal first
-        // Use setTimeout to ensure confirmation modal closes before error modal shows
         setTimeout(() => {
           setErrorModalMessage(
-            `Thank you for your interest. All slots are fully taken.`
+            checkData.closedByConference
+              ? 'Registration is now closed. Thank you for your interest.'
+              : 'Thank you for your interest. All slots are full.'
           );
           setShowErrorModal(true);
         }, 100);
@@ -800,11 +803,14 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
           return;
         }
         // Check if the error is about registration being closed
-        if (data.error && data.error.includes('closed')) {
+        if (data.error && data.error.includes('Registration is now closed')) {
           setTimeout(() => {
-            setErrorModalMessage(
-              `Thank you for your interest. All slots are fully taken.`
-            );
+            setErrorModalMessage('Registration is now closed. Thank you for your interest.');
+            setShowErrorModal(true);
+          }, 100);
+        } else if (data.error && data.error.includes('closed')) {
+          setTimeout(() => {
+            setErrorModalMessage('Thank you for your interest. All slots are full.');
             setShowErrorModal(true);
           }, 100);
         } else {
@@ -898,7 +904,9 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
             </svg>
           </div>
           <p className="text-lg sm:text-xl text-gray-700 leading-relaxed">
-            Thank you for your interest in joining the conference. We regret to inform you that all slots are fully taken.
+            {closedByConference
+              ? 'Registration is now closed. Thank you for your interest.'
+              : 'Thank you for your interest. All slots are full.'}
           </p>
         </div>
       </div>

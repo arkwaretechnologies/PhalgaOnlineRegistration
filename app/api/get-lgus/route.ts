@@ -219,7 +219,7 @@ export async function GET(request: Request) {
         includePsgcRaw.split(',').map(p => p.trim()).filter(p => p !== '')
       );
       filteredLguData = filteredLguData.filter(
-        row => row.psgc && allowedPsgcSet.has(row.psgc) && (row.geolevel === 'MUN' || row.geolevel === 'HUC')
+        row => row.psgc && allowedPsgcSet.has(row.psgc) && (row.geolevel === 'MUN' || row.geolevel === 'HUC' || row.geolevel === 'CITY')
       );
     }
 

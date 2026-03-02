@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { toast } from 'sonner';
 
 interface RegistrationHeader {
   regid: string;
@@ -66,8 +67,6 @@ export default function ViewRegistration() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState('');
-  const [uploadSuccess, setUploadSuccess] = useState(false);
   const [paymentProofs, setPaymentProofs] = useState<PaymentProof[]>([]);
   const [currentViewingProof, setCurrentViewingProof] = useState<string | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -265,20 +264,18 @@ export default function ViewRegistration() {
     // Validate file type (images and PDFs)
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf'];
     if (!allowedTypes.includes(file.type)) {
-      setUploadError('Please upload an image (JPEG, PNG, GIF) or PDF file.');
+      toast.error('Please upload an image (JPEG, PNG, GIF) or PDF file.');
       return;
     }
 
     // Validate file size (max 10MB)
     const maxSize = 10 * 1024 * 1024; // 10MB
     if (file.size > maxSize) {
-      setUploadError('File size must be less than 10MB.');
+      toast.error('File size must be less than 10MB.');
       return;
     }
 
     setUploading(true);
-    setUploadError('');
-    setUploadSuccess(false);
 
     try {
       const formData = new FormData();
@@ -293,7 +290,7 @@ export default function ViewRegistration() {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        setUploadSuccess(true);
+        toast.success('Proof of payment successfully uploaded. Registration will be on review.');
         // Refresh payment proofs list
         const timestamp = new Date().getTime();
         const refreshResponse = await fetch(
@@ -307,14 +304,12 @@ export default function ViewRegistration() {
         if (refreshResponse.ok && refreshData.paymentProofs) {
           setPaymentProofs(refreshData.paymentProofs || []);
         }
-        // Clear success message after 3 seconds
-        setTimeout(() => setUploadSuccess(false), 3000);
       } else {
-        setUploadError(data.error || 'Failed to upload file. Please try again.');
+        toast.error(data.error || 'Failed to upload file. Please try again.');
       }
     } catch (error) {
       console.error('Upload error:', error);
-      setUploadError('An error occurred while uploading. Please try again.');
+      toast.error('An error occurred while uploading. Please try again.');
     } finally {
       setUploading(false);
       // Reset file input
@@ -328,7 +323,6 @@ export default function ViewRegistration() {
     if (!proof || !transId || isDeleting) return;
 
     setIsDeleting(true);
-    setUploadError('');
     
     try {
       const response = await fetch(
@@ -355,6 +349,7 @@ export default function ViewRegistration() {
         if (refreshResponse.ok && refreshData.paymentProofs) {
           setPaymentProofs(refreshData.paymentProofs || []);
         }
+        toast.success('Payment proof deleted successfully.');
         // If we deleted the proof currently being viewed, close the modal
         const proofToDelete = paymentProofs.find(p => 
           p.regid === proof.regid && 
@@ -368,13 +363,13 @@ export default function ViewRegistration() {
         setShowDeleteConfirm(false);
         setDeletingProof(null);
       } else {
-        setUploadError(data.error || 'Failed to delete payment proof. Please try again.');
+        toast.error(data.error || 'Failed to delete payment proof. Please try again.');
         setShowDeleteConfirm(false);
         setDeletingProof(null);
       }
     } catch (error) {
       console.error('Delete error:', error);
-      setUploadError('An error occurred while deleting. Please try again.');
+      toast.error('An error occurred while deleting. Please try again.');
       setShowDeleteConfirm(false);
       setDeletingProof(null);
     } finally {
@@ -614,7 +609,7 @@ export default function ViewRegistration() {
                               type="button"
                               onClick={() => {
                                 if (!proof.payment_proof_url || proof.payment_proof_url.includes('undefined')) {
-                                  setUploadError('Invalid file URL. Please re-upload the file.');
+                                  toast.error('Invalid file URL. Please re-upload the file.');
                                 } else {
                                   setCurrentViewingProof(proof.payment_proof_url);
                                   setShowPaymentModal(true);
@@ -644,12 +639,6 @@ export default function ViewRegistration() {
                   <p className="text-xs sm:text-sm text-gray-600 mb-3">
                     Upload a scanned copy or photo of your validated bank deposit slip
                   </p>
-                )}
-                {uploadError && (
-                  <p className="text-xs sm:text-sm text-red-600 mt-2 break-words">{uploadError}</p>
-                )}
-                {uploadSuccess && (
-                  <p className="text-xs sm:text-sm text-green-600 mt-2">✓ File uploaded successfully!</p>
                 )}
               </div>
               <div className="w-full sm:w-auto">
@@ -890,7 +879,7 @@ export default function ViewRegistration() {
                     className="max-w-full max-h-[75vh] sm:max-h-[70vh] object-contain rounded"
                     onError={(e) => {
                       console.error('Failed to load image:', currentViewingProof);
-                      setUploadError('Failed to load payment proof image. The file may have been deleted or the URL is invalid.');
+                      toast.error('Failed to load payment proof image. The file may have been deleted or the URL is invalid.');
                       setShowPaymentModal(false);
                       setCurrentViewingProof(null);
                     }}

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
+import { Toaster } from "sonner";
 import "./globals.css";
 import Footer from "@/components/Footer";
 import MaintenanceGuard from "@/components/MaintenanceGuard";
@@ -36,6 +37,7 @@ export default function RootLayout({
           {children}
         </main>
         <Footer />
+        <Toaster position="top-center" richColors closeButton style={{ zIndex: 99999 }} />
       </body>
     </html>
   );

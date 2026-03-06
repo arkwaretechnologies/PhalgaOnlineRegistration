@@ -1382,7 +1382,14 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                           value={participant.barangay}
                           onChange={(e) => handleBarangayChange(participant.id, e)}
                           onInput={(e) => handleBarangayChange(participant.id, e)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
+                          onBlur={(e) => {
+                            const enteredValue = e.target.value.trim().toUpperCase();
+                            const isValid = barangayOptions.some(b => b.toUpperCase() === enteredValue);
+                            if (!isValid && enteredValue !== '' && isBarangayEnabled(participant)) {
+                              updateParticipant(participant.id, 'barangay', '');
+                            }
+                          }}
+                          className="w-full px-3 py-2.5 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
                           disabled={!lgu || !isBarangayEnabled(participant)}
                           required={isBarangayEnabled(participant)}
                         />
@@ -1511,17 +1518,24 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                         aria-label="LGU (from header)"
                       />
                     </td>
-                    <td className="border border-gray-300 p-1 bg-blue-50">
+                    <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50">
                       <input
                         type="text"
                         list={`barangay-list-${participant.id}`}
                         value={participant.barangay}
                         onChange={(e) => handleBarangayChange(participant.id, e)}
                         onInput={(e) => handleBarangayChange(participant.id, e)}
-                        className="w-full px-1 py-0.5 border-0 bg-transparent uppercase text-gray-900"
+                        onBlur={(e) => {
+                          const enteredValue = e.target.value.trim().toUpperCase();
+                          const isValid = barangayOptions.some(b => b.toUpperCase() === enteredValue);
+                          if (!isValid && enteredValue !== '' && isBarangayEnabled(participant)) {
+                            updateParticipant(participant.id, 'barangay', '');
+                          }
+                        }}
+                        className="w-full px-2 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white text-sm"
                         disabled={!lgu || !isBarangayEnabled(participant)}
                         required={isBarangayEnabled(participant)}
-                        title={!lgu ? 'Please select an LGU first' : (!isBarangayEnabled(participant) ? 'Barangay is only enabled for positions with level BGY' : 'Barangay is required for this position')}
+                        title={!lgu ? 'Please select an LGU first' : (!isBarangayEnabled(participant) ? 'Barangay is only for positions with level BGY' : 'Select or type barangay')}
                       />
                       <datalist id={`barangay-list-${participant.id}`}>
                         {barangayOptions.map(b => <option key={b} value={b} />)}

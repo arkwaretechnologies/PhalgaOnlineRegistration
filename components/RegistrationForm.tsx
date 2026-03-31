@@ -120,6 +120,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
     is_anc?: string | null;
   } | null>(null);
   const [provinces, setProvinces] = useState<string[]>([]); // Start with empty array - only show fetched provinces
+  const [provincialLeagues, setProvincialLeagues] = useState<Array<{ acronym: string; name: string; label: string }>>([]);
   const [isProvinceLgu, setIsProvinceLgu] = useState(false);
   const [venues, setVenues] = useState<Array<{ confcode: string; name: string | null; venue: string | null }>>([]);
   const [venuesLoading, setVenuesLoading] = useState(true);
@@ -288,6 +289,24 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       });
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    // Fetch provincial leagues (for ANC Provincial League dropdown)
+    let cancelled = false;
+    fetch(appendConfcode('/api/get-provincial-leagues', confcode))
+      .then(res => res.json())
+      .then(data => {
+        if (!cancelled && Array.isArray(data)) {
+          setProvincialLeagues(data);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to fetch provincial leagues', err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [confcode]);
 
   // Start 30-minute session timer only when registration is open and we've received check-registration
   useEffect(() => {
@@ -1568,12 +1587,20 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                         <div className="grid grid-cols-2 gap-2">
                           <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">Provincial League</label>
-                            <input
-                              type="text"
+                            <select
                               value={participant.provincialLeague || ''}
-                              onChange={(e) => updateParticipant(participant.id, 'provincialLeague', e.target.value.toUpperCase())}
+                              onChange={(e) => updateParticipant(participant.id, 'provincialLeague', e.target.value)}
                               className="w-full h-8 px-3 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white text-sm"
-                            />
+                              required
+                            >
+                              <option value="">Select League</option>
+                              <option value="NO LEAGUE">NO LEAGUE</option>
+                              {provincialLeagues.map(league => (
+                                <option key={league.acronym || league.label} value={league.acronym}>
+                                  {league.label}
+                                </option>
+                              ))}
+                            </select>
                           </div>
                           <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">T-Shirt Size *</label>
@@ -1808,12 +1835,20 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                           />
                         </td>
                         <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 min-w-[120px]">
-                          <input
-                            type="text"
+                          <select
                             value={participant.provincialLeague || ''}
-                            onChange={(e) => updateParticipant(participant.id, 'provincialLeague', e.target.value.toUpperCase())}
+                            onChange={(e) => updateParticipant(participant.id, 'provincialLeague', e.target.value)}
                             className="w-full px-2 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white text-sm"
-                          />
+                            required
+                          >
+                            <option value="">Select League</option>
+                            <option value="NO LEAGUE">NO LEAGUE</option>
+                            {provincialLeagues.map(league => (
+                              <option key={league.acronym || league.label} value={league.acronym}>
+                                {league.label}
+                              </option>
+                            ))}
+                          </select>
                         </td>
                       </>
                     ) : (

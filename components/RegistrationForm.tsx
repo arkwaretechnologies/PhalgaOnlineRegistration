@@ -21,6 +21,7 @@ interface Participant {
   provincialLeague?: string;
   tshirt: string;
   member?: boolean;
+  nonMember?: boolean;
   contactNo?: string;
   email?: string;
 }
@@ -96,6 +97,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
     provincialLeague: '',
     tshirt: '',
     member: false,
+    nonMember: false,
     contactNo: '',
     email: ''
   }]);
@@ -127,12 +129,10 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
     'MUNICIPAL ACCCOUNTANT',
     'CITY ACCOUNTANT',
     'PROVINCIAL ACCOUNTANT',
-    'OIC-MUNICIPAL ACCOUNTAT',
+    'OIC-MUNICIPAL ACCOUNTANT',
     'OIC-CITY ACCOUNTANT',
     'OIC-PROVINCIAL ACCOUNTANT',
-  ]
-    .map(s => s.toUpperCase())
-    .sort((a, b) => a.localeCompare(b));
+  ].map(s => s.toUpperCase());
 
   const fetchAncLgus = useCallback((prov: string) => {
     const key = prov.toUpperCase().trim();
@@ -474,6 +474,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       provincialLeague: '',
       tshirt: '',
       member: false,
+      nonMember: false,
       contactNo: '',
       email: ''
     }]);
@@ -509,6 +510,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       provincialLeague: '',
       tshirt: '',
       member: false,
+      nonMember: false,
       contactNo: '',
       email: ''
     };
@@ -556,11 +558,23 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       ));
       return;
     }
-    if (field === 'member') {
+    if (field === 'member' || field === 'nonMember') {
       const checked = value === true;
-      setParticipants(participants.map(p =>
-        p.id === id ? { ...p, member: checked } : p
-      ));
+      setParticipants(participants.map(p => {
+        if (p.id !== id) return p;
+        if (field === 'member') {
+          return {
+            ...p,
+            member: checked,
+            nonMember: checked ? false : p.nonMember ?? false,
+          };
+        }
+        return {
+          ...p,
+          nonMember: checked,
+          member: checked ? false : p.member ?? false,
+        };
+      }));
       return;
     }
     const strValue = typeof value === 'string' ? value : '';
@@ -692,6 +706,11 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       const positionLvl = getPositionLvl(p.position);
       if (!isAnc && positionLvl === 'BGY' && (!p.barangay || p.barangay.trim() === '')) {
         setErrorModalMessage(`Participant ${i + 1}: Barangay is required for this position.`);
+        setShowErrorModal(true);
+        return;
+      }
+      if (isAnc && !p.member && !p.nonMember) {
+        setErrorModalMessage(`Participant ${i + 1}: Please select either Member or Non-Member.`);
         setShowErrorModal(true);
         return;
       }
@@ -1337,7 +1356,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
           </table>
 
           <p className="mb-4 text-xs sm:text-sm text-gray-600">
-            <strong>NOTE:</strong> T-shirt size is limited to XS,S, M, L, XL, XXL,XXXL,5XL,8XL
+            <strong>NOTE:</strong> T-shirt size is limited to XS,S, M, L, XL, XXL
           </p>
 
           {/* Participants Section - Card Layout (mobile always, desktop when ANC) */}
@@ -1507,6 +1526,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                               value={participant.expiryDate || ''}
                               onChange={(e) => updateParticipant(participant.id, 'expiryDate', e.target.value)}
                               className="w-full h-8 px-3 py-1 border border-gray-300 rounded text-gray-900 bg-white text-sm"
+                              disabled={(participant.prcNo || '').toString().trim() === ''}
                               required={(participant.prcNo || '').toString().trim() !== ''}
                             />
                           </div>
@@ -1523,7 +1543,11 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                               onChange={(e) => updateParticipant(participant.id, 'contactNo', e.target.value)}
                               className="w-full h-8 px-3 py-1 border border-gray-300 rounded text-gray-900 bg-white text-sm"
                               placeholder="09XXXXXXXXX"
+                              title="Contact number must start with 09 and be exactly 11 digits"
                             />
+                            {participant.contactNo && !validateContactNumber((participant.contactNo || '').toString().trim()) && (
+                              <p className="text-xs text-red-600 mt-1">Contact number must start with 09 and be exactly 11 digits</p>
+                            )}
                           </div>
                           <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">Email</label>
@@ -1531,9 +1555,14 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                               type="email"
                               value={participant.email || ''}
                               onChange={(e) => updateParticipant(participant.id, 'email', e.target.value)}
-                              className="w-full h-8 px-3 py-1 border border-gray-300 rounded text-gray-900 bg-white text-sm"
+                              className={`w-full h-8 px-3 py-1 border border-gray-300 rounded text-gray-900 bg-white text-sm ${
+                                participant.email && !validateEmail((participant.email || '').toString().trim()) ? 'border-red-500' : ''
+                              }`}
                               placeholder="name@example.com"
                             />
+                            {participant.email && !validateEmail((participant.email || '').toString().trim()) && (
+                              <p className="text-xs text-red-600 mt-1">Please enter a valid email address</p>
+                            )}
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
@@ -1561,15 +1590,28 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                             </select>
                           </div>
                         </div>
-                        <label className="flex items-center gap-2 select-none">
-                          <input
-                            type="checkbox"
-                            checked={!!participant.member}
-                            onChange={(e) => updateParticipant(participant.id, 'member', e.target.checked)}
-                            className="rounded border-gray-300"
-                          />
-                          <span className="text-sm font-semibold text-gray-700">Member <span className="font-normal text-gray-500 text-xs">(Check if you are a member of PhALGA)</span></span>
-                        </label>
+                        <div className="flex flex-wrap gap-4">
+                          <label className="flex items-center gap-2 select-none">
+                            <input
+                              type="checkbox"
+                              checked={!!participant.member}
+                              onChange={(e) => updateParticipant(participant.id, 'member', e.target.checked)}
+                              className="rounded border-gray-300"
+                            />
+                            <span className="text-sm font-semibold text-gray-700">
+                              Member <span className="font-normal text-gray-500 text-xs">(Check if you are a member of PhALGA)</span>
+                            </span>
+                          </label>
+                          <label className="flex items-center gap-2 select-none">
+                            <input
+                              type="checkbox"
+                              checked={!!participant.nonMember}
+                              onChange={(e) => updateParticipant(participant.id, 'nonMember', e.target.checked)}
+                              className="rounded border-gray-300"
+                            />
+                            <span className="text-sm font-semibold text-gray-700">Non-Member</span>
+                          </label>
+                        </div>
                       </>
                     ) : (
                       <>
@@ -1755,12 +1797,13 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                             className="w-full h-8 px-2 py-1 border border-gray-300 rounded text-gray-900 bg-white text-sm"
                           />
                         </td>
-                        <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 min-w-[60px]">
+                      <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 min-w-[60px]">
                           <input
                             type="date"
                             value={participant.expiryDate || ''}
                             onChange={(e) => updateParticipant(participant.id, 'expiryDate', e.target.value)}
                             className="w-full h-8 px-2 py-1 border border-gray-300 rounded text-gray-900 bg-white text-sm"
+                          disabled={(participant.prcNo || '').toString().trim() === ''}
                             required={(participant.prcNo || '').toString().trim() !== ''}
                           />
                         </td>
@@ -1820,13 +1863,27 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                       </select>
                     </td>
                     {isAnc && (
-                      <td className="border border-gray-300 p-1 bg-blue-50 w-24 text-center">
-                        <input
-                          type="checkbox"
-                          checked={!!participant.member}
-                          onChange={(e) => updateParticipant(participant.id, 'member', e.target.checked)}
-                          className="rounded border-gray-300"
-                        />
+                      <td className="border border-gray-300 p-1 bg-blue-50 w-32 text-center">
+                        <div className="flex flex-col items-center gap-1 text-[11px] leading-tight">
+                          <label className="flex items-center gap-1 select-none">
+                            <input
+                              type="checkbox"
+                              checked={!!participant.member}
+                              onChange={(e) => updateParticipant(participant.id, 'member', e.target.checked)}
+                              className="w-3 h-3 rounded border-gray-300"
+                            />
+                            <span>Member</span>
+                          </label>
+                          <label className="flex items-center gap-1 select-none">
+                            <input
+                              type="checkbox"
+                              checked={!!participant.nonMember}
+                              onChange={(e) => updateParticipant(participant.id, 'nonMember', e.target.checked)}
+                              className="w-3 h-3 rounded border-gray-300"
+                            />
+                            <span>Non-Member</span>
+                          </label>
+                        </div>
                       </td>
                     )}
                     <td className="border border-gray-300 p-1">

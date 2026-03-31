@@ -209,6 +209,8 @@ export async function POST(request: Request) {
         const dateObj = new Date(expirydateStr);
         if (!isNaN(dateObj.getTime())) expirydate = dateObj.toISOString().split('T')[0];
       }
+      const provincialleague = (formData[`PROVINCIALLEAGUE|${i}`] || '').toString().trim().toUpperCase() || null;
+      const phalgamember = (formData[`MEMBER|${i}`] || '').toString().trim().toUpperCase() === 'Y' ? 'Y' : null;
       participants.push({
         lastname: (formData[`LASTNAME|${i}`] || '').toString().trim().toUpperCase(),
         firstname: (formData[`FIRSTNAME|${i}`] || '').toString().trim().toUpperCase(),
@@ -222,6 +224,8 @@ export async function POST(request: Request) {
         contactnum: (formData[`CONTACTNUMBER|${i}`] || '').toString().trim().toUpperCase(),
         prcnum: (formData[`PRCNUM|${i}`] || '').toString().trim().toUpperCase(),
         expirydate,
+        provincialleague,
+        phalgamember,
         email: (formData[`EMAIL|${i}`] || '').toString().trim().toLowerCase()
       });
     }
@@ -293,6 +297,52 @@ export async function POST(request: Request) {
     }
 
     const regId = rpcData.regid;
+
+    // Ensure ANC-specific fields are saved to regd even if the RPC doesn't map them yet
+    // (PRC/expiry may already be handled by the RPC; we only backfill the new columns.)
+    try {
+      const { data: insertedDetails, error: insertedDetailsError } = await withTimeout(
+        supabase
+          .from('regd')
+          .select('linenum')
+          .eq('regid', regId)
+          .eq('confcode', confcode)
+          .order('linenum', { ascending: true }),
+        timeoutPromise
+      ) as { data: Array<{ linenum: number }> | null; error: any };
+
+      if (insertedDetailsError) {
+        console.error('Failed to read inserted regd rows:', insertedDetailsError);
+        throw new Error('Failed to save additional registration details.');
+      }
+
+      const linenums = (insertedDetails || []).map(r => r.linenum);
+      for (let i = 0; i < Math.min(linenums.length, participants.length); i++) {
+        const linenum = linenums[i];
+        const row = participants[i] as any;
+        const { error: updateErr } = await withTimeout(
+          supabase
+            .from('regd')
+            .update({
+              provincialleague: row.provincialleague ?? null,
+              phalgamember: row.phalgamember ?? null,
+            })
+            .eq('regid', regId)
+            .eq('confcode', confcode)
+            .eq('linenum', linenum),
+          timeoutPromise
+        ) as { error: any };
+
+        if (updateErr) {
+          console.error('Failed to update regd ANC fields:', updateErr);
+          throw new Error('Failed to save additional registration details.');
+        }
+      }
+    } catch (e) {
+      clearTimeout(timeoutId);
+      const message = e instanceof Error ? e.message : 'Failed to save additional registration details.';
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
 
     // Send confirmation email (non-blocking - registration succeeds even if email fails)
     try {

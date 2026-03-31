@@ -14,6 +14,7 @@ export interface ConferenceInfo {
   psgc: string | null;
   include_psgc: string | null;
   exclude_psgc: string | null;
+  is_anc: string | null;
   on_maintenance: string | null;
   notification: string | null;
   linked_conference: string | null;

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { toast } from 'sonner';
 
 interface Participant {
   id: number;
@@ -14,7 +15,11 @@ interface Participant {
   position: string;
   lgu: string;
   barangay: string;
+  prcNo?: string;
+  expiryDate?: string; // yyyy-mm-dd (from <input type="date" />)
+  provincialLeague?: string;
   tshirt: string;
+  member?: boolean;
 }
 
 // Default provinces list as fallback if API fails
@@ -81,7 +86,11 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
     position: '',
     lgu: '',
     barangay: '',
-    tshirt: ''
+    prcNo: '',
+    expiryDate: '',
+    provincialLeague: '',
+    tshirt: '',
+    member: false
   }]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -98,11 +107,24 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
     date_to: string | null;
     venue: string | null;
     psgc: string | null;
+    is_anc?: string | null;
   } | null>(null);
   const [provinces, setProvinces] = useState<string[]>([]); // Start with empty array - only show fetched provinces
   const [isProvinceLgu, setIsProvinceLgu] = useState(false);
   const [venues, setVenues] = useState<Array<{ confcode: string; name: string | null; venue: string | null }>>([]);
   const [venuesLoading, setVenuesLoading] = useState(true);
+
+  const isAnc = (conference?.is_anc || '').toString().trim().toUpperCase() === 'Y';
+  const ANC_POSITION_CHOICES = [
+    'MUNICIPAL ACCCOUNTANT',
+    'CITY ACCOUNTANT',
+    'PROVINCIAL ACCOUNTANT',
+    'OIC-MUNICIPAL ACCOUNTAT',
+    'OIC-CITY ACCOUNTANT',
+    'OIC-PROVINCIAL ACCOUNTANT',
+  ]
+    .map(s => s.toUpperCase())
+    .sort((a, b) => a.localeCompare(b));
 
   // Session timer (only when a slot is open)
   const [registrationChecked, setRegistrationChecked] = useState(false);
@@ -131,7 +153,8 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
             date_from: null,
             date_to: null,
             venue: null,
-            psgc: null
+            psgc: null,
+            is_anc: null
           });
         }
       })
@@ -144,7 +167,8 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
           date_from: null,
           date_to: null,
           venue: null,
-          psgc: null
+          psgc: null,
+          is_anc: null
         });
       });
 
@@ -318,6 +342,10 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
 
   // Fetch barangays when LGU changes
   useEffect(() => {
+    if (isAnc) {
+      setBarangayOptions([]);
+      return;
+    }
     if (lgu && selectedLguPsgc) {
       // console.log('=== Fetching Barangays for LGU ===');
       // console.log('LGU selected:', lgu);
@@ -364,7 +392,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
     } else {
       setBarangayOptions([]);
     }
-  }, [lgu, selectedLguPsgc]);
+  }, [lgu, selectedLguPsgc, isAnc]);
 
   // LGU cell always matches header: keep all participant LGUs in sync with header LGU
   useEffect(() => {
@@ -409,7 +437,11 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       position: '',
       lgu: lgu, // Default to header LGU
       barangay: '',
-      tshirt: ''
+      prcNo: '',
+      expiryDate: '',
+      provincialLeague: '',
+      tshirt: '',
+      member: false
     }]);
   };
 
@@ -437,7 +469,11 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       position: '',
       lgu: lgu, // Default to header LGU
       barangay: '',
-      tshirt: ''
+      prcNo: '',
+      expiryDate: '',
+      provincialLeague: '',
+      tshirt: '',
+      member: false
     };
     setParticipants([...participants, newParticipant]);
   };
@@ -483,6 +519,13 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       ));
       return;
     }
+    if (field === 'member') {
+      const checked = value === true;
+      setParticipants(participants.map(p =>
+        p.id === id ? { ...p, member: checked } : p
+      ));
+      return;
+    }
     const strValue = typeof value === 'string' ? value : '';
     // M.I. should allow letters only (no special chars / digits), up to 2 chars
     let finalValue = strValue;
@@ -491,6 +534,13 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
         .toUpperCase()
         .replace(/[^A-Z]/g, '')
         .slice(0, 2);
+    }
+    if (field === 'prcNo') {
+      const numericOnly = formatPRCNumber(strValue);
+      if (numericOnly !== strValue) {
+        toast.warning('PRC No must be numbers only.');
+      }
+      finalValue = numericOnly;
     }
 
     setParticipants(participants.map(p =>
@@ -521,15 +571,22 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
 
   // Helper function to get the lvl for a position name
   const getPositionLvl = (positionName: string): string | null => {
+    if (isAnc) return null;
     const position = positionOptions.find(p => p.name.toUpperCase() === positionName.toUpperCase());
     return position?.lvl || null;
   };
 
   // Helper function to check if Barangay should be enabled for a participant
   const isBarangayEnabled = (participant: Participant): boolean => {
+    if (isAnc) return false;
     if (!participant.position) return false;
     const lvl = getPositionLvl(participant.position);
     return lvl === 'BGY';
+  };
+
+  const getEffectivePositions = (effectiveLgu: string): Array<{ name: string; lvl: string | null }> => {
+    if (isAnc) return ANC_POSITION_CHOICES.map(name => ({ name, lvl: null }));
+    return getFilteredPositions(effectiveLgu);
   };
 
   // Helper function to get filtered positions based on LGU
@@ -549,7 +606,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
     setParticipants(participants.map(p => {
       if (p.id === participantId) {
         // If the new position doesn't have lvl === 'BGY', clear the barangay field
-        const shouldClearBarangay = lvl !== 'BGY';
+        const shouldClearBarangay = isAnc ? true : lvl !== 'BGY';
         return {
           ...p,
           position: newPositionUpper,
@@ -611,13 +668,19 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       }
       // Barangay validation: required if position LVL is 'BGY'
       const positionLvl = getPositionLvl(p.position);
-      if (positionLvl === 'BGY' && (!p.barangay || p.barangay.trim() === '')) {
+      if (!isAnc && positionLvl === 'BGY' && (!p.barangay || p.barangay.trim() === '')) {
         setErrorModalMessage(`Participant ${i + 1}: Barangay is required for this position.`);
         setShowErrorModal(true);
         return;
       }
       if (!p.tshirt || p.tshirt.trim() === '') {
         setErrorModalMessage(`Participant ${i + 1}: T-Shirt Size is required.`);
+        setShowErrorModal(true);
+        return;
+      }
+
+      if (isAnc && (p.prcNo || '').toString().trim() !== '' && (p.expiryDate || '').toString().trim() === '') {
+        setErrorModalMessage(`Participant ${i + 1}: Expiry Date is required when PRC No has a value.`);
         setShowErrorModal(true);
         return;
       }
@@ -659,7 +722,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
         normalize(p.suffix),
         normalize(p.position),
         normalize(effectiveLgu),
-        normalize(p.barangay)
+        ...(isAnc ? [] : [normalize(p.barangay)])
       ];
       return { index: index + 1, key: keyParts.join('|') };
     });
@@ -703,8 +766,12 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       formData[`SUFFIX|${index}`] = (p.suffix ?? '').toString().trim();
       formData[`DESIGNATION|${index}`] = (p.position ?? '').toString().trim();
       formData[`LGU|${index}`] = ((p.lgu || lgu) ?? '').toString().trim(); // Use header LGU if participant LGU is empty
-      formData[`BRGY|${index}`] = (p.barangay ?? '').toString().trim();
+      formData[`BRGY|${index}`] = isAnc ? '' : (p.barangay ?? '').toString().trim();
       formData[`TSHIRTSIZE|${index}`] = (p.tshirt ?? '').toString().trim();
+      formData[`PRCNUM|${index}`] = isAnc ? (p.prcNo ?? '').toString().trim() : '';
+      formData[`EXPIRYDATE|${index}`] = isAnc ? (p.expiryDate ?? '').toString().trim() : '';
+      formData[`PROVINCIALLEAGUE|${index}`] = isAnc ? (p.provincialLeague ?? '').toString().trim() : '';
+      formData[`MEMBER|${index}`] = isAnc && p.member ? 'Y' : '';
     });
 
     // Store form data and show confirmation
@@ -915,7 +982,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
 
   return (
     <div className="min-h-screen bg-gray-50 py-4 sm:py-6 md:py-8 px-3 sm:px-4">
-      <div className="max-w-[100%] sm:max-w-[95%] mx-auto">
+      <div className="max-w-screen-2xl mx-auto">
         <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-lg p-4 sm:p-6 md:p-8">
           {/* Header with Logos */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-2 mb-6 sm:mb-8">
@@ -1341,7 +1408,6 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                           onChange={(e) => updateParticipant(participant.id, 'suffix', e.target.value.toUpperCase())}
                           className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
                           maxLength={12}
-                          placeholder="JR, SR, II"
                         />
                       </div>
                     </div>
@@ -1353,11 +1419,12 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                         value={participant.position}
                         onChange={(e) => handlePositionChange(participant.id, e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
-                        placeholder="Enter or select position"
                         required
                       />
                       <datalist id={`position-list-mobile-${participant.id}`}>
-                        {getFilteredPositions(participant.lgu || lgu).map(position => <option key={position.name} value={position.name} />)}
+                        {getEffectivePositions(participant.lgu || lgu).map(position => (
+                          <option key={position.name} value={position.name} />
+                        ))}
                       </datalist>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -1372,32 +1439,70 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                           aria-label="LGU (from header)"
                         />
                       </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-700 mb-1">
-                          Barangay{isBarangayEnabled(participant) ? ' *' : ''}
-                        </label>
-                        <input
-                          type="text"
-                          list={`barangay-list-mobile-${participant.id}`}
-                          value={participant.barangay}
-                          onChange={(e) => handleBarangayChange(participant.id, e)}
-                          onInput={(e) => handleBarangayChange(participant.id, e)}
-                          onBlur={(e) => {
-                            const enteredValue = e.target.value.trim().toUpperCase();
-                            const isValid = barangayOptions.some(b => b.toUpperCase() === enteredValue);
-                            if (!isValid && enteredValue !== '' && isBarangayEnabled(participant)) {
-                              updateParticipant(participant.id, 'barangay', '');
-                            }
-                          }}
-                          className="w-full px-3 py-2.5 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
-                          disabled={!lgu || !isBarangayEnabled(participant)}
-                          required={isBarangayEnabled(participant)}
-                        />
-                        <datalist id={`barangay-list-mobile-${participant.id}`}>
-                          {barangayOptions.map(b => <option key={b} value={b} />)}
-                        </datalist>
-                      </div>
+                      {!isAnc && (
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 mb-1">
+                            Barangay{isBarangayEnabled(participant) ? ' *' : ''}
+                          </label>
+                          <input
+                            type="text"
+                            list={`barangay-list-mobile-${participant.id}`}
+                            value={participant.barangay}
+                            onChange={(e) => handleBarangayChange(participant.id, e)}
+                            onInput={(e) => handleBarangayChange(participant.id, e)}
+                            onBlur={(e) => {
+                              const enteredValue = e.target.value.trim().toUpperCase();
+                              const isValid = barangayOptions.some(b => b.toUpperCase() === enteredValue);
+                              if (!isValid && enteredValue !== '' && isBarangayEnabled(participant)) {
+                                updateParticipant(participant.id, 'barangay', '');
+                              }
+                            }}
+                            className="w-full px-3 py-2.5 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
+                            disabled={!lgu || !isBarangayEnabled(participant)}
+                            required={isBarangayEnabled(participant)}
+                          />
+                          <datalist id={`barangay-list-mobile-${participant.id}`}>
+                            {barangayOptions.map(b => <option key={b} value={b} />)}
+                          </datalist>
+                        </div>
+                      )}
                     </div>
+                    {isAnc && (
+                      <div className="grid grid-cols-1 gap-3">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-700 mb-1">PRC No</label>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              value={participant.prcNo || ''}
+                              onChange={(e) => updateParticipant(participant.id, 'prcNo', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900 bg-white text-base"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-700 mb-1">Expiry Date</label>
+                            <input
+                              type="date"
+                              value={participant.expiryDate || ''}
+                              onChange={(e) => updateParticipant(participant.id, 'expiryDate', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900 bg-white text-base"
+                              required={(participant.prcNo || '').toString().trim() !== ''}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-700 mb-1">Provincial League</label>
+                          <input
+                            type="text"
+                            value={participant.provincialLeague || ''}
+                            onChange={(e) => updateParticipant(participant.id, 'provincialLeague', e.target.value.toUpperCase())}
+                            className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
+                          />
+                        </div>
+                      </div>
+                    )}
                     <div>
                       <label className="block text-xs font-semibold text-gray-700 mb-1">T-Shirt Size *</label>
                       <select
@@ -1412,6 +1517,17 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                         ))}
                       </select>
                     </div>
+                    {isAnc && (
+                      <label className="flex items-center gap-2 select-none">
+                        <input
+                          type="checkbox"
+                          checked={!!participant.member}
+                          onChange={(e) => updateParticipant(participant.id, 'member', e.target.checked)}
+                          className="rounded border-gray-300"
+                        />
+                        <span className="text-sm font-semibold text-gray-700">Member</span>
+                      </label>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1423,7 +1539,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
             <table className="w-full border-collapse border border-gray-300">
               <thead>
                 <tr>
-                  <th colSpan={9} className="border border-gray-300 p-2 bg-gray-200 text-center">
+                  <th colSpan={isAnc ? 11 : 9} className="border border-gray-300 p-2 bg-gray-200 text-center">
                     <span className="text-lg font-bold text-gray-900">LIST OF PARTICIPANTS</span>
                     <span className="ml-4 text-base font-normal text-gray-700">
                       (Total: {participants.length} {participants.length === 1 ? 'participant' : 'participants'})
@@ -1431,21 +1547,39 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                   </th>
                 </tr>
                 <tr>
-                  <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">LAST NAME</th>
-                  <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">FIRST NAME</th>
-                  <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-16">M.I.</th>
-                  <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-20">SUFFIX</th>
-                  <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-48">POSITION</th>
-                  <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[120px]">LGU</th>
-                  <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">BARANGAY</th>
-                  <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-32">T-SHIRT</th>
-                  <th className="border border-gray-300 p-2 bg-gray-200 w-40 text-gray-900">ACTIONS</th>
+                  <th className={`border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 ${isAnc ? 'min-w-[190px]' : 'min-w-[170px]'}`}>LAST NAME</th>
+                  <th className={`border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 ${isAnc ? 'min-w-[190px]' : 'min-w-[170px]'}`}>FIRST NAME</th>
+                  <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-10">M.I.</th>
+                  <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-16">SUFFIX</th>
+                  <th className={`border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 ${isAnc ? 'w-72' : 'w-56'}`}>POSITION</th>
+                  {!isAnc && (
+                    <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[260px]">
+                      LGU
+                    </th>
+                  )}
+                  {isAnc && (
+                    <>
+                      <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[84px]">PRC NO</th>
+                      <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[56px]">EXPIRY DATE</th>
+                      <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[100px]">PROVINCIAL LEAGUE</th>
+                    </>
+                  )}
+                  {!isAnc && (
+                    <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[240px]">BARANGAY</th>
+                  )}
+                  <th className={`border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 ${isAnc ? 'w-40' : 'w-40'}`}>T-SHIRT</th>
+                  {isAnc && (
+                    <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-20">MEMBER</th>
+                  )}
+                  {!isAnc && (
+                    <th className="border border-gray-300 p-2 bg-gray-200 text-gray-900 w-32">ACTIONS</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {participants.map((participant) => (
                   <tr key={participant.id}>
-                    <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50">
+                    <td className={`border border-gray-300 p-1.5 md:p-2 bg-blue-50 ${isAnc ? 'min-w-[190px]' : 'min-w-[170px]'}`}>
                       <input
                         type="text"
                         value={participant.lastName}
@@ -1454,7 +1588,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                         required
                       />
                     </td>
-                    <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50">
+                    <td className={`border border-gray-300 p-1.5 md:p-2 bg-blue-50 ${isAnc ? 'min-w-[190px]' : 'min-w-[170px]'}`}>
                       <input
                         type="text"
                         value={participant.firstName}
@@ -1484,64 +1618,99 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                         </label>
                       </div>
                     </td>
-                    <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 w-16">
+                    <td className={`border border-gray-300 p-1.5 md:p-2 bg-blue-50 ${isAnc ? 'w-16' : 'w-14'}`}>
                       <input
                         type="text"
                         value={participant.suffix}
                         onChange={(e) => updateParticipant(participant.id, 'suffix', e.target.value.toUpperCase())}
                         className="w-full px-2 py-1.5 md:py-1 border-0 bg-transparent uppercase text-gray-900 text-sm"
                         maxLength={12}
-                        placeholder="JR, SR, II"
                       />
                     </td>
-                    <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 w-48">
+                    <td className={`border border-gray-300 p-1.5 md:p-2 bg-blue-50 ${isAnc ? 'w-72' : 'w-56'}`}>
                       <input
                         type="text"
                         list={`position-list-${participant.id}`}
                         value={participant.position}
                         onChange={(e) => handlePositionChange(participant.id, e.target.value)}
                         className="w-full px-2 py-1.5 md:py-1 border-0 bg-transparent uppercase text-gray-900 text-sm"
-                        placeholder="Enter position"
                         required
                       />
                       <datalist id={`position-list-${participant.id}`}>
-                        {getFilteredPositions(participant.lgu || lgu).map(position => <option key={position.name} value={position.name} />)}
+                        {getEffectivePositions(participant.lgu || lgu).map(position => (
+                          <option key={position.name} value={position.name} />
+                        ))}
                       </datalist>
                     </td>
-                    <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 min-w-[120px]">
-                      <input
-                        type="text"
-                        value={participant.lgu || lgu}
-                        readOnly
-                        disabled
-                        className="w-full min-w-0 px-2 py-1.5 md:py-1 border border-gray-300 rounded bg-gray-100 uppercase text-gray-700 text-sm disabled:cursor-not-allowed disabled:opacity-100"
-                        aria-label="LGU (from header)"
-                      />
-                    </td>
-                    <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50">
-                      <input
-                        type="text"
-                        list={`barangay-list-${participant.id}`}
-                        value={participant.barangay}
-                        onChange={(e) => handleBarangayChange(participant.id, e)}
-                        onInput={(e) => handleBarangayChange(participant.id, e)}
-                        onBlur={(e) => {
-                          const enteredValue = e.target.value.trim().toUpperCase();
-                          const isValid = barangayOptions.some(b => b.toUpperCase() === enteredValue);
-                          if (!isValid && enteredValue !== '' && isBarangayEnabled(participant)) {
-                            updateParticipant(participant.id, 'barangay', '');
-                          }
-                        }}
-                        className="w-full px-2 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white text-sm"
-                        disabled={!lgu || !isBarangayEnabled(participant)}
-                        required={isBarangayEnabled(participant)}
-                        title={!lgu ? 'Please select an LGU first' : (!isBarangayEnabled(participant) ? 'Barangay is only for positions with level BGY' : 'Select or type barangay')}
-                      />
-                      <datalist id={`barangay-list-${participant.id}`}>
-                        {barangayOptions.map(b => <option key={b} value={b} />)}
-                      </datalist>
-                    </td>
-                    <td className="border border-gray-300 p-1 bg-blue-50 w-32">
+                    {!isAnc && (
+                      <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 min-w-[260px]">
+                        <input
+                          type="text"
+                          value={participant.lgu || lgu}
+                          readOnly
+                          disabled
+                          className="w-full min-w-0 px-2 py-1.5 md:py-1 border border-gray-300 rounded bg-gray-100 uppercase text-gray-700 text-sm disabled:cursor-not-allowed disabled:opacity-100"
+                          aria-label="LGU (from header)"
+                        />
+                      </td>
+                    )}
+                    {isAnc && (
+                      <>
+                        <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 min-w-[84px]">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={participant.prcNo || ''}
+                            onChange={(e) => updateParticipant(participant.id, 'prcNo', e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-gray-900 bg-white text-sm"
+                          />
+                        </td>
+                        <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 min-w-[60px]">
+                          <input
+                            type="date"
+                            value={participant.expiryDate || ''}
+                            onChange={(e) => updateParticipant(participant.id, 'expiryDate', e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-gray-900 bg-white text-sm"
+                            required={(participant.prcNo || '').toString().trim() !== ''}
+                          />
+                        </td>
+                        <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 min-w-[120px]">
+                          <input
+                            type="text"
+                            value={participant.provincialLeague || ''}
+                            onChange={(e) => updateParticipant(participant.id, 'provincialLeague', e.target.value.toUpperCase())}
+                            className="w-full px-2 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white text-sm"
+                          />
+                        </td>
+                      </>
+                    )}
+                    {!isAnc && (
+                      <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 min-w-[240px]">
+                        <input
+                          type="text"
+                          list={`barangay-list-${participant.id}`}
+                          value={participant.barangay}
+                          onChange={(e) => handleBarangayChange(participant.id, e)}
+                          onInput={(e) => handleBarangayChange(participant.id, e)}
+                          onBlur={(e) => {
+                            const enteredValue = e.target.value.trim().toUpperCase();
+                            const isValid = barangayOptions.some(b => b.toUpperCase() === enteredValue);
+                            if (!isValid && enteredValue !== '' && isBarangayEnabled(participant)) {
+                              updateParticipant(participant.id, 'barangay', '');
+                            }
+                          }}
+                          className="w-full px-2 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white text-sm"
+                          disabled={!lgu || !isBarangayEnabled(participant)}
+                          required={isBarangayEnabled(participant)}
+                          title={!lgu ? 'Please select an LGU first' : (!isBarangayEnabled(participant) ? 'Barangay is only for positions with level BGY' : 'Select or type barangay')}
+                        />
+                        <datalist id={`barangay-list-${participant.id}`}>
+                          {barangayOptions.map(b => <option key={b} value={b} />)}
+                        </datalist>
+                      </td>
+                    )}
+                    <td className={`border border-gray-300 p-1 bg-blue-50 ${isAnc ? 'w-40' : 'w-40'}`}>
                       <select
                         value={participant.tshirt}
                         onChange={(e) => updateParticipant(participant.id, 'tshirt', e.target.value)}
@@ -1554,25 +1723,37 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                         ))}
                       </select>
                     </td>
-                    <td className="border border-gray-300 p-1">
-                      <div className="flex gap-1">
-                        <button
-                          type="button"
-                          onClick={() => deleteParticipant(participant.id)}
-                          className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
-                        >
-                          Delete
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => insertParticipant(participant.id)}
-                          disabled={participants.length >= MAX_PARTICIPANTS}
-                          className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                        >
-                          Insert
-                        </button>
-                      </div>
-                    </td>
+                    {isAnc && (
+                      <td className="border border-gray-300 p-1 bg-blue-50 w-24 text-center">
+                        <input
+                          type="checkbox"
+                          checked={!!participant.member}
+                          onChange={(e) => updateParticipant(participant.id, 'member', e.target.checked)}
+                          className="rounded border-gray-300"
+                        />
+                      </td>
+                    )}
+                    {!isAnc && (
+                      <td className="border border-gray-300 p-1">
+                        <div className="flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => deleteParticipant(participant.id)}
+                            className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
+                          >
+                            Delete
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => insertParticipant(participant.id)}
+                            disabled={participants.length >= MAX_PARTICIPANTS}
+                            className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                          >
+                            Insert
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -1798,9 +1979,23 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                           <div className="space-y-1.5 text-xs">
                             <div><span className="font-semibold text-gray-700">Name:</span> <span className="text-gray-900">{pendingFormData[`LASTNAME|${index}`] || '-'}, {pendingFormData[`FIRSTNAME|${index}`] || '-'} {pendingFormData[`MI|${index}`] || ''} {pendingFormData[`SUFFIX|${index}`] || ''}</span></div>
                             <div><span className="font-semibold text-gray-700">Position:</span> <span className="text-gray-900">{pendingFormData[`DESIGNATION|${index}`] || '-'}</span></div>
-                            <div><span className="font-semibold text-gray-700">LGU:</span> <span className="text-gray-900">{pendingFormData[`LGU|${index}`] || '-'}</span></div>
-                            <div><span className="font-semibold text-gray-700">Barangay:</span> <span className="text-gray-900">{pendingFormData[`BRGY|${index}`] || '-'}</span></div>
+                            {!isAnc && (
+                              <div><span className="font-semibold text-gray-700">LGU:</span> <span className="text-gray-900">{pendingFormData[`LGU|${index}`] || '-'}</span></div>
+                            )}
+                            {isAnc && (
+                              <>
+                                <div><span className="font-semibold text-gray-700">PRC No:</span> <span className="text-gray-900">{pendingFormData[`PRCNUM|${index}`] || '-'}</span></div>
+                                <div><span className="font-semibold text-gray-700">Expiry Date:</span> <span className="text-gray-900">{pendingFormData[`EXPIRYDATE|${index}`] || '-'}</span></div>
+                                <div><span className="font-semibold text-gray-700">Provincial League:</span> <span className="text-gray-900">{pendingFormData[`PROVINCIALLEAGUE|${index}`] || '-'}</span></div>
+                              </>
+                            )}
+                            {!isAnc && (
+                              <div><span className="font-semibold text-gray-700">Barangay:</span> <span className="text-gray-900">{pendingFormData[`BRGY|${index}`] || '-'}</span></div>
+                            )}
                             <div><span className="font-semibold text-gray-700">T-Shirt:</span> <span className="text-gray-900">{pendingFormData[`TSHIRTSIZE|${index}`] || '-'}</span></div>
+                            {isAnc && (
+                              <div><span className="font-semibold text-gray-700">Member:</span> <span className="text-gray-900">{(pendingFormData[`MEMBER|${index}`] || '').toString().trim().toUpperCase() === 'Y' ? 'Y' : 'N'}</span></div>
+                            )}
                           </div>
                         </div>
                       );
@@ -1814,12 +2009,31 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                           <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">#</th>
                           <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">Last Name</th>
                           <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">First Name</th>
-                          <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-16">M.I.</th>
+                          <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-12">M.I.</th>
                           <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-16">Suffix</th>
-                          <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-48">Position</th>
-                          <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">LGU</th>
-                          <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">Barangay</th>
-                          <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-32">T-Shirt</th>
+                          <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[200px]">Position</th>
+                          {!isAnc && (
+                            <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[260px]">LGU</th>
+                          )}
+                          {isAnc && (
+                            <>
+                              <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[84px]">PRC No</th>
+                              <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[56px]">Expiry Date</th>
+                              <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[120px]">Provincial League</th>
+                            </>
+                          )}
+                          {!isAnc && (
+                            <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[240px]">Barangay</th>
+                          )}
+                          {!isAnc && (
+                            <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-48">T-Shirt</th>
+                          )}
+                          {isAnc && (
+                            <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-64">T-Shirt</th>
+                          )}
+                          {isAnc && (
+                            <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900">Member</th>
+                          )}
                         </tr>
                       </thead>
                       <tbody>
@@ -1837,9 +2051,23 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                               <td className="border border-gray-300 p-2 text-gray-900 w-16">{pendingFormData[`MI|${index}`] || '-'}</td>
                               <td className="border border-gray-300 p-2 text-gray-900 w-16">{pendingFormData[`SUFFIX|${index}`] || '-'}</td>
                               <td className="border border-gray-300 p-2 text-gray-900 w-48">{pendingFormData[`DESIGNATION|${index}`] || '-'}</td>
-                              <td className="border border-gray-300 p-2 text-gray-900">{pendingFormData[`LGU|${index}`] || '-'}</td>
-                              <td className="border border-gray-300 p-2 text-gray-900">{pendingFormData[`BRGY|${index}`] || '-'}</td>
-                              <td className="border border-gray-300 p-2 text-gray-900 w-32">{pendingFormData[`TSHIRTSIZE|${index}`] || '-'}</td>
+                              {!isAnc && (
+                                <td className="border border-gray-300 p-2 text-gray-900 min-w-[260px]">{pendingFormData[`LGU|${index}`] || '-'}</td>
+                              )}
+                              {isAnc && (
+                                <>
+                                  <td className="border border-gray-300 p-2 text-gray-900">{pendingFormData[`PRCNUM|${index}`] || '-'}</td>
+                                  <td className="border border-gray-300 p-2 text-gray-900">{pendingFormData[`EXPIRYDATE|${index}`] || '-'}</td>
+                                  <td className="border border-gray-300 p-2 text-gray-900">{pendingFormData[`PROVINCIALLEAGUE|${index}`] || '-'}</td>
+                                </>
+                              )}
+                              {!isAnc && (
+                                <td className="border border-gray-300 p-2 text-gray-900 min-w-[240px]">{pendingFormData[`BRGY|${index}`] || '-'}</td>
+                              )}
+                              <td className={`border border-gray-300 p-2 text-gray-900 ${isAnc ? 'w-64' : 'w-48'}`}>{pendingFormData[`TSHIRTSIZE|${index}`] || '-'}</td>
+                              {isAnc && (
+                                <td className="border border-gray-300 p-2 text-gray-900">{(pendingFormData[`MEMBER|${index}`] || '').toString().trim().toUpperCase() === 'Y' ? 'Y' : 'N'}</td>
+                              )}
                             </tr>
                           );
                         })}

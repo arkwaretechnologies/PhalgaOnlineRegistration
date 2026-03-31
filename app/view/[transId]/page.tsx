@@ -36,6 +36,8 @@ interface RegistrationDetail {
   contactnum: string;
   prcnum: string;
   expirydate: string | null;
+  provincialleague?: string | null;
+  phalgamember?: string | null;
   email: string;
 }
 
@@ -81,6 +83,7 @@ export default function ViewRegistration() {
     date_from: string | null;
     date_to: string | null;
     venue: string | null;
+    is_anc?: string | null;
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -239,7 +242,8 @@ export default function ViewRegistration() {
             name: '18th Mindanao Geographic Conference',
             date_from: null,
             date_to: null,
-            venue: null
+            venue: null,
+            is_anc: null
           });
         }
       } catch (err) {
@@ -249,13 +253,16 @@ export default function ViewRegistration() {
           name: '18th Mindanao Geographic Conference',
           date_from: null,
           date_to: null,
-          venue: null
+          venue: null,
+          is_anc: null
         });
       }
     };
 
     fetchConference();
   }, [header?.confcode]);
+
+  const isAnc = (conference?.is_anc || '').toString().trim().toUpperCase() === 'Y';
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -700,8 +707,20 @@ export default function ViewRegistration() {
                 <div className="space-y-1.5 text-xs">
                   <div><span className="font-semibold text-gray-700">Name:</span> <span className="text-gray-900">{detail.lastname}{detail.suffix ? ' ' + detail.suffix : ''}, {detail.firstname} {detail.middleinit}</span></div>
                   <div><span className="font-semibold text-gray-700">Designation:</span> <span className="text-gray-900">{detail.designation || '-'}</span></div>
-                  <div><span className="font-semibold text-gray-700">Barangay:</span> <span className="text-gray-900">{detail.brgy || '-'}</span></div>
+                  {isAnc && (
+                    <>
+                      <div><span className="font-semibold text-gray-700">PRC No:</span> <span className="text-gray-900">{detail.prcnum || '-'}</span></div>
+                      <div><span className="font-semibold text-gray-700">Expiry Date:</span> <span className="text-gray-900">{detail.expirydate || '-'}</span></div>
+                      <div><span className="font-semibold text-gray-700">Provincial League:</span> <span className="text-gray-900">{detail.provincialleague || '-'}</span></div>
+                    </>
+                  )}
+                  {!isAnc && (
+                    <div><span className="font-semibold text-gray-700">Barangay:</span> <span className="text-gray-900">{detail.brgy || '-'}</span></div>
+                  )}
                   <div><span className="font-semibold text-gray-700">T-Shirt Size:</span> <span className="text-gray-900">{detail.tshirtsize || '-'}</span></div>
+                  {isAnc && (
+                    <div><span className="font-semibold text-gray-700">Member:</span> <span className="text-gray-900">{(detail.phalgamember || '').toString().trim().toUpperCase() === 'Y' ? 'Y' : 'N'}</span></div>
+                  )}
                 </div>
               </div>
             ))}
@@ -714,8 +733,20 @@ export default function ViewRegistration() {
                   <th className="border border-gray-300 px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-semibold text-gray-700">#</th>
                   <th className="border border-gray-300 px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-semibold text-gray-700">Name</th>
                   <th className="border border-gray-300 px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-semibold text-gray-700">Designation</th>
-                  <th className="border border-gray-300 px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-semibold text-gray-700">Barangay</th>
+                  {isAnc && (
+                    <>
+                      <th className="border border-gray-300 px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-semibold text-gray-700">PRC No</th>
+                      <th className="border border-gray-300 px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-semibold text-gray-700">Expiry Date</th>
+                      <th className="border border-gray-300 px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-semibold text-gray-700">Provincial League</th>
+                    </>
+                  )}
+                  {!isAnc && (
+                    <th className="border border-gray-300 px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-semibold text-gray-700">Barangay</th>
+                  )}
                   <th className="border border-gray-300 px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-semibold text-gray-700">T-Shirt Size</th>
+                  {isAnc && (
+                    <th className="border border-gray-300 px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-semibold text-gray-700">Member</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -726,8 +757,20 @@ export default function ViewRegistration() {
                       {detail.lastname}{detail.suffix ? ' ' + detail.suffix : ''}, {detail.firstname} {detail.middleinit}
                     </td>
                     <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700">{detail.designation || '-'}</td>
-                    <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700">{detail.brgy || '-'}</td>
+                    {isAnc && (
+                      <>
+                        <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700">{detail.prcnum || '-'}</td>
+                        <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700">{detail.expirydate || '-'}</td>
+                        <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700">{detail.provincialleague || '-'}</td>
+                      </>
+                    )}
+                    {!isAnc && (
+                      <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700">{detail.brgy || '-'}</td>
+                    )}
                     <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700">{detail.tshirtsize || '-'}</td>
+                    {isAnc && (
+                      <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700">{(detail.phalgamember || '').toString().trim().toUpperCase() === 'Y' ? 'Y' : 'N'}</td>
+                    )}
                   </tr>
                 ))}
               </tbody>

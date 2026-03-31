@@ -531,14 +531,18 @@ export default function ViewRegistration() {
                 })()}
               </p>
             </div>
-            <div>
-              <span className="text-xs sm:text-sm font-medium text-gray-500">Province</span>
-              <p className="text-sm sm:text-base text-gray-800 break-words">{header.province}</p>
-            </div>
-            <div>
-              <span className="text-xs sm:text-sm font-medium text-gray-500">LGU</span>
-              <p className="text-sm sm:text-base text-gray-800 break-words">{header.lgu}</p>
-            </div>
+            {!isAnc && (
+              <div>
+                <span className="text-xs sm:text-sm font-medium text-gray-500">Province</span>
+                <p className="text-sm sm:text-base text-gray-800 break-words">{header.province}</p>
+              </div>
+            )}
+            {!isAnc && (
+              <div>
+                <span className="text-xs sm:text-sm font-medium text-gray-500">LGU</span>
+                <p className="text-sm sm:text-base text-gray-800 break-words">{header.lgu}</p>
+              </div>
+            )}
             <div>
               <span className="text-xs sm:text-sm font-medium text-gray-500">Contact Person</span>
               <p className="text-sm sm:text-base text-gray-800 break-words">{header.contactperson}</p>
@@ -709,8 +713,12 @@ export default function ViewRegistration() {
                   <div><span className="font-semibold text-gray-700">Designation:</span> <span className="text-gray-900">{detail.designation || '-'}</span></div>
                   {isAnc && (
                     <>
+                      <div><span className="font-semibold text-gray-700">Province:</span> <span className="text-gray-900">{detail.province || '-'}</span></div>
+                      <div><span className="font-semibold text-gray-700">LGU:</span> <span className="text-gray-900">{detail.lgu || '-'}</span></div>
                       <div><span className="font-semibold text-gray-700">PRC No:</span> <span className="text-gray-900">{detail.prcnum || '-'}</span></div>
                       <div><span className="font-semibold text-gray-700">Expiry Date:</span> <span className="text-gray-900">{detail.expirydate || '-'}</span></div>
+                      <div><span className="font-semibold text-gray-700">Contact No:</span> <span className="text-gray-900">{detail.contactnum || '-'}</span></div>
+                      <div><span className="font-semibold text-gray-700">Email:</span> <span className="text-gray-900 break-words">{detail.email || '-'}</span></div>
                       <div><span className="font-semibold text-gray-700">Provincial League:</span> <span className="text-gray-900">{detail.provincialleague || '-'}</span></div>
                     </>
                   )}
@@ -735,8 +743,12 @@ export default function ViewRegistration() {
                   <th className="border border-gray-300 px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-semibold text-gray-700">Designation</th>
                   {isAnc && (
                     <>
+                      <th className="border border-gray-300 px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-semibold text-gray-700">Province</th>
+                      <th className="border border-gray-300 px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-semibold text-gray-700">LGU</th>
                       <th className="border border-gray-300 px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-semibold text-gray-700">PRC No</th>
                       <th className="border border-gray-300 px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-semibold text-gray-700">Expiry Date</th>
+                      <th className="border border-gray-300 px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-semibold text-gray-700">Contact No</th>
+                      <th className="border border-gray-300 px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-semibold text-gray-700">Email</th>
                       <th className="border border-gray-300 px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-semibold text-gray-700">Provincial League</th>
                     </>
                   )}
@@ -759,8 +771,12 @@ export default function ViewRegistration() {
                     <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700">{detail.designation || '-'}</td>
                     {isAnc && (
                       <>
+                        <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700">{detail.province || '-'}</td>
+                        <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700">{detail.lgu || '-'}</td>
                         <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700">{detail.prcnum || '-'}</td>
                         <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700">{detail.expirydate || '-'}</td>
+                        <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700">{detail.contactnum || '-'}</td>
+                        <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700 break-words">{detail.email || '-'}</td>
                         <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700">{detail.provincialleague || '-'}</td>
                       </>
                     )}

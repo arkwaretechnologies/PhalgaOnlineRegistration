@@ -211,6 +211,7 @@ export async function POST(request: Request) {
       }
       const provincialleague = (formData[`PROVINCIALLEAGUE|${i}`] || '').toString().trim().toUpperCase() || null;
       const phalgamember = (formData[`MEMBER|${i}`] || '').toString().trim().toUpperCase() === 'Y' ? 'Y' : null;
+      const participantProvince = (formData[`PROVINCE|${i}`] || province).toString().trim().toUpperCase();
       participants.push({
         lastname: (formData[`LASTNAME|${i}`] || '').toString().trim().toUpperCase(),
         firstname: (formData[`FIRSTNAME|${i}`] || '').toString().trim().toUpperCase(),
@@ -219,7 +220,7 @@ export async function POST(request: Request) {
         designation: (formData[`DESIGNATION|${i}`] || '').toString().trim().toUpperCase(),
         brgy: (formData[`BRGY|${i}`] || '').toString().trim().toUpperCase(),
         lgu: (formData[`LGU|${i}`] || lgu).toString().trim().toUpperCase(),
-        province,
+        province: participantProvince,
         tshirtsize: (formData[`TSHIRTSIZE|${i}`] || '').toString().trim().toUpperCase(),
         contactnum: (formData[`CONTACTNUMBER|${i}`] || '').toString().trim().toUpperCase(),
         prcnum: (formData[`PRCNUM|${i}`] || '').toString().trim().toUpperCase(),

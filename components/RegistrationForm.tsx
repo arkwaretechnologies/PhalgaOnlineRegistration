@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -13,13 +13,16 @@ interface Participant {
   middleNameNotApplicable?: boolean;
   suffix: string;
   position: string;
+  province?: string;
   lgu: string;
   barangay: string;
   prcNo?: string;
-  expiryDate?: string; // yyyy-mm-dd (from <input type="date" />)
+  expiryDate?: string;
   provincialLeague?: string;
   tshirt: string;
   member?: boolean;
+  contactNo?: string;
+  email?: string;
 }
 
 // Default provinces list as fallback if API fails
@@ -44,6 +47,7 @@ const DEFAULT_PROVINCES = [
 ];
 
 const TSHIRT_SIZES = ['XS','S', 'M', 'L', 'XL', 'XXL','XXXL','5XL','8XL'];
+const ANC_TSHIRT_SIZES = ['XS','S', 'M', 'L', 'XL', 'XXL'];
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -84,14 +88,18 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
     middleNameNotApplicable: false,
     suffix: '',
     position: '',
+    province: '',
     lgu: '',
     barangay: '',
     prcNo: '',
     expiryDate: '',
     provincialLeague: '',
     tshirt: '',
-    member: false
+    member: false,
+    contactNo: '',
+    email: ''
   }]);
+  const [ancLguCache, setAncLguCache] = useState<Record<string, Array<{ name: string; psgc: string }>>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [isRegistrationOpen, setIsRegistrationOpen] = useState(true);
@@ -125,6 +133,29 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
   ]
     .map(s => s.toUpperCase())
     .sort((a, b) => a.localeCompare(b));
+
+  const fetchAncLgus = useCallback((prov: string) => {
+    const key = prov.toUpperCase().trim();
+    if (!key || ancLguCache[key]) return;
+    fetch(appendConfcode(`/api/get-lgus?province=${encodeURIComponent(key)}`, confcode))
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          const formatted = data.map((item: any) =>
+            typeof item === 'string'
+              ? { name: item, psgc: '' }
+              : { name: item.name || item.lguname || '', psgc: item.psgc || '' }
+          );
+          setAncLguCache(prev => ({ ...prev, [key]: formatted }));
+        }
+      })
+      .catch(() => {});
+  }, [ancLguCache, confcode]);
+
+  const getAncLguOptions = (prov: string | undefined) => {
+    if (!prov) return [];
+    return ancLguCache[prov.toUpperCase().trim()] || [];
+  };
 
   // Session timer (only when a slot is open)
   const [registrationChecked, setRegistrationChecked] = useState(false);
@@ -435,13 +466,16 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       middleNameNotApplicable: false,
       suffix: '',
       position: '',
-      lgu: lgu, // Default to header LGU
+      province: '',
+      lgu: isAnc ? '' : lgu,
       barangay: '',
       prcNo: '',
       expiryDate: '',
       provincialLeague: '',
       tshirt: '',
-      member: false
+      member: false,
+      contactNo: '',
+      email: ''
     }]);
   };
 
@@ -467,13 +501,16 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       middleNameNotApplicable: false,
       suffix: '',
       position: '',
-      lgu: lgu, // Default to header LGU
+      province: '',
+      lgu: isAnc ? '' : lgu,
       barangay: '',
       prcNo: '',
       expiryDate: '',
       provincialLeague: '',
       tshirt: '',
-      member: false
+      member: false,
+      contactNo: '',
+      email: ''
     };
     setParticipants([...participants, newParticipant]);
   };
@@ -546,27 +583,6 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
     setParticipants(participants.map(p =>
       p.id === id ? { ...p, [field]: finalValue } : p
     ));
-  };
-
-  // Unified handlers for Safari compatibility (work with both onChange and onInput)
-  const handleProvinceChange = (e: React.ChangeEvent<HTMLInputElement> | React.FormEvent<HTMLInputElement>) => {
-    const value = e.currentTarget.value;
-    setProvince(value);
-  };
-
-  const handleLguChange = (e: React.ChangeEvent<HTMLInputElement> | React.FormEvent<HTMLInputElement>) => {
-    if (!isProvinceLgu) {
-      const selectedName = e.currentTarget.value;
-      setLgu(selectedName);
-      // Find matching LGU object and set PSGC
-      const matchedLgu = lguOptions.find(l => l.name.toUpperCase() === selectedName.toUpperCase());
-      setSelectedLguPsgc(matchedLgu?.psgc || '');
-    }
-  };
-
-  const handleBarangayChange = (participantId: number, e: React.ChangeEvent<HTMLInputElement> | React.FormEvent<HTMLInputElement>) => {
-    const value = e.currentTarget.value.toUpperCase();
-    updateParticipant(participantId, 'barangay', value);
   };
 
   // Helper function to get the lvl for a position name
@@ -659,8 +675,14 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
         setShowErrorModal(true);
         return;
       }
-      // LGU validation: participant LGU can be empty if header LGU is set (it will default)
-      const effectiveLgu = p.lgu && p.lgu.trim() !== '' ? p.lgu : lgu;
+      if (isAnc && (!p.province || p.province.trim() === '')) {
+        setErrorModalMessage(`Participant ${i + 1}: Province is required.`);
+        setShowErrorModal(true);
+        return;
+      }
+      const effectiveLgu = isAnc
+        ? (p.lgu || '')
+        : (p.lgu && p.lgu.trim() !== '' ? p.lgu : lgu);
       if (!effectiveLgu || effectiveLgu.trim() === '') {
         setErrorModalMessage(`Participant ${i + 1}: LGU is required.`);
         setShowErrorModal(true);
@@ -684,15 +706,33 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
         setShowErrorModal(true);
         return;
       }
+
+      if (isAnc && (p.contactNo || '').toString().trim() !== '') {
+        const contact = (p.contactNo || '').toString().trim();
+        if (!validateContactNumber(contact)) {
+          setErrorModalMessage(`Participant ${i + 1}: Contact No must start with 09 and be exactly 11 digits.`);
+          setShowErrorModal(true);
+          return;
+        }
+      }
+
+      if (isAnc && (p.email || '').toString().trim() !== '') {
+        const email = (p.email || '').toString().trim();
+        if (!validateEmail(email)) {
+          setErrorModalMessage(`Participant ${i + 1}: Please enter a valid email address.`);
+          setShowErrorModal(true);
+          return;
+        }
+      }
     }
 
     // Validate header fields
-    if (!province || province.trim() === '') {
+    if (!isAnc && (!province || province.trim() === '')) {
       setErrorModalMessage('Province is required.');
       setShowErrorModal(true);
       return;
     }
-    if (!lgu || lgu.trim() === '') {
+    if (!isAnc && (!lgu || lgu.trim() === '')) {
       setErrorModalMessage('LGU is required.');
       setShowErrorModal(true);
       return;
@@ -765,13 +805,20 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       formData[`MI|${index}`] = p.middleNameNotApplicable ? '' : (p.middleInit ?? '').toString().trim();
       formData[`SUFFIX|${index}`] = (p.suffix ?? '').toString().trim();
       formData[`DESIGNATION|${index}`] = (p.position ?? '').toString().trim();
-      formData[`LGU|${index}`] = ((p.lgu || lgu) ?? '').toString().trim(); // Use header LGU if participant LGU is empty
+      formData[`PROVINCE|${index}`] = isAnc ? (p.province ?? '').toString().trim() : (province ?? '').toString().trim();
+      formData[`LGU|${index}`] = (isAnc ? p.lgu : (p.lgu || lgu) ?? '').toString().trim();
       formData[`BRGY|${index}`] = isAnc ? '' : (p.barangay ?? '').toString().trim();
       formData[`TSHIRTSIZE|${index}`] = (p.tshirt ?? '').toString().trim();
       formData[`PRCNUM|${index}`] = isAnc ? (p.prcNo ?? '').toString().trim() : '';
       formData[`EXPIRYDATE|${index}`] = isAnc ? (p.expiryDate ?? '').toString().trim() : '';
       formData[`PROVINCIALLEAGUE|${index}`] = isAnc ? (p.provincialLeague ?? '').toString().trim() : '';
       formData[`MEMBER|${index}`] = isAnc && p.member ? 'Y' : '';
+      formData[`CONTACTNUMBER|${index}`] = isAnc
+        ? (p.contactNo ?? '').toString().trim()
+        : (contactNo ?? '').toString().trim();
+      formData[`EMAIL|${index}`] = isAnc
+        ? (p.email ?? '').toString().trim()
+        : (emailAddress ?? '').toString().trim();
     });
 
     // Store form data and show confirmation
@@ -982,7 +1029,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
 
   return (
     <div className="min-h-screen bg-gray-50 py-4 sm:py-6 md:py-8 px-3 sm:px-4">
-      <div className="max-w-screen-2xl mx-auto">
+      <div className={`${isAnc ? 'max-w-5xl' : 'max-w-screen-2xl'} mx-auto`}>
         <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-lg p-4 sm:p-6 md:p-8">
           {/* Header with Logos */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-2 mb-6 sm:mb-8">
@@ -1031,71 +1078,56 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                 <div className="mt-1.5 text-sm text-gray-600">{conference.venue}</div>
               )}
             </div>
-            <div className="border border-gray-300 rounded-lg p-3 bg-blue-50">
-              <label className="block font-semibold text-sm text-gray-900 mb-2">PROVINCE *</label>
-              <input
-                type="text"
-                list="provinces-list-mobile"
-                value={province}
-                onChange={handleProvinceChange}
-                onInput={handleProvinceChange}
-                onBlur={(e) => {
-                  // Validate that the value exists in the provinces list
-                  const enteredValue = e.target.value.trim().toUpperCase();
-                  const isValid = provinces.some(p => p.toUpperCase() === enteredValue);
-                  if (!isValid && enteredValue !== '') {
-                    setProvince('');
-                  }
-                }}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
-                required
-              />
-              <datalist id="provinces-list-mobile">
-                {provinces.map(p => <option key={p} value={p} />)}
-              </datalist>
-            </div>
-            <div className="border border-gray-300 rounded-lg p-3 bg-blue-50">
-              <label className="block font-semibold text-sm text-gray-900 mb-2">LGU *</label>
-              <div className="flex items-center gap-2 sm:gap-3">
-                <input
-                  type="text"
-                  list="lgu-list-mobile"
-                  value={lgu}
-                  onChange={handleLguChange}
-                  onInput={handleLguChange}
-                  onBlur={(e) => {
-                    if (!isProvinceLgu) {
-                      // Validate that the value exists in the LGU options list
-                      const enteredValue = e.target.value.trim().toUpperCase();
-                      const isValid = lguOptions.some(l => l.name.toUpperCase() === enteredValue);
-                      if (!isValid && enteredValue !== '') {
-                        setLgu('');
-                        setSelectedLguPsgc('');
-                      }
-                    }
-                  }}
-                  className="flex-1 px-3 py-2.5 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
+            {!isAnc && (
+              <div className="border border-gray-300 rounded-lg p-3 bg-blue-50">
+                <label className="block font-semibold text-sm text-gray-900 mb-2">PROVINCE *</label>
+                <select
+                  value={province}
+                  onChange={(e) => setProvince(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
                   required
-                />
-                <label htmlFor="province-lgu-checkbox-mobile" className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    id="province-lgu-checkbox-mobile"
-                    checked={isProvinceLgu}
-                    onChange={(e) => {
-                      setIsProvinceLgu(e.target.checked);
-                    }}
-                    className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer m-0"
-                  />
-                  <span className="text-xs sm:text-sm font-medium text-gray-900 select-none whitespace-nowrap">
-                    PROVINCE
-                  </span>
-                </label>
+                >
+                  <option value="">Select Province</option>
+                  {provinces.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
               </div>
-              <datalist id="lgu-list-mobile">
-                {lguOptions.map((l, idx) => <option key={l.psgc || idx} value={l.name} />)}
-              </datalist>
-            </div>
+            )}
+            {!isAnc && (
+              <div className="border border-gray-300 rounded-lg p-3 bg-blue-50">
+                <label className="block font-semibold text-sm text-gray-900 mb-2">LGU *</label>
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <select
+                    value={lgu}
+                    onChange={(e) => {
+                      const selectedName = e.target.value;
+                      setLgu(selectedName);
+                      const matchedLgu = lguOptions.find(l => l.name.toUpperCase() === selectedName.toUpperCase());
+                      setSelectedLguPsgc(matchedLgu?.psgc || '');
+                    }}
+                    className="flex-1 px-3 py-2.5 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
+                    required
+                    disabled={isProvinceLgu}
+                  >
+                    <option value="">Select LGU</option>
+                    {lguOptions.map((l, idx) => <option key={l.psgc || idx} value={l.name}>{l.name}</option>)}
+                  </select>
+                  <label htmlFor="province-lgu-checkbox-mobile" className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      id="province-lgu-checkbox-mobile"
+                      checked={isProvinceLgu}
+                      onChange={(e) => {
+                        setIsProvinceLgu(e.target.checked);
+                      }}
+                      className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer m-0"
+                    />
+                    <span className="text-xs sm:text-sm font-medium text-gray-900 select-none whitespace-nowrap">
+                      PROVINCE
+                    </span>
+                  </label>
+                </div>
+              </div>
+            )}
             <div className="border border-gray-300 rounded-lg p-3 bg-blue-50">
               <label className="block font-semibold text-sm text-gray-900 mb-2">CONTACT PERSON *</label>
               <input
@@ -1179,75 +1211,60 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                   <td className="border border-gray-300 p-2 text-gray-900">{conference.venue}</td>
                 </tr>
               )}
-              <tr>
-                <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">PROVINCE</td>
-                <td className="border border-gray-300 p-2 bg-blue-50">
-                  <input
-                    type="text"
-                    list="provinces-list"
-                    value={province}
-                    onChange={handleProvinceChange}
-                    onInput={handleProvinceChange}
-                    onBlur={(e) => {
-                      // Validate that the value exists in the provinces list
-                      const enteredValue = e.target.value.trim().toUpperCase();
-                      const isValid = provinces.some(p => p.toUpperCase() === enteredValue);
-                      if (!isValid && enteredValue !== '') {
-                        setProvince('');
-                      }
-                    }}
-                    className="w-full px-2 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white"
-                    required
-                  />
-                  <datalist id="provinces-list">
-                    {provinces.map(p => <option key={p} value={p} />)}
-                  </datalist>
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">LGU</td>
-                <td className="border border-gray-300 p-2 bg-blue-50">
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <input
-                      type="text"
-                      list="lgu-list"
-                      value={lgu}
-                      onChange={handleLguChange}
-                      onInput={handleLguChange}
-                      onBlur={(e) => {
-                        if (!isProvinceLgu) {
-                          // Validate that the value exists in the LGU options list
-                          const enteredValue = e.target.value.trim().toUpperCase();
-                          const isValid = lguOptions.some(l => l.name.toUpperCase() === enteredValue);
-                          if (!isValid && enteredValue !== '') {
-                            setLgu('');
-                            setSelectedLguPsgc('');
-                          }
-                        }
-                      }}
-                      className="flex-1 px-2 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white"
+              {!isAnc && (
+                <tr>
+                  <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">PROVINCE</td>
+                  <td className="border border-gray-300 p-2 bg-blue-50">
+                    <select
+                      value={province}
+                      onChange={(e) => setProvince(e.target.value)}
+                      className="w-full px-2 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white"
                       required
-                    />
-                    <label htmlFor="province-lgu-checkbox" className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        id="province-lgu-checkbox"
-                        checked={isProvinceLgu}
+                    >
+                      <option value="">Select Province</option>
+                      {provinces.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </td>
+                </tr>
+              )}
+              {!isAnc && (
+                <tr>
+                  <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">LGU</td>
+                  <td className="border border-gray-300 p-2 bg-blue-50">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <select
+                        value={lgu}
                         onChange={(e) => {
-                          setIsProvinceLgu(e.target.checked);
+                          const selectedName = e.target.value;
+                          setLgu(selectedName);
+                          const matchedLgu = lguOptions.find(l => l.name.toUpperCase() === selectedName.toUpperCase());
+                          setSelectedLguPsgc(matchedLgu?.psgc || '');
                         }}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer m-0"
-                      />
-                      <span className="text-sm font-medium text-gray-900 select-none whitespace-nowrap">
-                        PROVINCE
-                      </span>
-                    </label>
-                  </div>
-                  <datalist id="lgu-list">
-                    {lguOptions.map((l, idx) => <option key={l.psgc || idx} value={l.name} />)}
-                  </datalist>
-                </td>
-              </tr>
+                        className="flex-1 px-2 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white"
+                        required
+                        disabled={isProvinceLgu}
+                      >
+                        <option value="">Select LGU</option>
+                        {lguOptions.map((l, idx) => <option key={l.psgc || idx} value={l.name}>{l.name}</option>)}
+                      </select>
+                      <label htmlFor="province-lgu-checkbox" className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          id="province-lgu-checkbox"
+                          checked={isProvinceLgu}
+                          onChange={(e) => {
+                            setIsProvinceLgu(e.target.checked);
+                          }}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer m-0"
+                        />
+                        <span className="text-sm font-medium text-gray-900 select-none whitespace-nowrap">
+                          PROVINCE
+                        </span>
+                      </label>
+                    </div>
+                  </td>
+                </tr>
+              )}
               <tr>
                 <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">CONTACT PERSON</td>
                 <td className="border border-gray-300 p-2 bg-blue-50">
@@ -1323,8 +1340,8 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
             <strong>NOTE:</strong> T-shirt size is limited to XS,S, M, L, XL, XXL,XXXL,5XL,8XL
           </p>
 
-          {/* Participants Section - Mobile Card Layout */}
-          <div className="block md:hidden mb-6">
+          {/* Participants Section - Card Layout (mobile always, desktop when ANC) */}
+          <div className={`${isAnc ? 'block' : 'block md:hidden'} mb-6`}>
             <div className="bg-gray-200 border border-gray-300 rounded-t-lg p-3 text-center mb-2">
               <span className="text-base font-bold text-gray-900">LIST OF PARTICIPANTS</span>
               <span className="block text-sm font-normal text-gray-700 mt-1">
@@ -1356,40 +1373,34 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-1 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">Last Name *</label>
-                      <input
-                        type="text"
-                        value={participant.lastName}
-                        onChange={(e) => updateParticipant(participant.id, 'lastName', e.target.value.toUpperCase())}
-                        className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
-                        required
-                      />
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-[2.4fr_2.4fr_auto_auto] gap-1.5">
                       <div>
-                        <label className="block text-xs font-semibold text-gray-700 mb-1">First Name *</label>
+                        <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">Last Name *</label>
                         <input
                           type="text"
-                          value={participant.firstName}
-                          onChange={(e) => updateParticipant(participant.id, 'firstName', e.target.value.toUpperCase())}
-                          className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
+                          value={participant.lastName}
+                          onChange={(e) => updateParticipant(participant.id, 'lastName', e.target.value.toUpperCase())}
+                          className="w-full h-8 px-3 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white text-sm"
                           required
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-gray-700 mb-1">{participant.middleNameNotApplicable ? 'M.I.' : 'M.I. *'}</label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            value={participant.middleInit}
-                            onChange={(e) => updateParticipant(participant.id, 'middleInit', e.target.value.toUpperCase())}
-                            className="w-12 flex-shrink-0 px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base disabled:bg-gray-100 disabled:cursor-not-allowed"
-                            maxLength={2}
-                            disabled={!!participant.middleNameNotApplicable}
-                          />
-                          <label className="flex items-center gap-1.5 cursor-pointer flex-shrink-0">
+                        <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">First Name *</label>
+                        <input
+                          type="text"
+                          value={participant.firstName}
+                          onChange={(e) => updateParticipant(participant.id, 'firstName', e.target.value.toUpperCase())}
+                          className="w-full h-8 px-3 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white text-sm"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-[-1px]">
+                          <span className="text-sm font-semibold text-gray-700">
+                            {participant.middleNameNotApplicable ? 'M.I.' : 'M.I. *'}
+                          </span>
+                          <label className="flex items-center gap-1 cursor-pointer">
                             <input
                               type="checkbox"
                               checked={!!participant.middleNameNotApplicable}
@@ -1399,134 +1410,212 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                             <span className="text-xs text-gray-600">N/A</span>
                           </label>
                         </div>
+                        <input
+                          type="text"
+                          value={participant.middleInit}
+                          onChange={(e) => updateParticipant(participant.id, 'middleInit', e.target.value.toUpperCase())}
+                          className="w-full h-8 px-2 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          maxLength={2}
+                          disabled={!!participant.middleNameNotApplicable}
+                        />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-gray-700 mb-1">Suffix</label>
+                        <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">Suffix</label>
                         <input
                           type="text"
                           value={participant.suffix}
                           onChange={(e) => updateParticipant(participant.id, 'suffix', e.target.value.toUpperCase())}
-                          className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
+                          className="w-full h-8 px-3 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white text-sm"
                           maxLength={12}
                         />
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">Position *</label>
-                      <input
-                        type="text"
-                        list={`position-list-mobile-${participant.id}`}
+                      <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">Position *</label>
+                      <select
                         value={participant.position}
                         onChange={(e) => handlePositionChange(participant.id, e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
+                        className="w-full h-8 px-3 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white text-sm"
                         required
-                      />
-                      <datalist id={`position-list-mobile-${participant.id}`}>
+                      >
+                        <option value="">Select Position</option>
                         {getEffectivePositions(participant.lgu || lgu).map(position => (
-                          <option key={position.name} value={position.name} />
+                          <option key={position.name} value={position.name}>{position.name}</option>
                         ))}
-                      </datalist>
+                      </select>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-700 mb-1">LGU *</label>
-                        <input
-                          type="text"
-                          value={participant.lgu || lgu}
-                          readOnly
-                          disabled
-                          className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-700 bg-gray-100 text-base disabled:cursor-not-allowed disabled:opacity-100"
-                          aria-label="LGU (from header)"
-                        />
-                      </div>
-                      {!isAnc && (
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">
-                            Barangay{isBarangayEnabled(participant) ? ' *' : ''}
-                          </label>
-                          <input
-                            type="text"
-                            list={`barangay-list-mobile-${participant.id}`}
-                            value={participant.barangay}
-                            onChange={(e) => handleBarangayChange(participant.id, e)}
-                            onInput={(e) => handleBarangayChange(participant.id, e)}
-                            onBlur={(e) => {
-                              const enteredValue = e.target.value.trim().toUpperCase();
-                              const isValid = barangayOptions.some(b => b.toUpperCase() === enteredValue);
-                              if (!isValid && enteredValue !== '' && isBarangayEnabled(participant)) {
-                                updateParticipant(participant.id, 'barangay', '');
-                              }
-                            }}
-                            className="w-full px-3 py-2.5 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
-                            disabled={!lgu || !isBarangayEnabled(participant)}
-                            required={isBarangayEnabled(participant)}
-                          />
-                          <datalist id={`barangay-list-mobile-${participant.id}`}>
-                            {barangayOptions.map(b => <option key={b} value={b} />)}
-                          </datalist>
-                        </div>
-                      )}
-                    </div>
-                    {isAnc && (
-                      <div className="grid grid-cols-1 gap-3">
+                    {isAnc ? (
+                      <>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <label className="block text-xs font-semibold text-gray-700 mb-1">PRC No</label>
+                            <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">Province *</label>
+                            <select
+                              value={participant.province || ''}
+                              onChange={(e) => {
+                                const val = e.target.value.toUpperCase();
+                                setParticipants(prev => prev.map(p =>
+                                  p.id === participant.id ? { ...p, province: val, lgu: '' } : p
+                                ));
+                                if (val) fetchAncLgus(val);
+                              }}
+                              className="w-full h-8 px-3 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white text-sm"
+                              required
+                            >
+                              <option value="">Select Province</option>
+                              {provinces.map(p => (
+                                <option key={p} value={p.toUpperCase()}>{p}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">LGU *</label>
+                            <select
+                              value={participant.lgu || ''}
+                              onChange={(e) => updateParticipant(participant.id, 'lgu', e.target.value.toUpperCase())}
+                              className="w-full h-8 px-3 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white text-sm"
+                              required
+                              disabled={!participant.province}
+                            >
+                              <option value="">Select LGU</option>
+                              {participant.province && participant.province.toUpperCase() !== 'HIGHLY URBANIZED CITY' && (
+                                <option value="PROVINCE">PROVINCE</option>
+                              )}
+                              {getAncLguOptions(participant.province).map((l) => (
+                                <option key={l.psgc} value={l.name.toUpperCase()}>
+                                  {l.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">PRC No</label>
                             <input
                               type="text"
                               inputMode="numeric"
                               pattern="[0-9]*"
                               value={participant.prcNo || ''}
                               onChange={(e) => updateParticipant(participant.id, 'prcNo', e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900 bg-white text-base"
+                              className="w-full h-8 px-3 py-1 border border-gray-300 rounded text-gray-900 bg-white text-sm"
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-semibold text-gray-700 mb-1">Expiry Date</label>
+                            <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">Expiry Date</label>
                             <input
                               type="date"
                               value={participant.expiryDate || ''}
                               onChange={(e) => updateParticipant(participant.id, 'expiryDate', e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900 bg-white text-base"
+                              className="w-full h-8 px-3 py-1 border border-gray-300 rounded text-gray-900 bg-white text-sm"
                               required={(participant.prcNo || '').toString().trim() !== ''}
                             />
                           </div>
                         </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-700 mb-1">Provincial League</label>
-                          <input
-                            type="text"
-                            value={participant.provincialLeague || ''}
-                            onChange={(e) => updateParticipant(participant.id, 'provincialLeague', e.target.value.toUpperCase())}
-                            className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
-                          />
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">Contact No</label>
+                            <input
+                              type="tel"
+                              inputMode="numeric"
+                              pattern="09[0-9]{9}"
+                              maxLength={11}
+                              value={participant.contactNo || ''}
+                              onChange={(e) => updateParticipant(participant.id, 'contactNo', e.target.value)}
+                              className="w-full h-8 px-3 py-1 border border-gray-300 rounded text-gray-900 bg-white text-sm"
+                              placeholder="09XXXXXXXXX"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">Email</label>
+                            <input
+                              type="email"
+                              value={participant.email || ''}
+                              onChange={(e) => updateParticipant(participant.id, 'email', e.target.value)}
+                              className="w-full h-8 px-3 py-1 border border-gray-300 rounded text-gray-900 bg-white text-sm"
+                              placeholder="name@example.com"
+                            />
+                          </div>
                         </div>
-                      </div>
-                    )}
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1">T-Shirt Size *</label>
-                      <select
-                        value={participant.tshirt}
-                        onChange={(e) => updateParticipant(participant.id, 'tshirt', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
-                        required
-                      >
-                        <option value="">Select Size</option>
-                        {TSHIRT_SIZES.map(size => (
-                          <option key={size} value={size}>{size}</option>
-                        ))}
-                      </select>
-                    </div>
-                    {isAnc && (
-                      <label className="flex items-center gap-2 select-none">
-                        <input
-                          type="checkbox"
-                          checked={!!participant.member}
-                          onChange={(e) => updateParticipant(participant.id, 'member', e.target.checked)}
-                          className="rounded border-gray-300"
-                        />
-                        <span className="text-sm font-semibold text-gray-700">Member</span>
-                      </label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">Provincial League</label>
+                            <input
+                              type="text"
+                              value={participant.provincialLeague || ''}
+                              onChange={(e) => updateParticipant(participant.id, 'provincialLeague', e.target.value.toUpperCase())}
+                              className="w-full h-8 px-3 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">T-Shirt Size *</label>
+                            <select
+                              value={participant.tshirt}
+                              onChange={(e) => updateParticipant(participant.id, 'tshirt', e.target.value)}
+                              className="w-full h-8 px-3 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white text-sm"
+                              required
+                            >
+                              <option value="">Select Size</option>
+                              {(isAnc ? ANC_TSHIRT_SIZES : TSHIRT_SIZES).map(size => (
+                                <option key={size} value={size}>{size}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                        <label className="flex items-center gap-2 select-none">
+                          <input
+                            type="checkbox"
+                            checked={!!participant.member}
+                            onChange={(e) => updateParticipant(participant.id, 'member', e.target.checked)}
+                            className="rounded border-gray-300"
+                          />
+                          <span className="text-sm font-semibold text-gray-700">Member <span className="font-normal text-gray-500 text-xs">(Check if you are a member of PhALGA)</span></span>
+                        </label>
+                      </>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">LGU *</label>
+                            <input
+                              type="text"
+                              value={participant.lgu || lgu}
+                              readOnly
+                              disabled
+                              className="w-full h-8 px-3 py-1 border border-gray-300 rounded uppercase text-gray-700 bg-gray-100 text-sm disabled:cursor-not-allowed disabled:opacity-100"
+                              aria-label="LGU (from header)"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">
+                              Barangay{isBarangayEnabled(participant) ? ' *' : ''}
+                            </label>
+                            <select
+                              value={participant.barangay}
+                              onChange={(e) => updateParticipant(participant.id, 'barangay', e.target.value)}
+                              className="w-full h-8 px-3 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white text-sm"
+                              disabled={!lgu || !isBarangayEnabled(participant)}
+                              required={isBarangayEnabled(participant)}
+                            >
+                              <option value="">Select Barangay</option>
+                              {barangayOptions.map(b => <option key={b} value={b}>{b}</option>)}
+                            </select>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">T-Shirt Size *</label>
+                          <select
+                            value={participant.tshirt}
+                            onChange={(e) => updateParticipant(participant.id, 'tshirt', e.target.value)}
+                            className="w-full h-8 px-3 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white text-sm"
+                            required
+                          >
+                            <option value="">Select Size</option>
+                            {(isAnc ? ANC_TSHIRT_SIZES : TSHIRT_SIZES).map(size => (
+                              <option key={size} value={size}>{size}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </>
                     )}
                   </div>
                 </div>
@@ -1534,7 +1623,8 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
             </div>
           </div>
 
-          {/* Participants Table - Desktop Layout */}
+          {/* Participants Table - Desktop Layout (non-ANC only) */}
+          {!isAnc && (
           <div className="hidden md:block overflow-x-auto mb-6">
             <table className="w-full border-collapse border border-gray-300">
               <thead>
@@ -1547,39 +1637,35 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                   </th>
                 </tr>
                 <tr>
-                  <th className={`border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 ${isAnc ? 'min-w-[190px]' : 'min-w-[170px]'}`}>LAST NAME</th>
-                  <th className={`border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 ${isAnc ? 'min-w-[190px]' : 'min-w-[170px]'}`}>FIRST NAME</th>
+                  <th className={`border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 ${isAnc ? 'min-w-[220px]' : 'min-w-[190px]'}`}>LAST NAME</th>
+                  <th className={`border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 ${isAnc ? 'min-w-[220px]' : 'min-w-[190px]'}`}>FIRST NAME</th>
                   <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-10">M.I.</th>
                   <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-16">SUFFIX</th>
                   <th className={`border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 ${isAnc ? 'w-72' : 'w-56'}`}>POSITION</th>
-                  {!isAnc && (
-                    <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[260px]">
-                      LGU
-                    </th>
-                  )}
-                  {isAnc && (
+                  {isAnc ? (
                     <>
+                      <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[180px]">LGU</th>
                       <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[84px]">PRC NO</th>
                       <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[56px]">EXPIRY DATE</th>
                       <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[100px]">PROVINCIAL LEAGUE</th>
                     </>
-                  )}
-                  {!isAnc && (
-                    <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[240px]">BARANGAY</th>
+                  ) : (
+                    <>
+                      <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[260px]">LGU</th>
+                      <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[240px]">BARANGAY</th>
+                    </>
                   )}
                   <th className={`border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 ${isAnc ? 'w-40' : 'w-40'}`}>T-SHIRT</th>
                   {isAnc && (
                     <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-20">MEMBER</th>
                   )}
-                  {!isAnc && (
-                    <th className="border border-gray-300 p-2 bg-gray-200 text-gray-900 w-32">ACTIONS</th>
-                  )}
+                  <th className="border border-gray-300 p-2 bg-gray-200 text-gray-900 w-32">ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
                 {participants.map((participant) => (
                   <tr key={participant.id}>
-                    <td className={`border border-gray-300 p-1.5 md:p-2 bg-blue-50 ${isAnc ? 'min-w-[190px]' : 'min-w-[170px]'}`}>
+                    <td className={`border border-gray-300 p-1.5 md:p-2 bg-blue-50 ${isAnc ? 'min-w-[220px]' : 'min-w-[190px]'}`}>
                       <input
                         type="text"
                         value={participant.lastName}
@@ -1588,7 +1674,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                         required
                       />
                     </td>
-                    <td className={`border border-gray-300 p-1.5 md:p-2 bg-blue-50 ${isAnc ? 'min-w-[190px]' : 'min-w-[170px]'}`}>
+                    <td className={`border border-gray-300 p-1.5 md:p-2 bg-blue-50 ${isAnc ? 'min-w-[220px]' : 'min-w-[190px]'}`}>
                       <input
                         type="text"
                         value={participant.firstName}
@@ -1628,34 +1714,37 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                       />
                     </td>
                     <td className={`border border-gray-300 p-1.5 md:p-2 bg-blue-50 ${isAnc ? 'w-72' : 'w-56'}`}>
-                      <input
-                        type="text"
-                        list={`position-list-${participant.id}`}
+                      <select
                         value={participant.position}
                         onChange={(e) => handlePositionChange(participant.id, e.target.value)}
                         className="w-full px-2 py-1.5 md:py-1 border-0 bg-transparent uppercase text-gray-900 text-sm"
                         required
-                      />
-                      <datalist id={`position-list-${participant.id}`}>
+                      >
+                        <option value="">Select Position</option>
                         {getEffectivePositions(participant.lgu || lgu).map(position => (
-                          <option key={position.name} value={position.name} />
+                          <option key={position.name} value={position.name}>{position.name}</option>
                         ))}
-                      </datalist>
+                      </select>
                     </td>
-                    {!isAnc && (
-                      <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 min-w-[260px]">
-                        <input
-                          type="text"
-                          value={participant.lgu || lgu}
-                          readOnly
-                          disabled
-                          className="w-full min-w-0 px-2 py-1.5 md:py-1 border border-gray-300 rounded bg-gray-100 uppercase text-gray-700 text-sm disabled:cursor-not-allowed disabled:opacity-100"
-                          aria-label="LGU (from header)"
-                        />
-                      </td>
-                    )}
-                    {isAnc && (
+                    {isAnc ? (
                       <>
+                        <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 min-w-[180px]">
+                          <select
+                            value={participant.lgu || ''}
+                            onChange={(e) => updateParticipant(participant.id, 'lgu', e.target.value.toUpperCase())}
+                            className="w-full h-8 px-2 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white text-sm"
+                          >
+                            <option value="">SELECT LGU</option>
+                            {province && province.toUpperCase() !== 'HIGHLY URBANIZED CITY' && (
+                              <option value="PROVINCE">PROVINCE</option>
+                            )}
+                            {lguOptions.map((l) => (
+                              <option key={l.psgc} value={l.name.toUpperCase()}>
+                                {l.name}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
                         <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 min-w-[84px]">
                           <input
                             type="text"
@@ -1663,7 +1752,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                             pattern="[0-9]*"
                             value={participant.prcNo || ''}
                             onChange={(e) => updateParticipant(participant.id, 'prcNo', e.target.value)}
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-gray-900 bg-white text-sm"
+                            className="w-full h-8 px-2 py-1 border border-gray-300 rounded text-gray-900 bg-white text-sm"
                           />
                         </td>
                         <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 min-w-[60px]">
@@ -1671,7 +1760,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                             type="date"
                             value={participant.expiryDate || ''}
                             onChange={(e) => updateParticipant(participant.id, 'expiryDate', e.target.value)}
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-gray-900 bg-white text-sm"
+                            className="w-full h-8 px-2 py-1 border border-gray-300 rounded text-gray-900 bg-white text-sm"
                             required={(participant.prcNo || '').toString().trim() !== ''}
                           />
                         </td>
@@ -1684,31 +1773,38 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                           />
                         </td>
                       </>
-                    )}
-                    {!isAnc && (
-                      <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 min-w-[240px]">
-                        <input
-                          type="text"
-                          list={`barangay-list-${participant.id}`}
-                          value={participant.barangay}
-                          onChange={(e) => handleBarangayChange(participant.id, e)}
-                          onInput={(e) => handleBarangayChange(participant.id, e)}
-                          onBlur={(e) => {
-                            const enteredValue = e.target.value.trim().toUpperCase();
-                            const isValid = barangayOptions.some(b => b.toUpperCase() === enteredValue);
-                            if (!isValid && enteredValue !== '' && isBarangayEnabled(participant)) {
-                              updateParticipant(participant.id, 'barangay', '');
+                    ) : (
+                      <>
+                        <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 min-w-[260px]">
+                          <input
+                            type="text"
+                            value={participant.lgu || lgu}
+                            readOnly
+                            disabled
+                            className="w-full min-w-0 px-2 py-1.5 md:py-1 border border-gray-300 rounded bg-gray-100 uppercase text-gray-700 text-sm disabled:cursor-not-allowed disabled:opacity-100"
+                            aria-label="LGU (from header)"
+                          />
+                        </td>
+                        <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 min-w-[240px]">
+                          <select
+                            value={participant.barangay}
+                            onChange={(e) => updateParticipant(participant.id, 'barangay', e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white text-sm"
+                            disabled={!lgu || !isBarangayEnabled(participant)}
+                            required={isBarangayEnabled(participant)}
+                            title={
+                              !lgu
+                                ? 'Please select an LGU first'
+                                : !isBarangayEnabled(participant)
+                                  ? 'Barangay is only for positions with level BGY'
+                                  : 'Select barangay'
                             }
-                          }}
-                          className="w-full px-2 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white text-sm"
-                          disabled={!lgu || !isBarangayEnabled(participant)}
-                          required={isBarangayEnabled(participant)}
-                          title={!lgu ? 'Please select an LGU first' : (!isBarangayEnabled(participant) ? 'Barangay is only for positions with level BGY' : 'Select or type barangay')}
-                        />
-                        <datalist id={`barangay-list-${participant.id}`}>
-                          {barangayOptions.map(b => <option key={b} value={b} />)}
-                        </datalist>
-                      </td>
+                          >
+                            <option value="">Select Barangay</option>
+                            {barangayOptions.map(b => <option key={b} value={b}>{b}</option>)}
+                          </select>
+                        </td>
+                      </>
                     )}
                     <td className={`border border-gray-300 p-1 bg-blue-50 ${isAnc ? 'w-40' : 'w-40'}`}>
                       <select
@@ -1718,7 +1814,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                         required
                       >
                         <option value="">Select Size</option>
-                        {TSHIRT_SIZES.map(size => (
+                        {(isAnc ? ANC_TSHIRT_SIZES : TSHIRT_SIZES).map(size => (
                           <option key={size} value={size}>{size}</option>
                         ))}
                       </select>
@@ -1733,32 +1829,31 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                         />
                       </td>
                     )}
-                    {!isAnc && (
-                      <td className="border border-gray-300 p-1">
-                        <div className="flex gap-1">
-                          <button
-                            type="button"
-                            onClick={() => deleteParticipant(participant.id)}
-                            className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
-                          >
-                            Delete
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => insertParticipant(participant.id)}
-                            disabled={participants.length >= MAX_PARTICIPANTS}
-                            className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                          >
-                            Insert
-                          </button>
-                        </div>
-                      </td>
-                    )}
+                    <td className="border border-gray-300 p-1">
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => deleteParticipant(participant.id)}
+                          className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
+                        >
+                          Delete
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => insertParticipant(participant.id)}
+                          disabled={participants.length >= MAX_PARTICIPANTS}
+                          className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                        >
+                          Insert
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center relative mt-6">
@@ -1898,14 +1993,18 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                         <div className="text-xs text-gray-600 mt-1">{conference.venue}</div>
                       )}
                     </div>
-                    <div className="border border-gray-300 rounded p-2">
-                      <div className="text-xs font-semibold text-gray-900 mb-1">Province</div>
-                      <div className="text-xs text-gray-900">{pendingFormData.PROVINCE || 'Not provided'}</div>
-                    </div>
-                    <div className="border border-gray-300 rounded p-2">
-                      <div className="text-xs font-semibold text-gray-900 mb-1">LGU</div>
-                      <div className="text-xs text-gray-900">{pendingFormData.LGU || 'Not provided'}</div>
-                    </div>
+                    {!isAnc && (
+                      <div className="border border-gray-300 rounded p-2">
+                        <div className="text-xs font-semibold text-gray-900 mb-1">Province</div>
+                        <div className="text-xs text-gray-900">{pendingFormData.PROVINCE || 'Not provided'}</div>
+                      </div>
+                    )}
+                    {!isAnc && (
+                      <div className="border border-gray-300 rounded p-2">
+                        <div className="text-xs font-semibold text-gray-900 mb-1">LGU</div>
+                        <div className="text-xs text-gray-900">{pendingFormData.LGU || 'Not provided'}</div>
+                      </div>
+                    )}
                     <div className="border border-gray-300 rounded p-2">
                       <div className="text-xs font-semibold text-gray-900 mb-1">Contact Person</div>
                       <div className="text-xs text-gray-900">{pendingFormData.CONTACTPERSON || 'Not provided'}</div>
@@ -1938,14 +2037,18 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                           <td className="border border-gray-300 p-2 text-gray-900">{conference.venue}</td>
                         </tr>
                       )}
-                      <tr>
-                        <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">Province</td>
-                        <td className="border border-gray-300 p-2 text-gray-900">{pendingFormData.PROVINCE || 'Not provided'}</td>
-                      </tr>
-                      <tr>
-                        <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">LGU</td>
-                        <td className="border border-gray-300 p-2 text-gray-900">{pendingFormData.LGU || 'Not provided'}</td>
-                      </tr>
+                      {!isAnc && (
+                        <tr>
+                          <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">Province</td>
+                          <td className="border border-gray-300 p-2 text-gray-900">{pendingFormData.PROVINCE || 'Not provided'}</td>
+                        </tr>
+                      )}
+                      {!isAnc && (
+                        <tr>
+                          <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">LGU</td>
+                          <td className="border border-gray-300 p-2 text-gray-900">{pendingFormData.LGU || 'Not provided'}</td>
+                        </tr>
+                      )}
                       <tr>
                         <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">Contact Person</td>
                         <td className="border border-gray-300 p-2 text-gray-900">{pendingFormData.CONTACTPERSON || 'Not provided'}</td>
@@ -1984,8 +2087,12 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                             )}
                             {isAnc && (
                               <>
+                                <div><span className="font-semibold text-gray-700">Province:</span> <span className="text-gray-900">{pendingFormData[`PROVINCE|${index}`] || '-'}</span></div>
+                                <div><span className="font-semibold text-gray-700">LGU:</span> <span className="text-gray-900">{pendingFormData[`LGU|${index}`] || '-'}</span></div>
                                 <div><span className="font-semibold text-gray-700">PRC No:</span> <span className="text-gray-900">{pendingFormData[`PRCNUM|${index}`] || '-'}</span></div>
                                 <div><span className="font-semibold text-gray-700">Expiry Date:</span> <span className="text-gray-900">{pendingFormData[`EXPIRYDATE|${index}`] || '-'}</span></div>
+                                <div><span className="font-semibold text-gray-700">Contact No:</span> <span className="text-gray-900">{pendingFormData[`CONTACTNUMBER|${index}`] || '-'}</span></div>
+                                <div><span className="font-semibold text-gray-700">Email:</span> <span className="text-gray-900 break-words">{pendingFormData[`EMAIL|${index}`] || '-'}</span></div>
                                 <div><span className="font-semibold text-gray-700">Provincial League:</span> <span className="text-gray-900">{pendingFormData[`PROVINCIALLEAGUE|${index}`] || '-'}</span></div>
                               </>
                             )}
@@ -2017,8 +2124,12 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                           )}
                           {isAnc && (
                             <>
+                              <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[120px]">Province</th>
+                              <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[140px]">LGU</th>
                               <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[84px]">PRC No</th>
                               <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[56px]">Expiry Date</th>
+                              <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[120px]">Contact No</th>
+                              <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[140px]">Email</th>
                               <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[120px]">Provincial League</th>
                             </>
                           )}
@@ -2056,8 +2167,12 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                               )}
                               {isAnc && (
                                 <>
+                                  <td className="border border-gray-300 p-2 text-gray-900">{pendingFormData[`PROVINCE|${index}`] || '-'}</td>
+                                  <td className="border border-gray-300 p-2 text-gray-900">{pendingFormData[`LGU|${index}`] || '-'}</td>
                                   <td className="border border-gray-300 p-2 text-gray-900">{pendingFormData[`PRCNUM|${index}`] || '-'}</td>
                                   <td className="border border-gray-300 p-2 text-gray-900">{pendingFormData[`EXPIRYDATE|${index}`] || '-'}</td>
+                                  <td className="border border-gray-300 p-2 text-gray-900">{pendingFormData[`CONTACTNUMBER|${index}`] || '-'}</td>
+                                  <td className="border border-gray-300 p-2 text-gray-900 break-words">{pendingFormData[`EMAIL|${index}`] || '-'}</td>
                                   <td className="border border-gray-300 p-2 text-gray-900">{pendingFormData[`PROVINCIALLEAGUE|${index}`] || '-'}</td>
                                 </>
                               )}

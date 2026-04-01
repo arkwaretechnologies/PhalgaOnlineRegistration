@@ -1586,7 +1586,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">Provincial League</label>
+                            <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">Provincial League *</label>
                             <select
                               value={participant.provincialLeague || ''}
                               onChange={(e) => updateParticipant(participant.id, 'provincialLeague', e.target.value)}

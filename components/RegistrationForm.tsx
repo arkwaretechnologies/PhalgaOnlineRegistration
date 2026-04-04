@@ -127,7 +127,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
 
   const isAnc = (conference?.is_anc || '').toString().trim().toUpperCase() === 'Y';
   const ANC_POSITION_CHOICES = [
-    'MUNICIPAL ACCCOUNTANT',
+    'MUNICIPAL ACCOUNTANT',
     'CITY ACCOUNTANT',
     'PROVINCIAL ACCOUNTANT',
     'OIC-MUNICIPAL ACCOUNTANT',

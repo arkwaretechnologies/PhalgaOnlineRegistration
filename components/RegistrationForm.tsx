@@ -634,7 +634,15 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
   };
 
   const getEffectivePositions = (effectiveLgu: string): Array<{ name: string; lvl: string | null }> => {
-    if (isAnc) return ANC_POSITION_CHOICES.map(name => ({ name, lvl: null }));
+    if (isAnc) {
+      const lguUpper = (effectiveLgu || '').toString().trim().toUpperCase();
+      const mode: 'PROVINCIAL' | 'CITY' | 'MUNICIPAL' =
+        lguUpper === 'PROVINCE' ? 'PROVINCIAL' : (/\bCITY\b/.test(lguUpper) ? 'CITY' : 'MUNICIPAL');
+
+      return ANC_POSITION_CHOICES
+        .filter(name => name.includes(mode))
+        .map(name => ({ name, lvl: null }));
+    }
     return getFilteredPositions(effectiveLgu);
   };
 

@@ -118,14 +118,15 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
     venue: string | null;
     psgc: string | null;
     is_anc?: string | null;
+    include_psgc?: string | null;
   } | null>(null);
   const [provinces, setProvinces] = useState<string[]>([]); // Start with empty array - only show fetched provinces
   const [provincialLeagues, setProvincialLeagues] = useState<Array<{ acronym: string; name: string; label: string }>>([]);
-  const [isProvinceLgu, setIsProvinceLgu] = useState(false);
   const [venues, setVenues] = useState<Array<{ confcode: string; name: string | null; venue: string | null }>>([]);
   const [venuesLoading, setVenuesLoading] = useState(true);
 
   const isAnc = (conference?.is_anc || '').toString().trim().toUpperCase() === 'Y';
+  const hasIncludePsgc = ((conference?.include_psgc || '').toString().trim() !== '');
   const ANC_POSITION_CHOICES = [
     'MUNICIPAL ACCOUNTANT',
     'CITY ACCOUNTANT',
@@ -446,6 +447,14 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
 
   // LGU cell always matches header: keep all participant LGUs in sync with header LGU
   useEffect(() => {
+    // If conference uses include_psgc, do not allow "PROVINCE" LGU mode in header.
+    if (hasIncludePsgc && (lgu || '').toString().trim().toUpperCase() === 'PROVINCE') {
+      setLgu('');
+      setSelectedLguPsgc('');
+    }
+  }, [hasIncludePsgc, lgu]);
+
+  useEffect(() => {
     if (lgu) {
       setParticipants(prevParticipants =>
         prevParticipants.map(p => ({
@@ -456,18 +465,6 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       );
     }
   }, [lgu]);
-
-  // Handle province LGU checkbox change
-  useEffect(() => {
-    if (isProvinceLgu) {
-      setLgu('PROVINCE');
-      setSelectedLguPsgc('');
-    } else if (lgu === 'PROVINCE') {
-      // If checkbox is unchecked and LGU is still "PROVINCE", clear it
-      setLgu('');
-      setSelectedLguPsgc('');
-    }
-  }, [isProvinceLgu]);
 
   const MAX_PARTICIPANTS = 20;
 
@@ -1147,30 +1144,22 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                     onChange={(e) => {
                       const selectedName = e.target.value;
                       setLgu(selectedName);
-                      const matchedLgu = lguOptions.find(l => l.name.toUpperCase() === selectedName.toUpperCase());
-                      setSelectedLguPsgc(matchedLgu?.psgc || '');
+                          if (selectedName.toUpperCase().trim() === 'PROVINCE') {
+                            setSelectedLguPsgc('');
+                            return;
+                          }
+                          const matchedLgu = lguOptions.find(l => l.name.toUpperCase() === selectedName.toUpperCase());
+                          setSelectedLguPsgc(matchedLgu?.psgc || '');
                     }}
                     className="flex-1 px-3 py-2.5 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
                     required
-                    disabled={isProvinceLgu}
                   >
                     <option value="">Select LGU</option>
+                        {!hasIncludePsgc && province.toUpperCase().trim() !== 'HIGHLY URBANIZED CITY' && (
+                          <option value="PROVINCE">PROVINCE</option>
+                        )}
                     {lguOptions.map((l, idx) => <option key={l.psgc || idx} value={l.name}>{l.name}</option>)}
                   </select>
-                  <label htmlFor="province-lgu-checkbox-mobile" className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      id="province-lgu-checkbox-mobile"
-                      checked={isProvinceLgu}
-                      onChange={(e) => {
-                        setIsProvinceLgu(e.target.checked);
-                      }}
-                      className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer m-0"
-                    />
-                    <span className="text-xs sm:text-sm font-medium text-gray-900 select-none whitespace-nowrap">
-                      PROVINCE
-                    </span>
-                  </label>
                 </div>
               </div>
             )}
@@ -1283,30 +1272,22 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                         onChange={(e) => {
                           const selectedName = e.target.value;
                           setLgu(selectedName);
+                          if (selectedName.toUpperCase().trim() === 'PROVINCE') {
+                            setSelectedLguPsgc('');
+                            return;
+                          }
                           const matchedLgu = lguOptions.find(l => l.name.toUpperCase() === selectedName.toUpperCase());
                           setSelectedLguPsgc(matchedLgu?.psgc || '');
                         }}
                         className="flex-1 px-2 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white"
                         required
-                        disabled={isProvinceLgu}
                       >
                         <option value="">Select LGU</option>
+                        {!hasIncludePsgc && province.toUpperCase().trim() !== 'HIGHLY URBANIZED CITY' && (
+                          <option value="PROVINCE">PROVINCE</option>
+                        )}
                         {lguOptions.map((l, idx) => <option key={l.psgc || idx} value={l.name}>{l.name}</option>)}
                       </select>
-                      <label htmlFor="province-lgu-checkbox" className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          id="province-lgu-checkbox"
-                          checked={isProvinceLgu}
-                          onChange={(e) => {
-                            setIsProvinceLgu(e.target.checked);
-                          }}
-                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer m-0"
-                        />
-                        <span className="text-sm font-medium text-gray-900 select-none whitespace-nowrap">
-                          PROVINCE
-                        </span>
-                      </label>
                     </div>
                   </td>
                 </tr>

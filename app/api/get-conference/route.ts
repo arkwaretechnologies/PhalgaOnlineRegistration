@@ -2,8 +2,10 @@ import { NextResponse } from 'next/server';
 import { getConferenceByDomain, getConferenceByConfcode, type ConferenceInfo } from '@/lib/conference';
 
 function sanitizeConferenceForClient(conference: ConferenceInfo) {
+  // These fields are safe to expose and needed client-side for UI behavior.
+  // (No secrets here; it's configuration.)
   const { exclude_psgc, include_psgc, reg_limit, ...rest } = conference;
-  return rest;
+  return { ...rest, include_psgc: include_psgc ?? null };
 }
 
 export const dynamic = 'force-dynamic';

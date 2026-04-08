@@ -100,8 +100,9 @@ if (data) {
 
       if (allProvinces.length > 0) {
         allProvinces.sort((a, b) => a.localeCompare(b));
-        const fixedCityClasses = ['HIGHLY URBANIZED CITY'];
-        const finalProvinces = [...fixedCityClasses, ...allProvinces];
+        // When include_psgc is configured, only show provinces that are actually included.
+        // Do not auto-add the HUC pseudo-province unless no include_psgc filter exists.
+        const finalProvinces = [...allProvinces];
         return NextResponse.json(finalProvinces, {
           headers: {
             'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',

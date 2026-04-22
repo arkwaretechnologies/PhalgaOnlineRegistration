@@ -263,10 +263,18 @@ export default function ViewRegistration() {
   }, [header?.confcode]);
 
   const isAnc = (conference?.is_anc || '').toString().trim().toUpperCase() === 'Y';
+  const maxPaymentProofUploads = details.length === 1 ? 2 : details.length;
+  const uploadsLimitReached = paymentProofs.length >= maxPaymentProofUploads;
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    if (uploadsLimitReached) {
+      toast.error(`Maximum upload limit reached. This registration allows ${maxPaymentProofUploads} payment proof(s).`);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
 
     // Validate file type (images and PDFs)
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf'];
@@ -664,7 +672,7 @@ export default function ViewRegistration() {
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading || isRejectedOrUnsuccessful}
+                  disabled={uploading || isRejectedOrUnsuccessful || uploadsLimitReached}
                   className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold py-3 sm:py-2 px-4 rounded-lg transition-colors text-sm sm:text-base flex items-center justify-center gap-2 touch-target"
                 >
                   {uploading ? (

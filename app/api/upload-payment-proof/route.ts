@@ -145,9 +145,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const maxUploads = participantCount || 0;
+    const participantCountValue = participantCount || 0;
+    // Special rule: if only 1 participant, allow up to 2 payment proof uploads
+    const maxUploads = participantCountValue === 1 ? 2 : participantCountValue;
 
-    if (maxUploads === 0) {
+    if (participantCountValue === 0) {
       clearTimeout(timeoutId);
       return NextResponse.json(
         { error: 'No participants found for this registration. Please register participants first before uploading payment proofs.' },
@@ -183,7 +185,7 @@ export async function POST(request: Request) {
     if (currentUploadCount >= maxUploads) {
       clearTimeout(timeoutId);
       return NextResponse.json(
-        { error: `Maximum upload limit reached. This registration has ${maxUploads} participant(s), and you have already uploaded ${currentUploadCount} payment proof(s).` },
+        { error: `Maximum upload limit reached. This registration allows ${maxUploads} payment proof(s), and you have already uploaded ${currentUploadCount}.` },
         { status: 400 }
       );
     }
@@ -222,7 +224,7 @@ export async function POST(request: Request) {
       if (linenum > maxUploads) {
         clearTimeout(timeoutId);
         return NextResponse.json(
-          { error: `Line number ${linenum} exceeds the maximum allowed uploads (${maxUploads} participant(s) in this registration).` },
+          { error: `Line number ${linenum} exceeds the maximum allowed uploads (${maxUploads}).` },
           { status: 400 }
         );
       }

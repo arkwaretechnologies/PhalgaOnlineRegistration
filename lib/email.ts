@@ -73,13 +73,14 @@ export async function sendRegistrationConfirmation(
     let dateFrom: string | null = null;
     let dateTo: string | null = null;
     let venue: string | null = null;
+    let isAnc: boolean = false;
     let contactNumbers: string[] = [];
     if (data.confcode) {
       try {
         // Fetch conference data for date_from, date_to, and venue
         const { data: conferenceData, error: conferenceError } = await supabase
           .from('conference')
-          .select('date_from, date_to, venue')
+          .select('date_from, date_to, venue, is_anc')
           .eq('confcode', data.confcode)
           .single();
         
@@ -87,6 +88,7 @@ export async function sendRegistrationConfirmation(
           dateFrom = conferenceData.date_from;
           dateTo = conferenceData.date_to;
           venue = conferenceData.venue;
+          isAnc = (conferenceData.is_anc || '').toString().trim().toUpperCase() === 'Y';
         }
         
         // Fetch contacts
@@ -169,6 +171,27 @@ export async function sendRegistrationConfirmation(
     // });
 
     // Create HTML email template
+    const provinceAndLguRows = isAnc
+      ? ''
+      : `
+                <tr>
+                  <td style="padding: 10px; border-bottom: 1px solid #e0e0e0; color: #666666; font-size: 14px;">
+                    Province:
+                  </td>
+                  <td style="padding: 10px; border-bottom: 1px solid #e0e0e0; color: #333333; font-size: 14px; font-weight: 500;">
+                    ${data.province}
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px; border-bottom: 1px solid #e0e0e0; color: #666666; font-size: 14px;">
+                    LGU:
+                  </td>
+                  <td style="padding: 10px; border-bottom: 1px solid #e0e0e0; color: #333333; font-size: 14px; font-weight: 500;">
+                    ${data.lgu}
+                  </td>
+                </tr>
+      `;
+
     const htmlContent = `
 <!DOCTYPE html>
 <html lang="en">
@@ -255,22 +278,7 @@ export async function sendRegistrationConfirmation(
                     ${formattedDate}
                   </td>
                 </tr>
-                <tr>
-                  <td style="padding: 10px; border-bottom: 1px solid #e0e0e0; color: #666666; font-size: 14px;">
-                    Province:
-                  </td>
-                  <td style="padding: 10px; border-bottom: 1px solid #e0e0e0; color: #333333; font-size: 14px; font-weight: 500;">
-                    ${data.province}
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding: 10px; border-bottom: 1px solid #e0e0e0; color: #666666; font-size: 14px;">
-                    LGU:
-                  </td>
-                  <td style="padding: 10px; border-bottom: 1px solid #e0e0e0; color: #333333; font-size: 14px; font-weight: 500;">
-                    ${data.lgu}
-                  </td>
-                </tr>
+                ${provinceAndLguRows}
                 <tr>
                   <td style="padding: 10px; border-bottom: 1px solid #e0e0e0; color: #666666; font-size: 14px;">
                     Contact Number:

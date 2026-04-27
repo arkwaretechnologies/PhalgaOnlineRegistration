@@ -18,6 +18,7 @@ interface Participant {
   barangay: string;
   prcNo?: string;
   expiryDate?: string;
+  prcNotAvailable?: boolean;
   provincialLeague?: string;
   tshirt: string;
   member?: boolean;
@@ -94,6 +95,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
     barangay: '',
     prcNo: '',
     expiryDate: '',
+    prcNotAvailable: false,
     provincialLeague: '',
     tshirt: '',
     member: false,
@@ -487,6 +489,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       barangay: '',
       prcNo: '',
       expiryDate: '',
+      prcNotAvailable: false,
       provincialLeague: '',
       tshirt: '',
       member: false,
@@ -523,6 +526,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       barangay: '',
       prcNo: '',
       expiryDate: '',
+      prcNotAvailable: false,
       provincialLeague: '',
       tshirt: '',
       member: false,
@@ -589,6 +593,19 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
           ...p,
           nonMember: checked,
           member: checked ? false : p.member ?? false,
+        };
+      }));
+      return;
+    }
+    if (field === 'prcNotAvailable') {
+      const checked = value === true;
+      setParticipants(participants.map(p => {
+        if (p.id !== id) return p;
+        return {
+          ...p,
+          prcNotAvailable: checked,
+          prcNo: checked ? '' : (p.prcNo ?? ''),
+          expiryDate: checked ? '' : (p.expiryDate ?? ''),
         };
       }));
       return;
@@ -744,10 +761,20 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
         return;
       }
 
-      if (isAnc && (p.prcNo || '').toString().trim() !== '' && (p.expiryDate || '').toString().trim() === '') {
-        setErrorModalMessage(`Participant ${i + 1}: Expiry Date is required when PRC No has a value.`);
-        setShowErrorModal(true);
-        return;
+      if (isAnc) {
+        const prcNA = !!p.prcNotAvailable;
+        const prc = (p.prcNo || '').toString().trim();
+        const exp = (p.expiryDate || '').toString().trim();
+        if (!prcNA && prc === '') {
+          setErrorModalMessage(`Participant ${i + 1}: PRC No is required (or check N/A).`);
+          setShowErrorModal(true);
+          return;
+        }
+        if (!prcNA && exp === '') {
+          setErrorModalMessage(`Participant ${i + 1}: Expiry Date is required (or check N/A).`);
+          setShowErrorModal(true);
+          return;
+        }
       }
 
       if (isAnc && (p.contactNo || '').toString().trim() !== '') {
@@ -1517,7 +1544,18 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">PRC No</label>
+                            <div className="flex items-center justify-between">
+                              <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">PRC No *</label>
+                              <label className="flex items-center gap-1.5 select-none text-xs text-gray-600">
+                                <input
+                                  type="checkbox"
+                                  checked={!!participant.prcNotAvailable}
+                                  onChange={(e) => updateParticipant(participant.id, 'prcNotAvailable', e.target.checked)}
+                                  className="w-3.5 h-3.5 rounded border-gray-300"
+                                />
+                                N/A
+                              </label>
+                            </div>
                             <input
                               type="text"
                               inputMode="numeric"
@@ -1525,17 +1563,19 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                               value={participant.prcNo || ''}
                               onChange={(e) => updateParticipant(participant.id, 'prcNo', e.target.value)}
                               className="w-full h-8 px-3 py-1 border border-gray-300 rounded text-gray-900 bg-white text-sm"
+                              disabled={!!participant.prcNotAvailable}
+                              required={!participant.prcNotAvailable}
                             />
                           </div>
                           <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">Expiry Date</label>
+                            <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">Expiry Date *</label>
                             <input
                               type="date"
                               value={participant.expiryDate || ''}
                               onChange={(e) => updateParticipant(participant.id, 'expiryDate', e.target.value)}
                               className="w-full h-8 px-3 py-1 border border-gray-300 rounded text-gray-900 bg-white text-sm"
-                              disabled={(participant.prcNo || '').toString().trim() === ''}
-                              required={(participant.prcNo || '').toString().trim() !== ''}
+                              disabled={!!participant.prcNotAvailable}
+                              required={!participant.prcNotAvailable}
                             />
                           </div>
                         </div>
@@ -1803,24 +1843,37 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                             ))}
                           </select>
                         </td>
-                        <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 min-w-[84px]">
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            value={participant.prcNo || ''}
-                            onChange={(e) => updateParticipant(participant.id, 'prcNo', e.target.value)}
-                            className="w-full h-8 px-2 py-1 border border-gray-300 rounded text-gray-900 bg-white text-sm"
-                          />
+                        <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 min-w-[110px]">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              value={participant.prcNo || ''}
+                              onChange={(e) => updateParticipant(participant.id, 'prcNo', e.target.value)}
+                              className="flex-1 min-w-0 h-8 px-2 py-1 border border-gray-300 rounded text-gray-900 bg-white text-sm"
+                              disabled={!!participant.prcNotAvailable}
+                              required={!participant.prcNotAvailable}
+                            />
+                            <label className="flex items-center gap-1 select-none text-[11px] text-gray-700 whitespace-nowrap">
+                              <input
+                                type="checkbox"
+                                checked={!!participant.prcNotAvailable}
+                                onChange={(e) => updateParticipant(participant.id, 'prcNotAvailable', e.target.checked)}
+                                className="w-3 h-3 rounded border-gray-300"
+                              />
+                              N/A
+                            </label>
+                          </div>
                         </td>
-                      <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 min-w-[60px]">
+                        <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 min-w-[90px]">
                           <input
                             type="date"
                             value={participant.expiryDate || ''}
                             onChange={(e) => updateParticipant(participant.id, 'expiryDate', e.target.value)}
                             className="w-full h-8 px-2 py-1 border border-gray-300 rounded text-gray-900 bg-white text-sm"
-                          disabled={(participant.prcNo || '').toString().trim() === ''}
-                            required={(participant.prcNo || '').toString().trim() !== ''}
+                            disabled={!!participant.prcNotAvailable}
+                            required={!participant.prcNotAvailable}
                           />
                         </td>
                         <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 min-w-[120px]">

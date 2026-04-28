@@ -70,6 +70,7 @@ export async function POST(request: Request) {
     }
 
     const confcode = conference.confcode;
+    const isAnc = (conference as { is_anc?: string | null }).is_anc?.toString().trim().toUpperCase() === 'Y';
     const closedConference = (conference as { closed_conference?: string | null }).closed_conference;
     if (closedConference && String(closedConference).toUpperCase().trim() === 'Y') {
       clearTimeout(timeoutId);
@@ -229,6 +230,34 @@ export async function POST(request: Request) {
         phalgamember,
         email: (formData[`EMAIL|${i}`] || '').toString().trim().toLowerCase()
       });
+    }
+
+    // ANC rule: block registration if any submitted participant matches an existing (Province + LGU) pair
+    // among PENDING/APPROVED registrations for this conference.
+    if (isAnc) {
+      const existingPairs = new Set(
+        validRecords
+          .map(r => ({
+            province: (r.province || '').toString().trim().toUpperCase(),
+            lgu: (r.lgu || '').toString().trim().toUpperCase(),
+          }))
+          .filter(x => x.province && x.lgu)
+          .map(x => `${x.province}|${x.lgu}`)
+      );
+
+      for (const p of participants) {
+        const prov = (p.province || '').toString().trim().toUpperCase();
+        const lg = (p.lgu || '').toString().trim().toUpperCase();
+        if (!prov || !lg) continue;
+        const key = `${prov}|${lg}`;
+        if (existingPairs.has(key)) {
+          clearTimeout(timeoutId);
+          return NextResponse.json(
+            { error: `Cannot register. Existing participant already registered for Province "${prov}" and LGU "${lg}".` },
+            { status: 400 }
+          );
+        }
+      }
     }
 
     // Resolve province PSGC for RPC (for PROV limit check under lock)

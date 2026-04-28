@@ -614,10 +614,21 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
     // M.I. should allow letters only (no special chars / digits), up to 2 chars
     let finalValue = strValue;
     if (field === 'middleInit') {
+      const upperTrim = strValue.trim().toUpperCase();
+      if (upperTrim === 'N/A' || upperTrim === 'NA') {
+        finalValue = '';
+      } else {
       finalValue = strValue
         .toUpperCase()
         .replace(/[^A-Z]/g, '')
         .slice(0, 2);
+      }
+    }
+    if (field === 'suffix') {
+      const upperTrim = strValue.trim().toUpperCase();
+      if (upperTrim === 'N/A' || upperTrim === 'NA') {
+        finalValue = '';
+      }
     }
     if (field === 'prcNo') {
       const numericOnly = formatPRCNumber(strValue);

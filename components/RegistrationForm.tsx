@@ -630,8 +630,8 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
     setParticipants(participants.map(p => {
       if (p.id !== id) return p;
       const pos = (p.position || '').toString().trim().toUpperCase();
-      const oic = isAnc && pos.includes('OIC');
-      if (isAnc && !oic && (field === 'prcNo' || field === 'expiryDate')) {
+      const prcNaAllowed = isPrcNaAllowedForParticipant(pos);
+      if (isAnc && !prcNaAllowed && (field === 'prcNo' || field === 'expiryDate')) {
         return { ...p, [field]: finalValue, prcNotAvailable: false };
       }
       return { ...p, [field]: finalValue };
@@ -675,11 +675,23 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
     return positionOptions;
   };
 
+  const ANC_PRC_NA_POSITIONS = new Set([
+    'OIC-MUNICIPAL ACCOUNTANT',
+    'OIC-CITY ACCOUNTANT',
+    'OIC-PROVINCIAL ACCOUNTANT',
+  ]);
+
+  const isPrcNaAllowedForParticipant = (position: string) => {
+    if (!isAnc) return false;
+    const posU = (position || '').toString().trim().toUpperCase();
+    return ANC_PRC_NA_POSITIONS.has(posU);
+  };
+
   // Helper function to handle position change and clear barangay if needed
   const handlePositionChange = (participantId: number, newPosition: string) => {
     const newPositionUpper = newPosition.toUpperCase();
     const lvl = getPositionLvl(newPositionUpper);
-    const oic = isAnc && newPositionUpper.includes('OIC');
+    const prcNaAllowed = isPrcNaAllowedForParticipant(newPositionUpper);
     
     setParticipants(participants.map(p => {
       if (p.id === participantId) {
@@ -690,7 +702,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
           position: newPositionUpper,
           barangay: shouldClearBarangay ? '' : p.barangay,
           // PRC "N/A" is only for OIC ANC designations; reset when position no longer has OIC
-          prcNotAvailable: isAnc && !oic ? false : p.prcNotAvailable,
+          prcNotAvailable: isAnc && !prcNaAllowed ? false : p.prcNotAvailable,
         };
       }
       return p;
@@ -772,12 +784,12 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
 
       if (isAnc) {
         const posU = (p.position || '').toString().trim().toUpperCase();
-        const oic = posU.includes('OIC');
+        const prcNaAllowed = isPrcNaAllowedForParticipant(posU);
         const prc = (p.prcNo || '').toString().trim();
         const exp = (p.expiryDate || '').toString().trim();
         const prcNA = !!p.prcNotAvailable;
 
-        if (oic) {
+        if (prcNaAllowed) {
           if (!prcNA && prc === '') {
             setErrorModalMessage(`Participant ${i + 1}: PRC No is required (or check N/A if not available).`);
             setShowErrorModal(true);
@@ -1429,7 +1441,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
             </div>
             <div className="space-y-4">
               {participants.map((participant, index) => {
-                const oicPrc = isAnc && (participant.position || '').toString().toUpperCase().includes('OIC');
+                const oicPrc = isPrcNaAllowedForParticipant((participant.position || '').toString());
                 return (
                 <div key={participant.id} className="border border-gray-300 rounded-lg p-4 bg-blue-50 space-y-3">
                   <div className="flex items-center justify-between mb-2">
@@ -1792,7 +1804,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
               </thead>
               <tbody>
                 {participants.map((participant) => {
-                  const oicPrc = isAnc && (participant.position || '').toString().toUpperCase().includes('OIC');
+                  const oicPrc = isPrcNaAllowedForParticipant((participant.position || '').toString());
                   return (
                   <tr key={participant.id}>
                     <td className={`border border-gray-300 p-1.5 md:p-2 bg-blue-50 ${isAnc ? 'min-w-[220px]' : 'min-w-[190px]'}`}>

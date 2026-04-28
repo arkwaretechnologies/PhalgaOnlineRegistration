@@ -468,7 +468,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
     }
   }, [lgu]);
 
-  const MAX_PARTICIPANTS = 20;
+  const MAX_PARTICIPANTS = isAnc ? 50 : 20;
 
   const addParticipant = () => {
     if (participants.length >= MAX_PARTICIPANTS) {
@@ -627,9 +627,15 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       finalValue = numericOnly;
     }
 
-    setParticipants(participants.map(p =>
-      p.id === id ? { ...p, [field]: finalValue } : p
-    ));
+    setParticipants(participants.map(p => {
+      if (p.id !== id) return p;
+      const pos = (p.position || '').toString().trim().toUpperCase();
+      const oic = isAnc && pos.includes('OIC');
+      if (isAnc && !oic && (field === 'prcNo' || field === 'expiryDate')) {
+        return { ...p, [field]: finalValue, prcNotAvailable: false };
+      }
+      return { ...p, [field]: finalValue };
+    }));
   };
 
   // Helper function to get the lvl for a position name
@@ -673,6 +679,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
   const handlePositionChange = (participantId: number, newPosition: string) => {
     const newPositionUpper = newPosition.toUpperCase();
     const lvl = getPositionLvl(newPositionUpper);
+    const oic = isAnc && newPositionUpper.includes('OIC');
     
     setParticipants(participants.map(p => {
       if (p.id === participantId) {
@@ -681,7 +688,9 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
         return {
           ...p,
           position: newPositionUpper,
-          barangay: shouldClearBarangay ? '' : p.barangay
+          barangay: shouldClearBarangay ? '' : p.barangay,
+          // PRC "N/A" is only for OIC ANC designations; reset when position no longer has OIC
+          prcNotAvailable: isAnc && !oic ? false : p.prcNotAvailable,
         };
       }
       return p;
@@ -762,18 +771,34 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       }
 
       if (isAnc) {
-        const prcNA = !!p.prcNotAvailable;
+        const posU = (p.position || '').toString().trim().toUpperCase();
+        const oic = posU.includes('OIC');
         const prc = (p.prcNo || '').toString().trim();
         const exp = (p.expiryDate || '').toString().trim();
-        if (!prcNA && prc === '') {
-          setErrorModalMessage(`Participant ${i + 1}: PRC No is required (or check N/A).`);
-          setShowErrorModal(true);
-          return;
-        }
-        if (!prcNA && exp === '') {
-          setErrorModalMessage(`Participant ${i + 1}: Expiry Date is required (or check N/A).`);
-          setShowErrorModal(true);
-          return;
+        const prcNA = !!p.prcNotAvailable;
+
+        if (oic) {
+          if (!prcNA && prc === '') {
+            setErrorModalMessage(`Participant ${i + 1}: PRC No is required (or check N/A if not available).`);
+            setShowErrorModal(true);
+            return;
+          }
+          if (!prcNA && exp === '') {
+            setErrorModalMessage(`Participant ${i + 1}: Expiry Date is required (or check N/A if not available).`);
+            setShowErrorModal(true);
+            return;
+          }
+        } else {
+          if (prc === '') {
+            setErrorModalMessage(`Participant ${i + 1}: PRC No is required.`);
+            setShowErrorModal(true);
+            return;
+          }
+          if (exp === '') {
+            setErrorModalMessage(`Participant ${i + 1}: Expiry Date is required.`);
+            setShowErrorModal(true);
+            return;
+          }
         }
       }
 
@@ -1403,7 +1428,9 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
               </span>
             </div>
             <div className="space-y-4">
-              {participants.map((participant, index) => (
+              {participants.map((participant, index) => {
+                const oicPrc = isAnc && (participant.position || '').toString().toUpperCase().includes('OIC');
+                return (
                 <div key={participant.id} className="border border-gray-300 rounded-lg p-4 bg-blue-50 space-y-3">
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-bold text-sm text-gray-900">Participant #{index + 1}</span>
@@ -1546,15 +1573,17 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                           <div>
                             <div className="flex items-center justify-between">
                               <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">PRC No *</label>
-                              <label className="flex items-center gap-1.5 select-none text-xs text-gray-600">
-                                <input
-                                  type="checkbox"
-                                  checked={!!participant.prcNotAvailable}
-                                  onChange={(e) => updateParticipant(participant.id, 'prcNotAvailable', e.target.checked)}
-                                  className="w-3.5 h-3.5 rounded border-gray-300"
-                                />
-                                N/A
-                              </label>
+                              {oicPrc && (
+                                <label className="flex items-center gap-1.5 select-none text-xs text-gray-600">
+                                  <input
+                                    type="checkbox"
+                                    checked={!!participant.prcNotAvailable}
+                                    onChange={(e) => updateParticipant(participant.id, 'prcNotAvailable', e.target.checked)}
+                                    className="w-3.5 h-3.5 rounded border-gray-300"
+                                  />
+                                  N/A
+                                </label>
+                              )}
                             </div>
                             <input
                               type="text"
@@ -1563,8 +1592,8 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                               value={participant.prcNo || ''}
                               onChange={(e) => updateParticipant(participant.id, 'prcNo', e.target.value)}
                               className="w-full h-8 px-3 py-1 border border-gray-300 rounded text-gray-900 bg-white text-sm"
-                              disabled={!!participant.prcNotAvailable}
-                              required={!participant.prcNotAvailable}
+                              disabled={oicPrc && !!participant.prcNotAvailable}
+                              required
                             />
                           </div>
                           <div>
@@ -1574,8 +1603,8 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                               value={participant.expiryDate || ''}
                               onChange={(e) => updateParticipant(participant.id, 'expiryDate', e.target.value)}
                               className="w-full h-8 px-3 py-1 border border-gray-300 rounded text-gray-900 bg-white text-sm"
-                              disabled={!!participant.prcNotAvailable}
-                              required={!participant.prcNotAvailable}
+                              disabled={oicPrc && !!participant.prcNotAvailable}
+                              required
                             />
                           </div>
                         </div>
@@ -1717,7 +1746,8 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                     )}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -1761,7 +1791,9 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                 </tr>
               </thead>
               <tbody>
-                {participants.map((participant) => (
+                {participants.map((participant) => {
+                  const oicPrc = isAnc && (participant.position || '').toString().toUpperCase().includes('OIC');
+                  return (
                   <tr key={participant.id}>
                     <td className={`border border-gray-300 p-1.5 md:p-2 bg-blue-50 ${isAnc ? 'min-w-[220px]' : 'min-w-[190px]'}`}>
                       <input
@@ -1852,18 +1884,20 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                               value={participant.prcNo || ''}
                               onChange={(e) => updateParticipant(participant.id, 'prcNo', e.target.value)}
                               className="flex-1 min-w-0 h-8 px-2 py-1 border border-gray-300 rounded text-gray-900 bg-white text-sm"
-                              disabled={!!participant.prcNotAvailable}
-                              required={!participant.prcNotAvailable}
+                              disabled={oicPrc && !!participant.prcNotAvailable}
+                              required
                             />
-                            <label className="flex items-center gap-1 select-none text-[11px] text-gray-700 whitespace-nowrap">
-                              <input
-                                type="checkbox"
-                                checked={!!participant.prcNotAvailable}
-                                onChange={(e) => updateParticipant(participant.id, 'prcNotAvailable', e.target.checked)}
-                                className="w-3 h-3 rounded border-gray-300"
-                              />
-                              N/A
-                            </label>
+                            {oicPrc && (
+                              <label className="flex items-center gap-1 select-none text-[11px] text-gray-700 whitespace-nowrap">
+                                <input
+                                  type="checkbox"
+                                  checked={!!participant.prcNotAvailable}
+                                  onChange={(e) => updateParticipant(participant.id, 'prcNotAvailable', e.target.checked)}
+                                  className="w-3 h-3 rounded border-gray-300"
+                                />
+                                N/A
+                              </label>
+                            )}
                           </div>
                         </td>
                         <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 min-w-[90px]">
@@ -1872,8 +1906,8 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                             value={participant.expiryDate || ''}
                             onChange={(e) => updateParticipant(participant.id, 'expiryDate', e.target.value)}
                             className="w-full h-8 px-2 py-1 border border-gray-300 rounded text-gray-900 bg-white text-sm"
-                            disabled={!!participant.prcNotAvailable}
-                            required={!participant.prcNotAvailable}
+                            disabled={oicPrc && !!participant.prcNotAvailable}
+                            required
                           />
                         </td>
                         <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 min-w-[120px]">
@@ -1983,7 +2017,8 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -76,6 +76,7 @@ export async function sendRegistrationConfirmation(
     let venue: string | null = null;
     let isAnc: boolean = false;
     let awardStatus: string | null = null;
+    let banks: Array<{ bank_name: string | null; acct_no: string | null; payee: string | null }> = [];
     let contactNumbers: string[] = [];
     if (data.confcode) {
       try {
@@ -104,6 +105,16 @@ export async function sendRegistrationConfirmation(
           if (!reghErr && reghRow?.status) {
             awardStatus = String(reghRow.status).trim();
           }
+        }
+
+        // Fetch banks (for award email instructions / bank details section)
+        const { data: bankData, error: bankErr } = await supabase
+          .from('banks')
+          .select('bank_name, acct_no, payee')
+          .eq('confcode', data.confcode)
+          .order('id', { ascending: true });
+        if (!bankErr && Array.isArray(bankData)) {
+          banks = bankData as any;
         }
         
         // Fetch contacts
@@ -175,12 +186,45 @@ export async function sendRegistrationConfirmation(
     const rightImageUrl = `${baseUrl}/right.png`;
     const viewUrl = data.viewUrl || `${baseUrl}/view/${data.transId}${data.confcode ? `?confcode=${encodeURIComponent(data.confcode)}` : ''}`;
 
+    const totalFee = Number(data.participantCount || 0) * 2500;
+    const totalFeeFormatted = totalFee.toLocaleString('en-PH');
+    const bankDetailsHtml = banks.length
+      ? `
+        <div style="margin: 10px 0 0 0; padding: 12px; background-color: #f8f9fa; border: 1px solid #e5e7eb; border-radius: 6px;">
+          ${banks.map((b, idx) => `
+            <div style="margin: 0 0 ${idx === banks.length - 1 ? '0' : '10px'} 0; color: #333333; font-size: 14px; line-height: 1.5;">
+              <div style="font-weight: bold; margin-bottom: 2px;">(${idx + 1}) ${(b.bank_name || '').toString().trim() || '-'}</div>
+              <div><span style="font-weight: bold;">PAYEE:</span> ${(b.payee || '').toString().trim() || '-'}</div>
+              <div><span style="font-weight: bold;">Account No.:</span> ${(b.acct_no || '').toString().trim() || '-'}</div>
+            </div>
+          `).join('')}
+        </div>
+      `
+      : `<div style="margin: 10px 0 0 0; color: #666666; font-size: 14px; line-height: 1.6;">Bank details are not available at the moment.</div>`;
+
     const paymentInstruction = data.isAward
-      ? 'Your registration has been successfully submitted. If you have a support staff with you, please upload proof of payment on registration details.'
+      ? `
+        <div style="color: #333333; font-size: 16px; line-height: 1.7;">
+          <p style="margin: 0 0 10px 0;">
+            Confirming the attendance of the ${data.lgu} - ${data.province}.
+          </p>
+          <p style="margin: 0 0 10px 0;">
+            Please pay total fee ${totalFeeFormatted} for the accompanying.
+          </p>
+          <p style="margin: 0 0 8px 0; font-weight: bold;">
+            Bank details.
+          </p>
+          ${bankDetailsHtml}
+          <p style="margin: 12px 0 0 0;">
+            After paying, please click View Confirmation Details and click Add Payment Proof to upload proof of Payment.
+          </p>
+        </div>
+      `
       : 'Your registration has been successfully submitted. Please upload your proof of payment within 24 hours.';
 
     const statusText = (data.isAward ? (awardStatus || 'PENDING') : 'PENDING').toString().trim().toUpperCase();
     const participantCountLabel = data.isAward ? 'Number of Support Staff:' : 'Number of Participants:';
+    const viewButtonLabel = data.isAward ? 'View Confirmation Details' : 'View Registration Details';
     
     // // console.log('Email image URLs:', { 
     // //   leftImageUrl, 
@@ -276,9 +320,9 @@ export async function sendRegistrationConfirmation(
                 Dear ${data.contactPerson},
               </p>
               
-              <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+              <div style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
                 ${paymentInstruction}
-              </p>
+              </div>
               
               <!-- Transaction ID Highlight -->
               <div style="background-color: #f8f9fa; border-left: 4px solid #667eea; padding: 15px; margin: 20px 0; border-radius: 4px;">
@@ -334,7 +378,7 @@ export async function sendRegistrationConfirmation(
               <!-- View Registration Button -->
               <div style="text-align: center; margin: 30px 0;">
                 <a href="${viewUrl}" style="display: inline-block; background-color: #667eea; color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 5px; font-weight: bold; font-size: 16px;">
-                  View Registration Details
+                  ${viewButtonLabel}
                 </a>
               </div>
               

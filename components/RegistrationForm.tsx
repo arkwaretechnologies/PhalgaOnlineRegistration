@@ -76,7 +76,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
   const [lgu, setLgu] = useState('');
   const [contactPerson, setContactPerson] = useState('');
   const [contactPersonError, setContactPersonError] = useState<string>('');
-  const [repPositionType, setRepPositionType] = useState<'LOCAL CHIEF EXECUTIVE' | 'OTHERS' | ''>('');
+  const [repPositionType, setRepPositionType] = useState<'PROVINCIAL GOVERNOR' | 'MUNICIPAL MAYOR' | 'CITY MAYOR' | 'OTHERS' | ''>('');
   const [repPositionOther, setRepPositionOther] = useState('');
   const [showSupportStaff, setShowSupportStaff] = useState(false);
   const [contactNo, setContactNo] = useState('');
@@ -134,6 +134,12 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
   const isAnc = (conference?.is_anc || '').toString().trim().toUpperCase() === 'Y';
   const isAward = (conference?.is_award || '').toString().trim().toUpperCase() === 'Y';
   const hasIncludePsgc = ((conference?.include_psgc || '').toString().trim() !== '');
+  const getAwardPositionOptions = (lguValue: string) => {
+    const lguU = (lguValue || '').toString().trim().toUpperCase();
+    if (lguU === 'PROVINCE') return ['PROVINCIAL GOVERNOR', 'OTHERS'] as const;
+    if (lguU.includes('CITY')) return ['CITY MAYOR', 'OTHERS'] as const;
+    return ['MUNICIPAL MAYOR', 'OTHERS'] as const;
+  };
   const ANC_POSITION_CHOICES = [
     'MUNICIPAL ACCOUNTANT',
     'CITY ACCOUNTANT',
@@ -164,6 +170,15 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
   useEffect(() => {
     if (isAward) setShowSupportStaff(false);
   }, [isAward]);
+
+  useEffect(() => {
+    if (!isAward) return;
+    const options = getAwardPositionOptions(lgu);
+    if (repPositionType && !options.includes(repPositionType as any)) {
+      setRepPositionType('');
+      setRepPositionOther('');
+    }
+  }, [isAward, lgu, repPositionType]);
 
   const getAncLguOptions = (prov: string | undefined) => {
     if (!prov) return [];
@@ -477,7 +492,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
     }
   }, [lgu]);
 
-  const MAX_PARTICIPANTS = isAnc ? 50 : 20;
+  const MAX_PARTICIPANTS = isAward ? 20 : (isAnc ? 50 : 20);
 
   const addParticipant = () => {
     if (participants.length >= MAX_PARTICIPANTS) {
@@ -1193,41 +1208,83 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       <div className={`${isAnc ? 'max-w-5xl' : 'max-w-screen-2xl'} mx-auto`}>
         <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-lg p-4 sm:p-6 md:p-8">
           {/* Header with Logos */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-2 mb-6 sm:mb-8">
-            <div className="flex-shrink-0 hidden sm:block">
-              <img
-                src="/left.png"
-                alt="PHALGA Logo Left"
-                className="h-16 sm:h-20 md:h-24 w-auto object-contain"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
-            </div>
-            <div className="flex-1 text-center order-2 sm:order-1">
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">PhALGA Registration Form</h1>
-            </div>
-            <div className="flex-shrink-0 hidden sm:block order-1 sm:order-2">
-              <img
-                src="/right.png"
-                alt="PHALGA Logo Right"
-                className="h-16 sm:h-20 md:h-24 w-auto object-contain"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
-            </div>
-          </div>
+          {isAward ? (
+            <>
+              <div className="mb-4 sm:mb-6">
+                {/* Mobile header */}
+                <div className="sm:hidden text-center">
+                  <h1 className="text-xl font-bold tracking-wide text-gray-900">Phalga Registration</h1>
+                </div>
 
-          {isAward && (
-            <div className="mb-4 flex justify-center">
-              <button
-                type="button"
-                onClick={() => setShowSupportStaff((v) => !v)}
-                className="w-full sm:w-auto px-6 py-3 sm:py-2.5 rounded-lg font-semibold transition-colors text-sm sm:text-base touch-target bg-indigo-600 text-white hover:bg-indigo-700"
-              >
-                {showSupportStaff ? 'Hide Support Staff Information' : 'Add Support Staff Information'}
-              </button>
+                {/* Desktop header */}
+                <div className="hidden sm:grid grid-cols-[minmax(220px,340px)_1fr_minmax(220px,340px)] items-start gap-6">
+                  <div className="flex flex-col items-start">
+                    <img
+                      src="/left.png"
+                      alt="PHALGA Logo Left"
+                      className="h-16 md:h-20 w-auto object-contain"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex justify-center pt-2">
+                    <h1 className="text-2xl md:text-3xl font-extrabold tracking-wide text-gray-900">
+                      Phalga Registration
+                    </h1>
+                  </div>
+
+                  <div className="flex justify-end pt-1">
+                    <img
+                      src="/right.png"
+                      alt="PHALGA Logo Right"
+                      className="h-16 md:h-20 w-auto object-contain"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Award notice (full-width; matches header/details width) */}
+              <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950 shadow-sm">
+                <div className="text-sm font-semibold mb-1">Important</div>
+                <ol className="list-decimal pl-5 space-y-1.5 text-sm leading-relaxed">
+                  <li>For the Local Chief Executive or Representative, free of charge.</li>
+                  <li>
+                    For the accompanying, an assessment fee of 2,500 will be collected payable within 24 hours to secure the slot.
+                  </li>
+                  <li>An email will be sent in your registered email for bank details.</li>
+                </ol>
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-2 mb-6 sm:mb-8">
+              <div className="flex-shrink-0 hidden sm:block">
+                <img
+                  src="/left.png"
+                  alt="PHALGA Logo Left"
+                  className="h-16 sm:h-20 md:h-24 w-auto object-contain"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              </div>
+              <div className="flex-1 text-center order-2 sm:order-1">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">PhALGA Registration Form</h1>
+              </div>
+              <div className="flex-shrink-0 hidden sm:block order-1 sm:order-2">
+                <img
+                  src="/right.png"
+                  alt="PHALGA Logo Right"
+                  className="h-16 sm:h-20 md:h-24 w-auto object-contain"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              </div>
             </div>
           )}
 
@@ -1294,7 +1351,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
               </div>
             )}
             <div className="border border-gray-300 rounded-lg p-3 bg-blue-50">
-              <label className="block font-semibold text-sm text-gray-900 mb-2">{isAward ? 'NAME OF REPRESENTATIVE' : 'CONTACT PERSON'} *</label>
+              <label className="block font-semibold text-sm text-gray-900 mb-2">{isAward ? 'NAME OF LOCAL CHIEF EXECUTIVE/REPRESENTATIVE' : 'CONTACT PERSON'} *</label>
               <input
                 type="text"
                 value={contactPerson}
@@ -1337,8 +1394,9 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                   required
                 >
                   <option value="">Select Position</option>
-                  <option value="LOCAL CHIEF EXECUTIVE">LOCAL CHIEF EXECUTIVE</option>
-                  <option value="OTHERS">OTHERS</option>
+                  {getAwardPositionOptions(lgu).map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
                 </select>
                 {repPositionType === 'OTHERS' && (
                   <input
@@ -1391,24 +1449,24 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
           <table className="hidden sm:table w-full border-collapse border border-gray-300 mb-6">
             <tbody>
               <tr>
-                <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">CONFERENCE</td>
+                <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900 w-56 whitespace-nowrap">CONFERENCE</td>
                 <td className="border border-gray-300 p-2 text-gray-900">{conference?.name?.toUpperCase() || '18TH MINDANAO GEOGRAPHIC CONFERENCE'}</td>
               </tr>
               {formatConferenceDateRange(conference?.date_from ?? null, conference?.date_to ?? null) && (
                 <tr>
-                  <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">DATE</td>
+                  <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900 w-56 whitespace-nowrap">DATE</td>
                   <td className="border border-gray-300 p-2 text-gray-900">{formatConferenceDateRange(conference?.date_from ?? null, conference?.date_to ?? null)}</td>
                 </tr>
               )}
               {conference?.venue && (
                 <tr>
-                  <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">VENUE</td>
+                  <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900 w-56 whitespace-nowrap">VENUE</td>
                   <td className="border border-gray-300 p-2 text-gray-900">{conference.venue}</td>
                 </tr>
               )}
               {!isAnc && (
                 <tr>
-                  <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">PROVINCE</td>
+                  <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900 w-56 whitespace-nowrap">PROVINCE</td>
                   <td className="border border-gray-300 p-2 bg-blue-50">
                     <select
                       value={province}
@@ -1424,7 +1482,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
               )}
               {!isAnc && (
                 <tr>
-                  <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">LGU</td>
+                  <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900 w-56 whitespace-nowrap">LGU</td>
                   <td className="border border-gray-300 p-2 bg-blue-50">
                     <div className="flex items-center gap-2 sm:gap-3">
                       <select
@@ -1453,7 +1511,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                 </tr>
               )}
               <tr>
-                <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">{isAward ? 'NAME OF REPRESENTATIVE' : 'CONTACT PERSON'}</td>
+                <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900 w-56 whitespace-nowrap">{isAward ? 'NAME OF LOCAL CHIEF EXECUTIVE/REPRESENTATIVE' : 'CONTACT PERSON'}</td>
                 <td className="border border-gray-300 p-2 bg-blue-50">
                   <input
                     type="text"
@@ -1486,7 +1544,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
 
               {isAward && (
                 <tr>
-                  <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">POSITION</td>
+                  <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900 w-56 whitespace-nowrap">POSITION</td>
                   <td className="border border-gray-300 p-2 bg-blue-50">
                     <select
                       value={repPositionType}
@@ -1499,8 +1557,9 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                       required
                     >
                       <option value="">Select Position</option>
-                      <option value="LOCAL CHIEF EXECUTIVE">LOCAL CHIEF EXECUTIVE</option>
-                      <option value="OTHERS">OTHERS</option>
+                      {getAwardPositionOptions(lgu).map(opt => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
                     </select>
                     {repPositionType === 'OTHERS' && (
                       <input
@@ -1516,7 +1575,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                 </tr>
               )}
               <tr>
-                <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">CONTACT NO.</td>
+                <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900 w-56 whitespace-nowrap">CONTACT NO.</td>
                 <td className="border border-gray-300 p-2 bg-blue-50">
                   <input
                     type="tel"
@@ -1536,7 +1595,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                 </td>
               </tr>
               <tr>
-                <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">EMAIL ADDRESS</td>
+                <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900 w-56 whitespace-nowrap">EMAIL ADDRESS</td>
                 <td className="border border-gray-300 p-2 bg-blue-50">
                   <input
                     type="email"
@@ -1555,6 +1614,27 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
             </tbody>
           </table>
 
+          {isAward && (
+            <div className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => setShowSupportStaff((v) => !v)}
+                className="w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors touch-target text-sm sm:text-base font-semibold"
+              >
+                {showSupportStaff ? 'Hide Accompanying' : 'Add Accompanying'}
+              </button>
+              {!showSupportStaff && (
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-400 transition-colors touch-target text-sm sm:text-base font-semibold"
+                >
+                  {isSubmitting ? 'Submitting...' : 'Submit'}
+                </button>
+              )}
+            </div>
+          )}
+
           {(!isAward || showSupportStaff) && (
             <p className="mb-4 text-xs sm:text-sm text-gray-600">
               <strong>NOTE:</strong>{' '}
@@ -1568,7 +1648,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
           <div className={`${isAnc ? 'block' : 'block md:hidden'} mb-6`}>
             <div className="bg-gray-200 border border-gray-300 rounded-t-lg p-3 text-center mb-2">
               <span className="text-base font-bold text-gray-900">
-                {isAward ? 'LIST OF SUPPORT STAFF' : 'LIST OF PARTICIPANTS'}
+                {isAward ? 'LIST OF ACCOMPANYING' : 'LIST OF PARTICIPANTS'}
               </span>
               <span className="block text-sm font-normal text-gray-700 mt-1">
                 (Total: {participants.length}{' '}
@@ -1663,17 +1743,27 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">Position *</label>
-                      <select
-                        value={participant.position}
-                        onChange={(e) => handlePositionChange(participant.id, e.target.value)}
-                        className="w-full h-8 px-3 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white text-sm"
-                        required
-                      >
-                        <option value="">Select Position</option>
-                        {getEffectivePositions(participant.lgu || lgu).map(position => (
-                          <option key={position.name} value={position.name}>{position.name}</option>
-                        ))}
-                      </select>
+                      {isAward ? (
+                        <input
+                          type="text"
+                          value={participant.position}
+                          onChange={(e) => updateParticipant(participant.id, 'position', e.target.value.toUpperCase())}
+                          className="w-full h-8 px-3 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white text-sm"
+                          required
+                        />
+                      ) : (
+                        <select
+                          value={participant.position}
+                          onChange={(e) => handlePositionChange(participant.id, e.target.value)}
+                          className="w-full h-8 px-3 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white text-sm"
+                          required
+                        >
+                          <option value="">Select Position</option>
+                          {getEffectivePositions(participant.lgu || lgu).map(position => (
+                            <option key={position.name} value={position.name}>{position.name}</option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                     {isAward ? (
                       <>
@@ -1918,7 +2008,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
               <thead>
                 <tr>
                   <th colSpan={isAward ? 6 : (isAnc ? 11 : 9)} className="border border-gray-300 p-2 bg-gray-200 text-center">
-                    <span className="text-lg font-bold text-gray-900">{isAward ? 'LIST OF SUPPORT STAFF' : 'LIST OF PARTICIPANTS'}</span>
+                    <span className="text-lg font-bold text-gray-900">{isAward ? 'LIST OF ACCOMPANYING' : 'LIST OF PARTICIPANTS'}</span>
                     <span className="ml-4 text-base font-normal text-gray-700">
                       (Total: {participants.length} {participants.length === 1 ? (isAward ? 'staff' : 'participant') : (isAward ? 'staff' : 'participants')})
                     </span>
@@ -1962,7 +2052,10 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                         type="text"
                         value={participant.lastName}
                         onChange={(e) => updateParticipant(participant.id, 'lastName', e.target.value.toUpperCase())}
-                        className="w-full px-2 py-1.5 md:py-1 border-0 bg-transparent uppercase text-gray-900 text-sm"
+                        className={isAward
+                          ? 'w-full px-2 py-1.5 md:py-1 border border-gray-300 rounded bg-white uppercase text-gray-900 text-sm'
+                          : 'w-full px-2 py-1.5 md:py-1 border-0 bg-transparent uppercase text-gray-900 text-sm'
+                        }
                         required
                       />
                     </td>
@@ -1971,7 +2064,10 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                         type="text"
                         value={participant.firstName}
                         onChange={(e) => updateParticipant(participant.id, 'firstName', e.target.value.toUpperCase())}
-                        className="w-full px-2 py-1.5 md:py-1 border-0 bg-transparent uppercase text-gray-900 text-sm"
+                        className={isAward
+                          ? 'w-full px-2 py-1.5 md:py-1 border border-gray-300 rounded bg-white uppercase text-gray-900 text-sm'
+                          : 'w-full px-2 py-1.5 md:py-1 border-0 bg-transparent uppercase text-gray-900 text-sm'
+                        }
                         required
                       />
                     </td>
@@ -1981,7 +2077,10 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                           type="text"
                           value={participant.middleInit}
                           onChange={(e) => updateParticipant(participant.id, 'middleInit', e.target.value.toUpperCase())}
-                          className="w-10 flex-shrink-0 px-2 py-1.5 md:py-1 border-0 bg-transparent uppercase text-gray-900 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          className={isAward
+                            ? 'w-10 flex-shrink-0 px-2 py-1.5 md:py-1 border border-gray-300 rounded bg-white uppercase text-gray-900 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed'
+                            : 'w-10 flex-shrink-0 px-2 py-1.5 md:py-1 border-0 bg-transparent uppercase text-gray-900 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed'
+                          }
                           maxLength={2}
                           disabled={!!participant.middleNameNotApplicable}
                         />
@@ -2001,22 +2100,35 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                         type="text"
                         value={participant.suffix}
                         onChange={(e) => updateParticipant(participant.id, 'suffix', e.target.value.toUpperCase())}
-                        className="w-full px-2 py-1.5 md:py-1 border-0 bg-transparent uppercase text-gray-900 text-sm"
+                        className={isAward
+                          ? 'w-full px-2 py-1.5 md:py-1 border border-gray-300 rounded bg-white uppercase text-gray-900 text-sm'
+                          : 'w-full px-2 py-1.5 md:py-1 border-0 bg-transparent uppercase text-gray-900 text-sm'
+                        }
                         maxLength={12}
                       />
                     </td>
                     <td className={`border border-gray-300 p-1.5 md:p-2 bg-blue-50 ${isAnc ? 'w-72' : 'w-56'}`}>
-                      <select
-                        value={participant.position}
-                        onChange={(e) => handlePositionChange(participant.id, e.target.value)}
-                        className="w-full px-2 py-1.5 md:py-1 border-0 bg-transparent uppercase text-gray-900 text-sm"
-                        required
-                      >
-                        <option value="">Select Position</option>
-                        {getEffectivePositions(participant.lgu || lgu).map(position => (
-                          <option key={position.name} value={position.name}>{position.name}</option>
-                        ))}
-                      </select>
+                      {isAward ? (
+                        <input
+                          type="text"
+                          value={participant.position}
+                          onChange={(e) => updateParticipant(participant.id, 'position', e.target.value.toUpperCase())}
+                          className="w-full px-2 py-1.5 md:py-1 border border-gray-300 rounded bg-white uppercase text-gray-900 text-sm"
+                          required
+                        />
+                      ) : (
+                        <select
+                          value={participant.position}
+                          onChange={(e) => handlePositionChange(participant.id, e.target.value)}
+                          className="w-full px-2 py-1.5 md:py-1 border-0 bg-transparent uppercase text-gray-900 text-sm"
+                          required
+                        >
+                          <option value="">Select Position</option>
+                          {getEffectivePositions(participant.lgu || lgu).map(position => (
+                            <option key={position.name} value={position.name}>{position.name}</option>
+                          ))}
+                        </select>
+                      )}
                     </td>
                     {isAward ? null : isAnc ? (
                       <>
@@ -2224,13 +2336,15 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                 Add New Row {participants.length >= MAX_PARTICIPANTS && `(Max ${MAX_PARTICIPANTS})`}
               </button>
             )}
-            <button
-              type="submit"
-              disabled={isSubmitting}
+            {(!isAward || showSupportStaff) && (
+              <button
+                type="submit"
+                disabled={isSubmitting}
                 className="w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-400 transition-colors touch-target text-sm sm:text-base font-semibold"
-            >
-              {isSubmitting ? 'Submitting...' : 'Submit'}
-            </button>
+              >
+                {isSubmitting ? 'Submitting...' : 'Submit'}
+              </button>
+            )}
             </div>
           </div>
 
@@ -2343,7 +2457,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                       </div>
                     )}
                     <div className="border border-gray-300 rounded p-2">
-                      <div className="text-xs font-semibold text-gray-900 mb-1">{isAward ? 'Name of Representative' : 'Contact Person'}</div>
+                      <div className="text-xs font-semibold text-gray-900 mb-1">{isAward ? 'Name of Local Chief Executive/Representative' : 'Contact Person'}</div>
                       <div className="text-xs text-gray-900">
                         {isAward
                           ? (toSentenceCase(pendingFormData.CONTACTPERSON) || 'Not provided')
@@ -2397,7 +2511,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                         </tr>
                       )}
                       <tr>
-                        <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">{isAward ? 'Name of Representative' : 'Contact Person'}</td>
+                        <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">{isAward ? 'Name of Local Chief Executive/Representative' : 'Contact Person'}</td>
                         <td className="border border-gray-300 p-2 text-gray-900">
                           {isAward
                             ? (toSentenceCase(pendingFormData.CONTACTPERSON) || 'Not provided')
@@ -2425,7 +2539,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                 {/* Participants Details */}
                 <div className="mb-4 sm:mb-6">
                   <h3 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900 mb-2 sm:mb-3">
-                    {isAward ? 'Support Staff' : 'Participants'} ({pendingFormData.DETAILCOUNT})
+                    {isAward ? 'Accompanying' : 'Participants'} ({pendingFormData.DETAILCOUNT})
                   </h3>
                   {/* Mobile Card Layout */}
                   <div className="block md:hidden space-y-3">
@@ -2437,7 +2551,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                       };
                       return (
                         <div key={index} className="border border-gray-300 rounded-lg p-3 bg-gray-50">
-                          <div className="font-bold text-xs text-gray-900 mb-2">{isAward ? 'Support Staff' : 'Participant'} #{index + 1}</div>
+                          <div className="font-bold text-xs text-gray-900 mb-2">{isAward ? 'Accompanying' : 'Participant'} #{index + 1}</div>
                           <div className="space-y-1.5 text-xs">
                             <div><span className="font-semibold text-gray-700">Name:</span> <span className="text-gray-900">{pendingFormData[`LASTNAME|${index}`] || '-'}, {pendingFormData[`FIRSTNAME|${index}`] || '-'} {pendingFormData[`MI|${index}`] || ''} {pendingFormData[`SUFFIX|${index}`] || ''}</span></div>
                             <div><span className="font-semibold text-gray-700">Position:</span> <span className="text-gray-900">{pendingFormData[`DESIGNATION|${index}`] || '-'}</span></div>

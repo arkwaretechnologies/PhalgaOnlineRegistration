@@ -440,7 +440,7 @@ export default function ViewRegistration() {
           <div className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-0 mb-4">
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-gray-800 mb-1 sm:mb-2">
-                Registration Details
+                {isAward ? 'Confirmation Details' : 'Registration Details'}
               </h1>
               <p className="text-sm sm:text-base text-gray-600">{conference?.name || '18th Mindanao Geographic Conference'}</p>
               {conference?.date_from && conference?.date_to && (() => {
@@ -569,15 +569,23 @@ export default function ViewRegistration() {
               </div>
             )}
             <div>
-              <span className="text-xs sm:text-sm font-medium text-gray-500">Contact Person</span>
+              <span className="text-xs sm:text-sm font-medium text-gray-500">
+                {isAward ? 'Name of Local Chief Executive/Representative' : 'Contact Person'}
+              </span>
               <p className="text-sm sm:text-base text-gray-800 break-words">{header.contactperson}</p>
             </div>
+            {isAward && (
+              <div>
+                <span className="text-xs sm:text-sm font-medium text-gray-500">Position</span>
+                <p className="text-sm sm:text-base text-gray-800 break-words">{(header as any).position || '-'}</p>
+              </div>
+            )}
             <div>
-              <span className="text-xs sm:text-sm font-medium text-gray-500">Contact Number</span>
+              <span className="text-xs sm:text-sm font-medium text-gray-500">{isAward ? 'Contact No.' : 'Contact Number'}</span>
               <p className="text-sm sm:text-base text-gray-800">{header.contactnum}</p>
             </div>
             <div>
-              <span className="text-xs sm:text-sm font-medium text-gray-500">Email</span>
+              <span className="text-xs sm:text-sm font-medium text-gray-500">{isAward ? 'Email Address' : 'Email'}</span>
               <p className="text-sm sm:text-base text-gray-800 break-words break-all">{header.email}</p>
             </div>
             <div>
@@ -726,7 +734,7 @@ export default function ViewRegistration() {
         {/* Participants */}
         <div className="bg-white rounded-lg shadow-lg p-4 sm:p-5 md:p-6 mb-4 sm:mb-6">
           <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">
-            {isAward ? 'Support Staff' : 'Participants'} ({displayDetails.length})
+            {isAward ? 'Accompanying' : 'Participants'} ({displayDetails.length})
           </h2>
           {/* Mobile Card Layout */}
           <div className="block sm:hidden space-y-3">

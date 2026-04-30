@@ -71,6 +71,7 @@ export async function POST(request: Request) {
 
     const confcode = conference.confcode;
     const isAnc = (conference as { is_anc?: string | null }).is_anc?.toString().trim().toUpperCase() === 'Y';
+    const isAward = (conference as { is_award?: string | null }).is_award?.toString().trim().toUpperCase() === 'Y';
     const closedConference = (conference as { closed_conference?: string | null }).closed_conference;
     if (closedConference && String(closedConference).toUpperCase().trim() === 'Y') {
       clearTimeout(timeoutId);
@@ -169,15 +170,50 @@ export async function POST(request: Request) {
 
     const province = (formData.PROVINCE || '').toString().trim().toUpperCase();
     const lgu = (formData.LGU || '').toString().trim().toUpperCase();
-    const detailcount = parseInt(String(formData.DETAILCOUNT || '0'), 10) || 0;
+    const detailcountRequested = parseInt(String(formData.DETAILCOUNT || '0'), 10) || 0;
 
     // Note: Conference and LGU/province limit checks are now done inside submit_registration_atomic RPC
     // under advisory lock to ensure accurate counts for concurrent submissions. The pre-check above
     // (conference limit) is kept as a quick filter, but the RPC is authoritative.
 
     const contactperson = (formData.CONTACTPERSON || '').toString().trim().toUpperCase();
+    const headerPosition = (formData.POSITION || '').toString().trim().toUpperCase();
     const contactnum = (formData.CONTACTNUMBER || '').toString().trim().toUpperCase();
     const email = (formData.EMAILADDRESS || '').toString().trim().toLowerCase();
+
+    // Award rule: one representative per (Province + LGU) per conference.
+    // If a matching representative already exists in regh for this confcode, block the registration.
+    if (isAward && province && lgu) {
+      const { data: existingRep, error: existingRepErr } = await withTimeout(
+        supabase
+          .from('regh')
+          .select('regid, status')
+          .eq('confcode', confcode)
+          .eq('province', province)
+          .eq('lgu', lgu)
+          .in('status', ['PENDING', 'APPROVED'])
+          .limit(1)
+          .maybeSingle(),
+        timeoutPromise
+      ) as { data: { regid?: string | null } | null; error: any };
+
+      if (existingRepErr) {
+        console.error('Failed to check award representative duplicate:', existingRepErr);
+        clearTimeout(timeoutId);
+        return NextResponse.json(
+          { error: 'Failed to check registration status' },
+          { status: 500 }
+        );
+      }
+
+      if (existingRep?.regid) {
+        clearTimeout(timeoutId);
+        return NextResponse.json(
+          { error: 'Representative is already exist.' },
+          { status: 400 }
+        );
+      }
+    }
 
     // Confcodes to check for duplicate participants: current + linked_conference (comma-separated)
     const linkedRaw = (conference as { linked_conference?: string | null }).linked_conference || '';
@@ -203,33 +239,57 @@ export async function POST(request: Request) {
 
     // Build participants array for atomic RPC (duplicate check + insert under advisory lock)
     const participants: Record<string, string | null>[] = [];
-    for (let i = 0; i < detailcount; i++) {
-      const expirydateStr = (formData[`EXPIRYDATE|${i}`] || '').toString().trim();
-      let expirydate: string | null = null;
-      if (expirydateStr) {
-        const dateObj = new Date(expirydateStr);
-        if (!isNaN(dateObj.getTime())) expirydate = dateObj.toISOString().split('T')[0];
-      }
-      const provincialleague = (formData[`PROVINCIALLEAGUE|${i}`] || '').toString().trim().toUpperCase() || null;
-      const phalgamember = (formData[`MEMBER|${i}`] || '').toString().trim().toUpperCase() === 'Y' ? 'Y' : null;
-      const participantProvince = (formData[`PROVINCE|${i}`] || province).toString().trim().toUpperCase();
+    // Award rule: support staff list is optional. If none provided, still submit a single
+    // representative row so the atomic RPC can create the registration header.
+    if (isAward && detailcountRequested === 0) {
+      const representativeName = contactperson || 'REPRESENTATIVE';
+      const representativeDesignation = headerPosition || 'REPRESENTATIVE';
       participants.push({
-        lastname: (formData[`LASTNAME|${i}`] || '').toString().trim().toUpperCase(),
-        firstname: (formData[`FIRSTNAME|${i}`] || '').toString().trim().toUpperCase(),
-        middleinit: (formData[`MI|${i}`] || '').toString().trim().toUpperCase(),
-        suffix: (formData[`SUFFIX|${i}`] || '').toString().trim().toUpperCase() || null,
-        designation: (formData[`DESIGNATION|${i}`] || '').toString().trim().toUpperCase(),
-        brgy: (formData[`BRGY|${i}`] || '').toString().trim().toUpperCase(),
-        lgu: (formData[`LGU|${i}`] || lgu).toString().trim().toUpperCase(),
-        province: participantProvince,
-        tshirtsize: (formData[`TSHIRTSIZE|${i}`] || '').toString().trim().toUpperCase(),
-        contactnum: (formData[`CONTACTNUMBER|${i}`] || '').toString().trim().toUpperCase(),
-        prcnum: (formData[`PRCNUM|${i}`] || '').toString().trim().toUpperCase(),
-        expirydate,
-        provincialleague,
-        phalgamember,
-        email: (formData[`EMAIL|${i}`] || '').toString().trim().toLowerCase()
+        lastname: representativeName,
+        firstname: 'REPRESENTATIVE',
+        middleinit: '',
+        suffix: null,
+        designation: representativeDesignation,
+        brgy: '',
+        lgu,
+        province,
+        tshirtsize: '',
+        contactnum,
+        prcnum: '',
+        expirydate: null,
+        provincialleague: null,
+        phalgamember: null,
+        email,
       });
+    } else {
+      for (let i = 0; i < detailcountRequested; i++) {
+        const expirydateStr = (formData[`EXPIRYDATE|${i}`] || '').toString().trim();
+        let expirydate: string | null = null;
+        if (expirydateStr) {
+          const dateObj = new Date(expirydateStr);
+          if (!isNaN(dateObj.getTime())) expirydate = dateObj.toISOString().split('T')[0];
+        }
+        const provincialleague = (formData[`PROVINCIALLEAGUE|${i}`] || '').toString().trim().toUpperCase() || null;
+        const phalgamember = (formData[`MEMBER|${i}`] || '').toString().trim().toUpperCase() === 'Y' ? 'Y' : null;
+        const participantProvince = (formData[`PROVINCE|${i}`] || province).toString().trim().toUpperCase();
+        participants.push({
+          lastname: (formData[`LASTNAME|${i}`] || '').toString().trim().toUpperCase(),
+          firstname: (formData[`FIRSTNAME|${i}`] || '').toString().trim().toUpperCase(),
+          middleinit: (formData[`MI|${i}`] || '').toString().trim().toUpperCase(),
+          suffix: (formData[`SUFFIX|${i}`] || '').toString().trim().toUpperCase() || null,
+          designation: (formData[`DESIGNATION|${i}`] || '').toString().trim().toUpperCase(),
+          brgy: (formData[`BRGY|${i}`] || '').toString().trim().toUpperCase(),
+          lgu: (formData[`LGU|${i}`] || lgu).toString().trim().toUpperCase(),
+          province: participantProvince,
+          tshirtsize: (formData[`TSHIRTSIZE|${i}`] || '').toString().trim().toUpperCase(),
+          contactnum: (formData[`CONTACTNUMBER|${i}`] || '').toString().trim().toUpperCase(),
+          prcnum: (formData[`PRCNUM|${i}`] || '').toString().trim().toUpperCase(),
+          expirydate,
+          provincialleague,
+          phalgamember,
+          email: (formData[`EMAIL|${i}`] || '').toString().trim().toLowerCase()
+        });
+      }
     }
 
     // ANC rule: block registration if any submitted participant matches an existing (Province + LGU) pair
@@ -314,7 +374,7 @@ export async function POST(request: Request) {
         );
       }
       return NextResponse.json(
-        { error: 'Failed to submit registration' },
+        { error: msg || 'Failed to submit registration' },
         { status: 500 }
       );
     }
@@ -327,6 +387,47 @@ export async function POST(request: Request) {
     }
 
     const regId = rpcData.regid;
+
+    // Award rule: auto-approve representative-only registrations
+    if (isAward) {
+      try {
+        const { error: statusUpdateErr } = await withTimeout(
+          supabase
+            .from('regh')
+            .update({ status: 'APPROVED REPRESENTATIVE ONLY' })
+            .eq('regid', regId)
+            .eq('confcode', confcode),
+          timeoutPromise
+        ) as { error: any };
+        if (statusUpdateErr) {
+          console.error('Failed to update regh.status for award:', statusUpdateErr);
+          // Do not fail registration if status update fails
+        }
+      } catch (e) {
+        console.error('Error updating regh.status for award:', e);
+        // Do not fail registration if status update fails
+      }
+    }
+
+    // Save award representative position to regh.position (if provided)
+    if (headerPosition) {
+      try {
+        const { error: reghUpdateErr } = await withTimeout(
+          supabase
+            .from('regh')
+            .update({ position: headerPosition })
+            .eq('regid', regId)
+            .eq('confcode', confcode),
+          timeoutPromise
+        ) as { error: any };
+        if (reghUpdateErr) {
+          console.error('Failed to update regh.position:', reghUpdateErr);
+          // Do not fail registration if position update fails
+        }
+      } catch (e) {
+        console.error('Error updating regh.position:', e);
+      }
+    }
 
     // Ensure ANC-specific fields are saved to regd even if the RPC doesn't map them yet
     // (PRC/expiry may already be handled by the RPC; we only backfill the new columns.)
@@ -384,12 +485,13 @@ export async function POST(request: Request) {
         lgu: lgu,
         contactNumber: contactnum,
         regdate: regdate,
-        participantCount: detailcount,
+        participantCount: detailcountRequested,
         viewUrl: process.env.NEXT_PUBLIC_APP_URL 
           ? `${process.env.NEXT_PUBLIC_APP_URL}/view/${regId}${confcode ? `?confcode=${encodeURIComponent(confcode)}` : ''}`
           : undefined,
         conferenceName: conference.name || undefined,
-        confcode: confcode
+        confcode: confcode,
+        isAward,
       });
 
       if (emailResult.success) {

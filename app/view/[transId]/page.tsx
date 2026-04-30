@@ -84,6 +84,7 @@ export default function ViewRegistration() {
     date_to: string | null;
     venue: string | null;
     is_anc?: string | null;
+    is_award?: string | null;
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -243,7 +244,8 @@ export default function ViewRegistration() {
             date_from: null,
             date_to: null,
             venue: null,
-            is_anc: null
+            is_anc: null,
+            is_award: null,
           });
         }
       } catch (err) {
@@ -254,7 +256,8 @@ export default function ViewRegistration() {
           date_from: null,
           date_to: null,
           venue: null,
-          is_anc: null
+          is_anc: null,
+          is_award: null,
         });
       }
     };
@@ -263,6 +266,11 @@ export default function ViewRegistration() {
   }, [header?.confcode]);
 
   const isAnc = (conference?.is_anc || '').toString().trim().toUpperCase() === 'Y';
+  const isAward = (conference?.is_award || '').toString().trim().toUpperCase() === 'Y';
+  const displayDetails = isAward
+    ? details.filter(d => (d.firstname || '').toString().trim().toUpperCase() !== 'REPRESENTATIVE')
+    : details;
+
   const maxPaymentProofUploads = details.length === 1 ? 2 : details.length;
   const uploadsLimitReached = paymentProofs.length >= maxPaymentProofUploads;
 
@@ -490,6 +498,15 @@ export default function ViewRegistration() {
                   
                   // Use template literals to ensure Tailwind classes are properly recognized
                   const baseClasses = 'inline-block px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold';
+
+                  // Award conferences should display the exact status from regh
+                  if (isAward) {
+                    return (
+                      <span className={`${baseClasses} bg-gray-100 text-gray-800`}>
+                        {statusValue}
+                      </span>
+                    );
+                  }
                   
                   if (statusValue === 'PENDING') {
                     return (
@@ -709,11 +726,11 @@ export default function ViewRegistration() {
         {/* Participants */}
         <div className="bg-white rounded-lg shadow-lg p-4 sm:p-5 md:p-6 mb-4 sm:mb-6">
           <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">
-            Participants ({details.length})
+            {isAward ? 'Support Staff' : 'Participants'} ({displayDetails.length})
           </h2>
           {/* Mobile Card Layout */}
           <div className="block sm:hidden space-y-3">
-            {details.map((detail, index) => (
+            {displayDetails.map((detail, index) => (
               <div key={detail.linenum} className="border border-gray-300 rounded-lg p-3 bg-gray-50">
                 <div className="font-bold text-xs text-gray-900 mb-2">Participant #{index + 1}</div>
                 <div className="space-y-1.5 text-xs">
@@ -730,10 +747,12 @@ export default function ViewRegistration() {
                       <div><span className="font-semibold text-gray-700">Provincial League:</span> <span className="text-gray-900">{detail.provincialleague || '-'}</span></div>
                     </>
                   )}
-                  {!isAnc && (
+                  {!isAward && !isAnc && (
                     <div><span className="font-semibold text-gray-700">Barangay:</span> <span className="text-gray-900">{detail.brgy || '-'}</span></div>
                   )}
-                  <div><span className="font-semibold text-gray-700">T-Shirt Size:</span> <span className="text-gray-900">{detail.tshirtsize || '-'}</span></div>
+                  {!isAward && (
+                    <div><span className="font-semibold text-gray-700">T-Shirt Size:</span> <span className="text-gray-900">{detail.tshirtsize || '-'}</span></div>
+                  )}
                   {isAnc && (
                     <div><span className="font-semibold text-gray-700">Member:</span> <span className="text-gray-900">{(detail.phalgamember || '').toString().trim().toUpperCase() === 'Y' ? 'Y' : 'N'}</span></div>
                   )}
@@ -760,17 +779,19 @@ export default function ViewRegistration() {
                       <th className="border border-gray-300 px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-semibold text-gray-700">Provincial League</th>
                     </>
                   )}
-                  {!isAnc && (
+                  {!isAward && !isAnc && (
                     <th className="border border-gray-300 px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-semibold text-gray-700">Barangay</th>
                   )}
-                  <th className="border border-gray-300 px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-semibold text-gray-700">T-Shirt Size</th>
+                  {!isAward && (
+                    <th className="border border-gray-300 px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-semibold text-gray-700">T-Shirt Size</th>
+                  )}
                   {isAnc && (
                     <th className="border border-gray-300 px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-semibold text-gray-700">Member</th>
                   )}
                 </tr>
               </thead>
               <tbody>
-                {details.map((detail, index) => (
+                {displayDetails.map((detail, index) => (
                   <tr key={detail.linenum} className="hover:bg-gray-50">
                     <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700">{index + 1}</td>
                     <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-800">
@@ -788,10 +809,12 @@ export default function ViewRegistration() {
                         <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700">{detail.provincialleague || '-'}</td>
                       </>
                     )}
-                    {!isAnc && (
+                    {!isAward && !isAnc && (
                       <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700">{detail.brgy || '-'}</td>
                     )}
-                    <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700">{detail.tshirtsize || '-'}</td>
+                    {!isAward && (
+                      <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700">{detail.tshirtsize || '-'}</td>
+                    )}
                     {isAnc && (
                       <td className="border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-700">{(detail.phalgamember || '').toString().trim().toUpperCase() === 'Y' ? 'Y' : 'N'}</td>
                     )}

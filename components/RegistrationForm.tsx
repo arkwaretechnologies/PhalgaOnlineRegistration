@@ -76,6 +76,9 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
   const [lgu, setLgu] = useState('');
   const [contactPerson, setContactPerson] = useState('');
   const [contactPersonError, setContactPersonError] = useState<string>('');
+  const [repPositionType, setRepPositionType] = useState<'LOCAL CHIEF EXECUTIVE' | 'OTHERS' | ''>('');
+  const [repPositionOther, setRepPositionOther] = useState('');
+  const [showSupportStaff, setShowSupportStaff] = useState(false);
   const [contactNo, setContactNo] = useState('');
   const [emailAddress, setEmailAddress] = useState('');
   const [lguOptions, setLguOptions] = useState<Array<{ name: string; psgc: string }>>([]);
@@ -121,6 +124,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
     psgc: string | null;
     is_anc?: string | null;
     include_psgc?: string | null;
+    is_award?: string | null;
   } | null>(null);
   const [provinces, setProvinces] = useState<string[]>([]); // Start with empty array - only show fetched provinces
   const [provincialLeagues, setProvincialLeagues] = useState<Array<{ acronym: string; name: string; label: string }>>([]);
@@ -128,6 +132,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
   const [venuesLoading, setVenuesLoading] = useState(true);
 
   const isAnc = (conference?.is_anc || '').toString().trim().toUpperCase() === 'Y';
+  const isAward = (conference?.is_award || '').toString().trim().toUpperCase() === 'Y';
   const hasIncludePsgc = ((conference?.include_psgc || '').toString().trim() !== '');
   const ANC_POSITION_CHOICES = [
     'MUNICIPAL ACCOUNTANT',
@@ -155,6 +160,10 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       })
       .catch(() => {});
   }, [ancLguCache, confcode]);
+
+  useEffect(() => {
+    if (isAward) setShowSupportStaff(false);
+  }, [isAward]);
 
   const getAncLguOptions = (prov: string | undefined) => {
     if (!prov) return [];
@@ -725,6 +734,9 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
     setSubmitMessage(null);
     setShowErrorModal(false);
 
+    // Award rule: support staff list is optional. If not shown, submit with 0 staff.
+    const submitParticipants = (isAward && !showSupportStaff) ? [] : participants;
+
     // Validate main contact number (must start with 09 and be exactly 11 digits)
     if (!contactNo || !validateContactNumber(contactNo)) {
       setErrorModalMessage('Contact number must start with 09 and be exactly 11 digits.');
@@ -740,8 +752,8 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
     }
 
     // Validate that all participants have all required fields filled
-    for (let i = 0; i < participants.length; i++) {
-      const p = participants[i];
+    for (let i = 0; i < submitParticipants.length; i++) {
+      const p = submitParticipants[i];
       if (!p.lastName || p.lastName.trim() === '') {
         setErrorModalMessage(`Participant ${i + 1}: Last Name is required.`);
         setShowErrorModal(true);
@@ -777,7 +789,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       }
       // Barangay validation: required if position LVL is 'BGY'
       const positionLvl = getPositionLvl(p.position);
-      if (!isAnc && positionLvl === 'BGY' && (!p.barangay || p.barangay.trim() === '')) {
+      if (!isAward && !isAnc && positionLvl === 'BGY' && (!p.barangay || p.barangay.trim() === '')) {
         setErrorModalMessage(`Participant ${i + 1}: Barangay is required for this position.`);
         setShowErrorModal(true);
         return;
@@ -787,7 +799,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
         setShowErrorModal(true);
         return;
       }
-      if (!p.tshirt || p.tshirt.trim() === '') {
+      if (!isAward && (!p.tshirt || p.tshirt.trim() === '')) {
         setErrorModalMessage(`Participant ${i + 1}: T-Shirt Size is required.`);
         setShowErrorModal(true);
         return;
@@ -856,21 +868,36 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       return;
     }
     if (!contactPerson || contactPerson.trim() === '') {
-      setErrorModalMessage('Contact Person is required.');
+      setErrorModalMessage(isAward ? 'Name of Representative is required.' : 'Contact Person is required.');
       setShowErrorModal(true);
       return;
     }
 
     // Validate that Contact Person does not contain only numbers
     if (!validateContactPerson(contactPerson)) {
-      setErrorModalMessage('Contact Person cannot contain only numbers. Please enter a name.');
+      setErrorModalMessage(isAward
+        ? 'Name of Representative cannot contain only numbers. Please enter a name.'
+        : 'Contact Person cannot contain only numbers. Please enter a name.');
       setShowErrorModal(true);
       return;
     }
 
+    if (isAward) {
+      if (!repPositionType) {
+        setErrorModalMessage('Position is required.');
+        setShowErrorModal(true);
+        return;
+      }
+      if (repPositionType === 'OTHERS' && !repPositionOther.trim()) {
+        setErrorModalMessage('Please specify the Position.');
+        setShowErrorModal(true);
+        return;
+      }
+    }
+
     // Check for duplicate participants (same info)
     const normalize = (s: string) => (s ?? '').toString().trim().toUpperCase();
-    const participantKeys = participants.map((p, index) => {
+    const participantKeys = submitParticipants.map((p, index) => {
       const effectiveLgu = p.lgu && p.lgu.trim() !== '' ? p.lgu : lgu;
       const miNorm = normalize(p.middleInit);
       const keyParts = [
@@ -912,12 +939,17 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
       LGU: (lgu ?? '').toString().trim(),
       LGU_PSGC: (selectedLguPsgc ?? '').toString().trim(),
       CONTACTPERSON: (contactPerson ?? '').toString().trim(),
+      POSITION: isAward
+        ? (repPositionType === 'OTHERS'
+          ? (repPositionOther ?? '').toString().trim()
+          : repPositionType)
+        : '',
       CONTACTNUMBER: (contactNo ?? '').toString().trim(),
       EMAILADDRESS: (emailAddress ?? '').toString().trim(),
-      DETAILCOUNT: participants.length.toString()
+      DETAILCOUNT: submitParticipants.length.toString()
     };
 
-    participants.forEach((p, index) => {
+    submitParticipants.forEach((p, index) => {
       formData[`LASTNAME|${index}`] = (p.lastName ?? '').toString().trim();
       formData[`FIRSTNAME|${index}`] = (p.firstName ?? '').toString().trim();
       formData[`MI|${index}`] = p.middleNameNotApplicable ? '' : (p.middleInit ?? '').toString().trim();
@@ -942,6 +974,17 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
     // Store form data and show confirmation
     setPendingFormData(formData);
     setShowConfirmation(true);
+  };
+
+  const toSentenceCase = (value: string) => {
+    const s = (value ?? '').toString().trim();
+    if (!s) return '';
+    return s
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
   };
 
   const handleConfirmSubmit = async () => {
@@ -1176,6 +1219,18 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
             </div>
           </div>
 
+          {isAward && (
+            <div className="mb-4 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setShowSupportStaff((v) => !v)}
+                className="w-full sm:w-auto px-6 py-3 sm:py-2.5 rounded-lg font-semibold transition-colors text-sm sm:text-base touch-target bg-indigo-600 text-white hover:bg-indigo-700"
+              >
+                {showSupportStaff ? 'Hide Support Staff Information' : 'Add Support Staff Information'}
+              </button>
+            </div>
+          )}
+
           {/* Session expired notice */}
           {sessionExpired && (
             <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm sm:text-base">
@@ -1239,7 +1294,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
               </div>
             )}
             <div className="border border-gray-300 rounded-lg p-3 bg-blue-50">
-              <label className="block font-semibold text-sm text-gray-900 mb-2">CONTACT PERSON *</label>
+              <label className="block font-semibold text-sm text-gray-900 mb-2">{isAward ? 'NAME OF REPRESENTATIVE' : 'CONTACT PERSON'} *</label>
               <input
                 type="text"
                 value={contactPerson}
@@ -1253,7 +1308,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                 onBlur={(e) => {
                   const value = e.target.value.trim();
                   if (value && !validateContactPerson(value)) {
-                    setContactPersonError('Contact Person cannot contain only numbers.');
+                    setContactPersonError(isAward ? 'Name of Representative cannot contain only numbers.' : 'Contact Person cannot contain only numbers.');
                   } else {
                     setContactPersonError('');
                   }
@@ -1267,6 +1322,36 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                 <p className="text-xs text-red-600 mt-1">{contactPersonError}</p>
               )}
             </div>
+
+            {isAward && (
+              <div className="border border-gray-300 rounded-lg p-3 bg-blue-50">
+                <label className="block font-semibold text-sm text-gray-900 mb-2">POSITION *</label>
+                <select
+                  value={repPositionType}
+                  onChange={(e) => {
+                    const v = e.target.value as any;
+                    setRepPositionType(v);
+                    if (v !== 'OTHERS') setRepPositionOther('');
+                  }}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
+                  required
+                >
+                  <option value="">Select Position</option>
+                  <option value="LOCAL CHIEF EXECUTIVE">LOCAL CHIEF EXECUTIVE</option>
+                  <option value="OTHERS">OTHERS</option>
+                </select>
+                {repPositionType === 'OTHERS' && (
+                  <input
+                    type="text"
+                    value={repPositionOther}
+                    onChange={(e) => setRepPositionOther(e.target.value)}
+                    className="mt-2 w-full px-3 py-2.5 border border-gray-300 rounded uppercase text-gray-900 bg-white text-base"
+                    placeholder="Specify Position"
+                    required
+                  />
+                )}
+              </div>
+            )}
             <div className="border border-gray-300 rounded-lg p-3 bg-blue-50">
               <label className="block font-semibold text-sm text-gray-900 mb-2">CONTACT NO. *</label>
               <input
@@ -1368,7 +1453,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                 </tr>
               )}
               <tr>
-                <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">CONTACT PERSON</td>
+                <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">{isAward ? 'NAME OF REPRESENTATIVE' : 'CONTACT PERSON'}</td>
                 <td className="border border-gray-300 p-2 bg-blue-50">
                   <input
                     type="text"
@@ -1383,7 +1468,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                     onBlur={(e) => {
                       const value = e.target.value.trim();
                       if (value && !validateContactPerson(value)) {
-                        setContactPersonError('Contact Person cannot contain only numbers.');
+                        setContactPersonError(isAward ? 'Name of Representative cannot contain only numbers.' : 'Contact Person cannot contain only numbers.');
                       } else {
                         setContactPersonError('');
                       }
@@ -1398,6 +1483,38 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                   )}
                 </td>
               </tr>
+
+              {isAward && (
+                <tr>
+                  <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">POSITION</td>
+                  <td className="border border-gray-300 p-2 bg-blue-50">
+                    <select
+                      value={repPositionType}
+                      onChange={(e) => {
+                        const v = e.target.value as any;
+                        setRepPositionType(v);
+                        if (v !== 'OTHERS') setRepPositionOther('');
+                      }}
+                      className="w-full px-2 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white"
+                      required
+                    >
+                      <option value="">Select Position</option>
+                      <option value="LOCAL CHIEF EXECUTIVE">LOCAL CHIEF EXECUTIVE</option>
+                      <option value="OTHERS">OTHERS</option>
+                    </select>
+                    {repPositionType === 'OTHERS' && (
+                      <input
+                        type="text"
+                        value={repPositionOther}
+                        onChange={(e) => setRepPositionOther(e.target.value)}
+                        className="mt-2 w-full px-2 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white"
+                        placeholder="Specify Position"
+                        required
+                      />
+                    )}
+                  </td>
+                </tr>
+              )}
               <tr>
                 <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">CONTACT NO.</td>
                 <td className="border border-gray-300 p-2 bg-blue-50">
@@ -1438,16 +1555,26 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
             </tbody>
           </table>
 
-          <p className="mb-4 text-xs sm:text-sm text-gray-600">
-            <strong>NOTE:</strong> T-shirt size is limited to XS,S, M, L, XL, XXL
-          </p>
+          {(!isAward || showSupportStaff) && (
+            <p className="mb-4 text-xs sm:text-sm text-gray-600">
+              <strong>NOTE:</strong>{' '}
+              {isAward ? 'Each staff is required to pay 2,500.' : 'T-shirt size is limited to XS,S, M, L, XL, XXL'}
+            </p>
+          )}
 
+          {(!isAward || showSupportStaff) && (
+            <>
           {/* Participants Section - Card Layout (mobile always, desktop when ANC) */}
           <div className={`${isAnc ? 'block' : 'block md:hidden'} mb-6`}>
             <div className="bg-gray-200 border border-gray-300 rounded-t-lg p-3 text-center mb-2">
-              <span className="text-base font-bold text-gray-900">LIST OF PARTICIPANTS</span>
+              <span className="text-base font-bold text-gray-900">
+                {isAward ? 'LIST OF SUPPORT STAFF' : 'LIST OF PARTICIPANTS'}
+              </span>
               <span className="block text-sm font-normal text-gray-700 mt-1">
-                (Total: {participants.length} {participants.length === 1 ? 'participant' : 'participants'})
+                (Total: {participants.length}{' '}
+                {participants.length === 1
+                  ? (isAward ? 'staff' : 'participant')
+                  : (isAward ? 'staff' : 'participants')})
               </span>
             </div>
             <div className="space-y-4">
@@ -1456,7 +1583,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                 return (
                 <div key={participant.id} className="border border-gray-300 rounded-lg p-4 bg-blue-50 space-y-3">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-bold text-sm text-gray-900">Participant #{index + 1}</span>
+                    <span className="font-bold text-sm text-gray-900">{isAward ? 'Staff' : 'Participant'} #{index + 1}</span>
                     <div className="flex gap-2">
                       <button
                         type="button"
@@ -1548,7 +1675,11 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                         ))}
                       </select>
                     </div>
-                    {isAnc ? (
+                    {isAward ? (
+                      <>
+                        {/* Award support staff: hide LGU/Barangay/T-shirt fields */}
+                      </>
+                    ) : isAnc ? (
                       <>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
@@ -1724,47 +1855,53 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                     ) : (
                       <>
                         <div className="grid grid-cols-2 gap-2">
+                          {!isAward && (
+                            <>
+                              <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">LGU *</label>
+                                <input
+                                  type="text"
+                                  value={participant.lgu || lgu}
+                                  readOnly
+                                  disabled
+                                  className="w-full h-8 px-3 py-1 border border-gray-300 rounded uppercase text-gray-700 bg-gray-100 text-sm disabled:cursor-not-allowed disabled:opacity-100"
+                                  aria-label="LGU (from header)"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">
+                                  Barangay{isBarangayEnabled(participant) ? ' *' : ''}
+                                </label>
+                                <select
+                                  value={participant.barangay}
+                                  onChange={(e) => updateParticipant(participant.id, 'barangay', e.target.value)}
+                                  className="w-full h-8 px-3 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white text-sm"
+                                  disabled={!lgu || !isBarangayEnabled(participant)}
+                                  required={isBarangayEnabled(participant)}
+                                >
+                                  <option value="">Select Barangay</option>
+                                  {barangayOptions.map(b => <option key={b} value={b}>{b}</option>)}
+                                </select>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                        {!isAward && (
                           <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">LGU *</label>
-                            <input
-                              type="text"
-                              value={participant.lgu || lgu}
-                              readOnly
-                              disabled
-                              className="w-full h-8 px-3 py-1 border border-gray-300 rounded uppercase text-gray-700 bg-gray-100 text-sm disabled:cursor-not-allowed disabled:opacity-100"
-                              aria-label="LGU (from header)"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">
-                              Barangay{isBarangayEnabled(participant) ? ' *' : ''}
-                            </label>
+                            <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">T-Shirt Size *</label>
                             <select
-                              value={participant.barangay}
-                              onChange={(e) => updateParticipant(participant.id, 'barangay', e.target.value)}
+                              value={participant.tshirt}
+                              onChange={(e) => updateParticipant(participant.id, 'tshirt', e.target.value)}
                               className="w-full h-8 px-3 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white text-sm"
-                              disabled={!lgu || !isBarangayEnabled(participant)}
-                              required={isBarangayEnabled(participant)}
+                              required
                             >
-                              <option value="">Select Barangay</option>
-                              {barangayOptions.map(b => <option key={b} value={b}>{b}</option>)}
+                              <option value="">Select Size</option>
+                              {(isAnc ? ANC_TSHIRT_SIZES : TSHIRT_SIZES).map(size => (
+                                <option key={size} value={size}>{size}</option>
+                              ))}
                             </select>
                           </div>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-[-1px]">T-Shirt Size *</label>
-                          <select
-                            value={participant.tshirt}
-                            onChange={(e) => updateParticipant(participant.id, 'tshirt', e.target.value)}
-                            className="w-full h-8 px-3 py-1 border border-gray-300 rounded uppercase text-gray-900 bg-white text-sm"
-                            required
-                          >
-                            <option value="">Select Size</option>
-                            {(isAnc ? ANC_TSHIRT_SIZES : TSHIRT_SIZES).map(size => (
-                              <option key={size} value={size}>{size}</option>
-                            ))}
-                          </select>
-                        </div>
+                        )}
                       </>
                     )}
                   </div>
@@ -1780,10 +1917,10 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
             <table className="w-full border-collapse border border-gray-300">
               <thead>
                 <tr>
-                  <th colSpan={isAnc ? 11 : 9} className="border border-gray-300 p-2 bg-gray-200 text-center">
-                    <span className="text-lg font-bold text-gray-900">LIST OF PARTICIPANTS</span>
+                  <th colSpan={isAward ? 6 : (isAnc ? 11 : 9)} className="border border-gray-300 p-2 bg-gray-200 text-center">
+                    <span className="text-lg font-bold text-gray-900">{isAward ? 'LIST OF SUPPORT STAFF' : 'LIST OF PARTICIPANTS'}</span>
                     <span className="ml-4 text-base font-normal text-gray-700">
-                      (Total: {participants.length} {participants.length === 1 ? 'participant' : 'participants'})
+                      (Total: {participants.length} {participants.length === 1 ? (isAward ? 'staff' : 'participant') : (isAward ? 'staff' : 'participants')})
                     </span>
                   </th>
                 </tr>
@@ -1793,7 +1930,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                   <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-10">M.I.</th>
                   <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-16">SUFFIX</th>
                   <th className={`border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 ${isAnc ? 'w-72' : 'w-56'}`}>POSITION</th>
-                  {isAnc ? (
+                  {isAward ? null : isAnc ? (
                     <>
                       <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[180px]">LGU</th>
                       <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[84px]">PRC NO</th>
@@ -1806,8 +1943,10 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                       <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[240px]">BARANGAY</th>
                     </>
                   )}
-                  <th className={`border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 ${isAnc ? 'w-40' : 'w-40'}`}>T-SHIRT</th>
-                  {isAnc && (
+                  {!isAward && (
+                    <th className={`border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 ${isAnc ? 'w-40' : 'w-40'}`}>T-SHIRT</th>
+                  )}
+                  {!isAward && isAnc && (
                     <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-20">MEMBER</th>
                   )}
                   <th className="border border-gray-300 p-2 bg-gray-200 text-gray-900 w-32">ACTIONS</th>
@@ -1879,7 +2018,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                         ))}
                       </select>
                     </td>
-                    {isAnc ? (
+                    {isAward ? null : isAnc ? (
                       <>
                         <td className="border border-gray-300 p-1.5 md:p-2 bg-blue-50 min-w-[180px]">
                           <select
@@ -1983,20 +2122,22 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                         </td>
                       </>
                     )}
-                    <td className={`border border-gray-300 p-1 bg-blue-50 ${isAnc ? 'w-40' : 'w-40'}`}>
-                      <select
-                        value={participant.tshirt}
-                        onChange={(e) => updateParticipant(participant.id, 'tshirt', e.target.value)}
-                        className="w-full px-1 py-0.5 border-0 bg-transparent uppercase text-gray-900"
-                        required
-                      >
-                        <option value="">Select Size</option>
-                        {(isAnc ? ANC_TSHIRT_SIZES : TSHIRT_SIZES).map(size => (
-                          <option key={size} value={size}>{size}</option>
-                        ))}
-                      </select>
-                    </td>
-                    {isAnc && (
+                    {!isAward && (
+                      <td className={`border border-gray-300 p-1 bg-blue-50 ${isAnc ? 'w-40' : 'w-40'}`}>
+                        <select
+                          value={participant.tshirt}
+                          onChange={(e) => updateParticipant(participant.id, 'tshirt', e.target.value)}
+                          className="w-full px-1 py-0.5 border-0 bg-transparent uppercase text-gray-900"
+                          required
+                        >
+                          <option value="">Select Size</option>
+                          {(isAnc ? ANC_TSHIRT_SIZES : TSHIRT_SIZES).map(size => (
+                            <option key={size} value={size}>{size}</option>
+                          ))}
+                        </select>
+                      </td>
+                    )}
+                    {!isAward && isAnc && (
                       <td className="border border-gray-300 p-1 bg-blue-50 w-32 text-center">
                         <div className="flex flex-col items-center gap-1 text-[11px] leading-tight">
                           <label className="flex items-center gap-1 select-none">
@@ -2046,6 +2187,8 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
             </table>
           </div>
           )}
+            </>
+          )}
 
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center relative mt-6">
@@ -2071,14 +2214,16 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
               <span>Back</span>
             </Link>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center flex-1 order-1 sm:order-2">
-            <button
-              type="button"
-              onClick={addParticipant}
-              disabled={participants.length >= MAX_PARTICIPANTS}
-              className="w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors touch-target text-sm sm:text-base font-semibold"
-            >
-              Add New Row {participants.length >= MAX_PARTICIPANTS && `(Max ${MAX_PARTICIPANTS})`}
-            </button>
+            {(!isAward || showSupportStaff) && (
+              <button
+                type="button"
+                onClick={addParticipant}
+                disabled={participants.length >= MAX_PARTICIPANTS}
+                className="w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors touch-target text-sm sm:text-base font-semibold"
+              >
+                Add New Row {participants.length >= MAX_PARTICIPANTS && `(Max ${MAX_PARTICIPANTS})`}
+              </button>
+            )}
             <button
               type="submit"
               disabled={isSubmitting}
@@ -2198,8 +2343,18 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                       </div>
                     )}
                     <div className="border border-gray-300 rounded p-2">
-                      <div className="text-xs font-semibold text-gray-900 mb-1">Contact Person</div>
-                      <div className="text-xs text-gray-900">{pendingFormData.CONTACTPERSON || 'Not provided'}</div>
+                      <div className="text-xs font-semibold text-gray-900 mb-1">{isAward ? 'Name of Representative' : 'Contact Person'}</div>
+                      <div className="text-xs text-gray-900">
+                        {isAward
+                          ? (toSentenceCase(pendingFormData.CONTACTPERSON) || 'Not provided')
+                          : (pendingFormData.CONTACTPERSON || 'Not provided')}
+                      </div>
+                      {isAward && (
+                        <div className="mt-1 text-[11px] text-gray-700">
+                          <span className="font-semibold">Position:</span>{' '}
+                          <span>{toSentenceCase(pendingFormData.POSITION) || 'Not provided'}</span>
+                        </div>
+                      )}
                     </div>
                     <div className="border border-gray-300 rounded p-2">
                       <div className="text-xs font-semibold text-gray-900 mb-1">Contact Number</div>
@@ -2242,9 +2397,19 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                         </tr>
                       )}
                       <tr>
-                        <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">Contact Person</td>
-                        <td className="border border-gray-300 p-2 text-gray-900">{pendingFormData.CONTACTPERSON || 'Not provided'}</td>
+                        <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">{isAward ? 'Name of Representative' : 'Contact Person'}</td>
+                        <td className="border border-gray-300 p-2 text-gray-900">
+                          {isAward
+                            ? (toSentenceCase(pendingFormData.CONTACTPERSON) || 'Not provided')
+                            : (pendingFormData.CONTACTPERSON || 'Not provided')}
+                        </td>
                       </tr>
+                      {isAward && (
+                        <tr>
+                          <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">Position</td>
+                          <td className="border border-gray-300 p-2 text-gray-900">{toSentenceCase(pendingFormData.POSITION) || 'Not provided'}</td>
+                        </tr>
+                      )}
                       <tr>
                         <td className="border border-gray-300 p-2 bg-gray-100 font-semibold text-gray-900">Contact Number</td>
                         <td className="border border-gray-300 p-2 text-gray-900">{pendingFormData.CONTACTNUMBER || 'Not provided'}</td>
@@ -2259,7 +2424,9 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
 
                 {/* Participants Details */}
                 <div className="mb-4 sm:mb-6">
-                  <h3 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900 mb-2 sm:mb-3">Participants ({pendingFormData.DETAILCOUNT})</h3>
+                  <h3 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900 mb-2 sm:mb-3">
+                    {isAward ? 'Support Staff' : 'Participants'} ({pendingFormData.DETAILCOUNT})
+                  </h3>
                   {/* Mobile Card Layout */}
                   <div className="block md:hidden space-y-3">
                     {Array.from({ length: parseInt(pendingFormData.DETAILCOUNT) }).map((_, index) => {
@@ -2270,11 +2437,11 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                       };
                       return (
                         <div key={index} className="border border-gray-300 rounded-lg p-3 bg-gray-50">
-                          <div className="font-bold text-xs text-gray-900 mb-2">Participant #{index + 1}</div>
+                          <div className="font-bold text-xs text-gray-900 mb-2">{isAward ? 'Support Staff' : 'Participant'} #{index + 1}</div>
                           <div className="space-y-1.5 text-xs">
                             <div><span className="font-semibold text-gray-700">Name:</span> <span className="text-gray-900">{pendingFormData[`LASTNAME|${index}`] || '-'}, {pendingFormData[`FIRSTNAME|${index}`] || '-'} {pendingFormData[`MI|${index}`] || ''} {pendingFormData[`SUFFIX|${index}`] || ''}</span></div>
                             <div><span className="font-semibold text-gray-700">Position:</span> <span className="text-gray-900">{pendingFormData[`DESIGNATION|${index}`] || '-'}</span></div>
-                            {!isAnc && (
+                            {!isAward && !isAnc && (
                               <div><span className="font-semibold text-gray-700">LGU:</span> <span className="text-gray-900">{pendingFormData[`LGU|${index}`] || '-'}</span></div>
                             )}
                             {isAnc && (
@@ -2288,10 +2455,12 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                                 <div><span className="font-semibold text-gray-700">Provincial League:</span> <span className="text-gray-900">{pendingFormData[`PROVINCIALLEAGUE|${index}`] || '-'}</span></div>
                               </>
                             )}
-                            {!isAnc && (
+                            {!isAward && !isAnc && (
                               <div><span className="font-semibold text-gray-700">Barangay:</span> <span className="text-gray-900">{pendingFormData[`BRGY|${index}`] || '-'}</span></div>
                             )}
-                            <div><span className="font-semibold text-gray-700">T-Shirt:</span> <span className="text-gray-900">{pendingFormData[`TSHIRTSIZE|${index}`] || '-'}</span></div>
+                            {!isAward && (
+                              <div><span className="font-semibold text-gray-700">T-Shirt:</span> <span className="text-gray-900">{pendingFormData[`TSHIRTSIZE|${index}`] || '-'}</span></div>
+                            )}
                             {isAnc && (
                               <div><span className="font-semibold text-gray-700">Member:</span> <span className="text-gray-900">{(pendingFormData[`MEMBER|${index}`] || '').toString().trim().toUpperCase() === 'Y' ? 'Y' : 'N'}</span></div>
                             )}
@@ -2311,7 +2480,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                           <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-12">M.I.</th>
                           <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-16">Suffix</th>
                           <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[200px]">Position</th>
-                          {!isAnc && (
+                          {!isAward && !isAnc && (
                             <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[260px]">LGU</th>
                           )}
                           {isAnc && (
@@ -2325,10 +2494,10 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                               <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[120px]">Provincial League</th>
                             </>
                           )}
-                          {!isAnc && (
+                          {!isAward && !isAnc && (
                             <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 min-w-[240px]">Barangay</th>
                           )}
-                          {!isAnc && (
+                          {!isAward && !isAnc && (
                             <th className="border border-gray-300 p-2 bg-gray-200 font-semibold text-gray-900 w-48">T-Shirt</th>
                           )}
                           {isAnc && (
@@ -2354,7 +2523,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                               <td className="border border-gray-300 p-2 text-gray-900 w-16">{pendingFormData[`MI|${index}`] || '-'}</td>
                               <td className="border border-gray-300 p-2 text-gray-900 w-16">{pendingFormData[`SUFFIX|${index}`] || '-'}</td>
                               <td className="border border-gray-300 p-2 text-gray-900 w-48">{pendingFormData[`DESIGNATION|${index}`] || '-'}</td>
-                              {!isAnc && (
+                              {!isAward && !isAnc && (
                                 <td className="border border-gray-300 p-2 text-gray-900 min-w-[260px]">{pendingFormData[`LGU|${index}`] || '-'}</td>
                               )}
                               {isAnc && (
@@ -2368,10 +2537,12 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                                   <td className="border border-gray-300 p-2 text-gray-900">{pendingFormData[`PROVINCIALLEAGUE|${index}`] || '-'}</td>
                                 </>
                               )}
-                              {!isAnc && (
+                              {!isAward && !isAnc && (
                                 <td className="border border-gray-300 p-2 text-gray-900 min-w-[240px]">{pendingFormData[`BRGY|${index}`] || '-'}</td>
                               )}
-                              <td className={`border border-gray-300 p-2 text-gray-900 ${isAnc ? 'w-64' : 'w-48'}`}>{pendingFormData[`TSHIRTSIZE|${index}`] || '-'}</td>
+                              {!isAward && (
+                                <td className={`border border-gray-300 p-2 text-gray-900 ${isAnc ? 'w-64' : 'w-48'}`}>{pendingFormData[`TSHIRTSIZE|${index}`] || '-'}</td>
+                              )}
                               {isAnc && (
                                 <td className="border border-gray-300 p-2 text-gray-900">{(pendingFormData[`MEMBER|${index}`] || '').toString().trim().toUpperCase() === 'Y' ? 'Y' : 'N'}</td>
                               )}

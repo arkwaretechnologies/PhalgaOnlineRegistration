@@ -25,6 +25,7 @@ interface RegistrationEmailData {
   viewUrl?: string;
   conferenceName?: string;
   confcode?: string;
+  isAward?: boolean;
 }
 
 /**
@@ -74,6 +75,7 @@ export async function sendRegistrationConfirmation(
     let dateTo: string | null = null;
     let venue: string | null = null;
     let isAnc: boolean = false;
+    let awardStatus: string | null = null;
     let contactNumbers: string[] = [];
     if (data.confcode) {
       try {
@@ -89,6 +91,19 @@ export async function sendRegistrationConfirmation(
           dateTo = conferenceData.date_to;
           venue = conferenceData.venue;
           isAnc = (conferenceData.is_anc || '').toString().trim().toUpperCase() === 'Y';
+        }
+
+        // For award registrations, display the exact status from regh
+        if (data.isAward && data.transId) {
+          const { data: reghRow, error: reghErr } = await supabase
+            .from('regh')
+            .select('status')
+            .eq('regid', data.transId)
+            .eq('confcode', data.confcode)
+            .maybeSingle();
+          if (!reghErr && reghRow?.status) {
+            awardStatus = String(reghRow.status).trim();
+          }
         }
         
         // Fetch contacts
@@ -159,6 +174,13 @@ export async function sendRegistrationConfirmation(
     const leftImageUrl = `${baseUrl}/left.png`;
     const rightImageUrl = `${baseUrl}/right.png`;
     const viewUrl = data.viewUrl || `${baseUrl}/view/${data.transId}${data.confcode ? `?confcode=${encodeURIComponent(data.confcode)}` : ''}`;
+
+    const paymentInstruction = data.isAward
+      ? 'Your registration has been successfully submitted. If you have a support staff with you, please upload proof of payment on registration details.'
+      : 'Your registration has been successfully submitted. Please upload your proof of payment within 24 hours.';
+
+    const statusText = (data.isAward ? (awardStatus || 'PENDING') : 'PENDING').toString().trim().toUpperCase();
+    const participantCountLabel = data.isAward ? 'Number of Support Staff:' : 'Number of Participants:';
     
     // // console.log('Email image URLs:', { 
     // //   leftImageUrl, 
@@ -255,7 +277,7 @@ export async function sendRegistrationConfirmation(
               </p>
               
               <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
-                Your registration has been successfully submitted. Please upload your proof of payment within 24 hours.
+                ${paymentInstruction}
               </p>
               
               <!-- Transaction ID Highlight -->
@@ -289,7 +311,7 @@ export async function sendRegistrationConfirmation(
                 </tr>
                 <tr>
                   <td style="padding: 10px; border-bottom: 1px solid #e0e0e0; color: #666666; font-size: 14px;">
-                    Number of Participants:
+                    ${participantCountLabel}
                   </td>
                   <td style="padding: 10px; border-bottom: 1px solid #e0e0e0; color: #333333; font-size: 14px; font-weight: 500;">
                     ${data.participantCount}
@@ -300,7 +322,7 @@ export async function sendRegistrationConfirmation(
                     Status:
                   </td>
                   <td style="padding: 10px; color: #f97316; font-size: 14px; font-weight: 500;">
-                    PENDING
+                    ${statusText}
                   </td>
                 </tr>
               </table>

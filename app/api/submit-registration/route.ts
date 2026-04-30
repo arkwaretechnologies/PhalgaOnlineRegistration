@@ -191,7 +191,7 @@ export async function POST(request: Request) {
           .eq('confcode', confcode)
           .eq('province', province)
           .eq('lgu', lgu)
-          .in('status', ['PENDING', 'APPROVED'])
+          .in('status', ['PENDING', 'APPROVED', 'APPROVED REPRESENTATIVE ONLY'])
           .limit(1)
           .maybeSingle(),
         timeoutPromise
@@ -209,7 +209,7 @@ export async function POST(request: Request) {
       if (existingRep?.regid) {
         clearTimeout(timeoutId);
         return NextResponse.json(
-          { error: 'Representative is already exist.' },
+          { error: `LCE/Representative is already exist on ${lgu} - ${province}` },
           { status: 400 }
         );
       }

@@ -134,12 +134,6 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
   const isAnc = (conference?.is_anc || '').toString().trim().toUpperCase() === 'Y';
   const isAward = (conference?.is_award || '').toString().trim().toUpperCase() === 'Y';
   const hasIncludePsgc = ((conference?.include_psgc || '').toString().trim() !== '');
-  const getAwardPositionOptions = (lguValue: string) => {
-    const lguU = (lguValue || '').toString().trim().toUpperCase();
-    if (lguU === 'PROVINCE') return ['PROVINCIAL GOVERNOR', 'OTHERS'] as const;
-    if (lguU.includes('CITY')) return ['CITY MAYOR', 'OTHERS'] as const;
-    return ['MUNICIPAL MAYOR', 'OTHERS'] as const;
-  };
   const ANC_POSITION_CHOICES = [
     'MUNICIPAL ACCOUNTANT',
     'CITY ACCOUNTANT',
@@ -170,15 +164,6 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
   useEffect(() => {
     if (isAward) setShowSupportStaff(false);
   }, [isAward]);
-
-  useEffect(() => {
-    if (!isAward) return;
-    const options = getAwardPositionOptions(lgu);
-    if (repPositionType && !options.includes(repPositionType as any)) {
-      setRepPositionType('');
-      setRepPositionOther('');
-    }
-  }, [isAward, lgu, repPositionType]);
 
   const getAncLguOptions = (prov: string | undefined) => {
     if (!prov) return [];
@@ -1394,9 +1379,10 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                   required
                 >
                   <option value="">Select Position</option>
-                  {getAwardPositionOptions(lgu).map(opt => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
+                  <option value="PROVINCIAL GOVERNOR">PROVINCIAL GOVERNOR</option>
+                  <option value="MUNICIPAL MAYOR">MUNICIPAL MAYOR</option>
+                  <option value="CITY MAYOR">CITY MAYOR</option>
+                  <option value="OTHERS">OTHERS</option>
                 </select>
                 {repPositionType === 'OTHERS' && (
                   <input
@@ -1557,9 +1543,10 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                       required
                     >
                       <option value="">Select Position</option>
-                      {getAwardPositionOptions(lgu).map(opt => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
+                      <option value="PROVINCIAL GOVERNOR">PROVINCIAL GOVERNOR</option>
+                      <option value="MUNICIPAL MAYOR">MUNICIPAL MAYOR</option>
+                      <option value="CITY MAYOR">CITY MAYOR</option>
+                      <option value="OTHERS">OTHERS</option>
                     </select>
                     {repPositionType === 'OTHERS' && (
                       <input
@@ -1653,8 +1640,8 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
               <span className="block text-sm font-normal text-gray-700 mt-1">
                 (Total: {participants.length}{' '}
                 {participants.length === 1
-                  ? (isAward ? 'staff' : 'participant')
-                  : (isAward ? 'staff' : 'participants')})
+                  ? (isAward ? 'accompanying' : 'participant')
+                  : (isAward ? 'accompanying' : 'participants')})
               </span>
             </div>
             <div className="space-y-4">
@@ -2010,7 +1997,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
                   <th colSpan={isAward ? 6 : (isAnc ? 11 : 9)} className="border border-gray-300 p-2 bg-gray-200 text-center">
                     <span className="text-lg font-bold text-gray-900">{isAward ? 'LIST OF ACCOMPANYING' : 'LIST OF PARTICIPANTS'}</span>
                     <span className="ml-4 text-base font-normal text-gray-700">
-                      (Total: {participants.length} {participants.length === 1 ? (isAward ? 'staff' : 'participant') : (isAward ? 'staff' : 'participants')})
+                      (Total: {participants.length} {participants.length === 1 ? (isAward ? 'accompanying' : 'participant') : (isAward ? 'staff' : 'participants')})
                     </span>
                   </th>
                 </tr>

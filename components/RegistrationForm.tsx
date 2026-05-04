@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -52,6 +52,9 @@ const TSHIRT_SIZES = ['XS','S', 'M', 'L', 'XL', 'XXL','XXXL','5XL','8XL'];
 const ANC_TSHIRT_SIZES = ['XS','S', 'M', 'L', 'XL', 'XXL'];
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+/** After this idle period with no interaction on the registration form, the 30-minute session countdown begins. Each interaction resets this idle timer. */
+const IDLE_MS_BEFORE_REGISTRATION_COUNTDOWN = 60 * 1000;
 
 function formatConferenceDateRange(dateFrom: string | null, dateTo: string | null): string {
   if (!dateFrom || !dateTo) return '';
@@ -180,6 +183,8 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
   const sessionEndTimeRef = useRef<number | null>(null);
   const notified5Ref = useRef(false);
   const hasStartedTimerRef = useRef(false);
+  const registrationFormRef = useRef<HTMLFormElement | null>(null);
+  const idleBeforeRegistrationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     // Fetch conference information (by confcode when multi-venue)
@@ -320,13 +325,51 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
     };
   }, [confcode]);
 
-  // Start 30-minute session timer only when registration is open and we've received check-registration
-  useEffect(() => {
-    if (!registrationChecked || !isRegistrationOpen || hasStartedTimerRef.current) return;
-    hasStartedTimerRef.current = true;
-    const endTime = Date.now() + 30 * 60 * 1000;
-    sessionEndTimeRef.current = endTime;
-    setSessionEndTime(endTime);
+  // Start 30-minute registration session countdown only after idle (no interaction) on this form for IDLE_MS_BEFORE_REGISTRATION_COUNTDOWN
+  useLayoutEffect(() => {
+    if (!registrationChecked || !isRegistrationOpen) return;
+
+    const formEl = registrationFormRef.current;
+    if (!formEl) return;
+
+    const clearIdleTimer = () => {
+      if (idleBeforeRegistrationTimerRef.current !== null) {
+        clearTimeout(idleBeforeRegistrationTimerRef.current);
+        idleBeforeRegistrationTimerRef.current = null;
+      }
+    };
+
+    const startRegistrationSessionCountdown = () => {
+      if (hasStartedTimerRef.current) return;
+      hasStartedTimerRef.current = true;
+      clearIdleTimer();
+      const endTime = Date.now() + 30 * 60 * 1000;
+      sessionEndTimeRef.current = endTime;
+      setSessionEndTime(endTime);
+    };
+
+    const scheduleIdleUntilCountdown = () => {
+      if (hasStartedTimerRef.current) {
+        clearIdleTimer();
+        return;
+      }
+      clearIdleTimer();
+      idleBeforeRegistrationTimerRef.current = setTimeout(startRegistrationSessionCountdown, IDLE_MS_BEFORE_REGISTRATION_COUNTDOWN);
+    };
+
+    const activityEvents = [
+      'keydown', 'pointerdown', 'touchstart', 'scroll', 'input', 'change', 'paste', 'cut', 'focusin', 'mousedown',
+    ] as const;
+
+    const onFormActivity = () => scheduleIdleUntilCountdown();
+
+    activityEvents.forEach((ev) => formEl.addEventListener(ev, onFormActivity, true));
+    scheduleIdleUntilCountdown();
+
+    return () => {
+      activityEvents.forEach((ev) => formEl.removeEventListener(ev, onFormActivity, true));
+      clearIdleTimer();
+    };
   }, [registrationChecked, isRegistrationOpen]);
 
   // Timer tick: update display, trigger 10/5 min notifications, handle expiry
@@ -1191,7 +1234,7 @@ export default function RegistrationForm({ confcode }: { confcode?: string | nul
   return (
     <div className="min-h-screen bg-gray-50 py-4 sm:py-6 md:py-8 px-3 sm:px-4">
       <div className={`${isAnc ? 'max-w-5xl' : 'max-w-screen-2xl'} mx-auto`}>
-        <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-lg p-4 sm:p-6 md:p-8">
+        <form ref={registrationFormRef} onSubmit={handleSubmit} className="bg-white rounded-lg shadow-lg p-4 sm:p-6 md:p-8">
           {/* Header with Logos */}
           {isAward ? (
             <>

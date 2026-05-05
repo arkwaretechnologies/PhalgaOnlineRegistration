@@ -49,7 +49,7 @@ const DEFAULT_PROVINCES = [
 ];
 
 const TSHIRT_SIZES = ['XS','S', 'M', 'L', 'XL', 'XXL','XXXL','5XL','8XL'];
-const ANC_TSHIRT_SIZES = ['XS','S', 'M', 'L', 'XL', 'XXL'];
+const ANC_TSHIRT_SIZES = ['XS','S', 'M', 'L', 'XL', 'XXL','XXXL','4XL','5XL'];
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
